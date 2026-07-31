@@ -725,6 +725,13 @@ const CONFIG = {
   // ---- ADMIN EMAIL: shown in the UI + used as a last-resort mailto fallback ----
   adminEmail: "lalit.rade@jaro.in",
 
+  // ---- GOOGLE API KEY: makes the dashboard ignore any active Filter on your sheets ----
+  // Without this, live data is read via a method that respects filters/hidden rows (so a Filter
+  // left on by anyone editing the sheet can silently make rows disappear from the dashboard).
+  // With a key here, every row is always fetched regardless of filters. See SETUP_GUIDE.md for
+  // the 5-minute steps to get one — paste it in place of the placeholder below.
+  googleApiKey: "AIzaSyDXFlYi-O5yuHZfzOAw5bHpBPUIYZOwGUk",
+
   // ---- GOOGLE SHEET SOURCES ----
   // sheetId is already filled in from the links you shared. You only need to paste each
   // tab's GID (Sheet > click the tab > look at the URL after "#gid="). Sheet ID stays the
@@ -861,23 +868,18 @@ const FIELD_ALIASES = [
   { canonical:"Category / Domain",     test:h => h.includes("category") || h.includes("domain") },
   { canonical:"Webpage Link",          test:h => h.includes("webpage") && h.includes("link") },
 ];
-async function loadSheet(sectionKey, expectedHeaderHints){
-  const cfg = CONFIG.sheets[sectionKey];
-  if(!cfg || !cfg.sheetId){ return null; } // no live source configured -> caller falls back to demo
-  const url = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv&gid=${cfg.gid||"0"}`;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("Sheet fetch failed: " + res.status);
-  const csvText = await res.text();
-  const parsed = Papa.parse(csvText, { skipEmptyLines:false });
-  const rows = parsed.data;
+/* Turns a raw 2D array of cell values (from either fetch method below) into the array of row
+   objects the rest of the app expects — finds the header row, aliases drifted field names, and
+   forward-fills merged cells. Shared so both fetch strategies produce identical output. */
+function parseRowsToObjects(rows, expectedHeaderHints){
   let headerIdx = -1;
   for(let i=0;i<Math.min(rows.length,15);i++){
-    const rowVals = rows[i].map(v=>(v||"").toString().toLowerCase());
+    const rowVals = (rows[i]||[]).map(v=>(v||"").toString().toLowerCase());
     const matches = expectedHeaderHints.filter(h => rowVals.some(v=>v.includes(h.toLowerCase()))).length;
     if(matches >= Math.max(2, expectedHeaderHints.length-1)){ headerIdx = i; break; }
   }
   if(headerIdx === -1) headerIdx = 0;
-  const header = rows[headerIdx].map(h=>(h||"").toString().trim());
+  const header = (rows[headerIdx]||[]).map(h=>(h||"").toString().trim());
   const out = [];
   let lastFill = {};
   for(let i=headerIdx+1;i<rows.length;i++){
@@ -906,6 +908,57 @@ async function loadSheet(sectionKey, expectedHeaderHints){
     out.push(obj);
   }
   return out;
+}
+
+/* ---- Fetch strategy A: gviz CSV export ----
+   Simple, needs no API key, but reads the *rendered view* of the sheet — meaning it silently
+   omits any rows currently hidden by an active Filter (not Filter View) or manually hidden rows.
+   Used automatically as a fallback when no Google API key is configured. */
+async function loadSheetViaGviz(cfg, expectedHeaderHints){
+  const url = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv&gid=${cfg.gid||"0"}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Sheet fetch failed: " + res.status);
+  const csvText = await res.text();
+  const rows = Papa.parse(csvText, { skipEmptyLines:false }).data;
+  return parseRowsToObjects(rows, expectedHeaderHints);
+}
+
+/* ---- Fetch strategy B: Google Sheets API v4 ----
+   Reads the underlying data model directly, so it always returns every row regardless of any
+   active Filter, Filter View, or hidden rows/columns — exactly what "ignore filters, fetch
+   everything" needs. Requires CONFIG.googleApiKey to be set (see SETUP_GUIDE.md). */
+const SHEET_TITLE_CACHE = {};
+async function resolveSheetTitle(sheetId, gid){
+  if(!SHEET_TITLE_CACHE[sheetId]){
+    const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties&key=${CONFIG.googleApiKey}`;
+    const res = await fetch(metaUrl);
+    if(!res.ok) throw new Error("Sheet metadata fetch failed: " + res.status);
+    const json = await res.json();
+    const map = {};
+    (json.sheets||[]).forEach(s=>{ map[String(s.properties.sheetId)] = s.properties.title; });
+    SHEET_TITLE_CACHE[sheetId] = map;
+  }
+  return SHEET_TITLE_CACHE[sheetId][String(gid||"0")];
+}
+async function loadSheetViaApi(cfg, expectedHeaderHints){
+  const title = await resolveSheetTitle(cfg.sheetId, cfg.gid);
+  if(!title) throw new Error(`Could not find a tab with gid ${cfg.gid} in sheet ${cfg.sheetId}`);
+  const range = encodeURIComponent(`${title}!A1:ZZ`);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${range}?key=${CONFIG.googleApiKey}&valueRenderOption=UNFORMATTED_VALUE`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Sheet values fetch failed: " + res.status);
+  const json = await res.json();
+  return parseRowsToObjects(json.values || [], expectedHeaderHints);
+}
+
+function hasApiKey(){
+  return !!(CONFIG.googleApiKey && !CONFIG.googleApiKey.startsWith("PASTE"));
+}
+async function loadSheet(sectionKey, expectedHeaderHints){
+  const cfg = CONFIG.sheets[sectionKey];
+  if(!cfg || !cfg.sheetId){ return null; } // no live source configured -> caller falls back to demo
+  if(hasApiKey()) return loadSheetViaApi(cfg, expectedHeaderHints);
+  return loadSheetViaGviz(cfg, expectedHeaderHints);
 }
 
 /* Returns {data, isLive} for a section, using live sheet if configured else demo.
