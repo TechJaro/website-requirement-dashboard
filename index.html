@@ -1352,7 +1352,13 @@ async function renderHome(){
   };
   for(const key of NAV_ORDER){
     getData(sheetKeyFor(key), hintMap[key]).then(({data,isLive})=>{
-      const n = key==="landing" ? data.length : data.length;
+      // Some sections (B2B/University/Pillar) drop rows that have neither a title nor a valid
+      // link when actually rendering cards — mirror that exact filter here so the Home stat and
+      // sidebar badge always match what you see when you open the section, not the raw row count.
+      const sec = SECTIONS[key];
+      const n = (sec.type === "flat-cards")
+        ? data.filter(row => (row[sec.titleField]||"").trim() || isValidLink(row[sec.linkField])).length
+        : data.length;
       const target = document.getElementById(`stat-${key}`);
       if(target) target.textContent = n;
       updateNavCount(key, n);
