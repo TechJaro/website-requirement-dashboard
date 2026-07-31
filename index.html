@@ -879,6 +879,7 @@ async function loadSheet(sectionKey, expectedHeaderHints){
   if(headerIdx === -1) headerIdx = 0;
   const header = rows[headerIdx].map(h=>(h||"").toString().trim());
   const out = [];
+  let lastFill = {};
   for(let i=headerIdx+1;i<rows.length;i++){
     const r = rows[i];
     if(!r || r.every(v=>!v || !v.toString().trim())) continue;
@@ -893,6 +894,14 @@ async function loadSheet(sectionKey, expectedHeaderHints){
         if(obj[canonical]) return;
         if(h && test(h.toLowerCase()) && obj[h]) obj[canonical] = obj[h];
       });
+    });
+    // Forward-fill for vertically-merged cells: Google Sheets only stores a merged cell's value
+    // in the top row of the merge, so continuation rows would otherwise come through blank here
+    // (this only ever fills in a value on a row that already has other real content — fully
+    // blank spacer rows were already skipped just above).
+    ["University/Institute","Category / Domain"].forEach(field=>{
+      if(obj[field]) lastFill[field] = obj[field];
+      else if(lastFill[field]) obj[field] = lastFill[field];
     });
     out.push(obj);
   }
