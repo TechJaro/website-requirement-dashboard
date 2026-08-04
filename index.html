@@ -1,271 +1,2684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaro Education · Web Pages Command Center</title>
+[LINE 7 TRUNCATED, orig_len=20737] <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABDgAAAQ4CAYAAADsEGyPAAAgAElEQVR4nOzdC7CedX0n8O+bQwhJQCLXchNBRbyAVW4KKpAKikKVbm1FbbXacWe0te1urbuzU2fqbKe7WrXbbjttd7dVK0rVVi3WCygBgSBysRoURAUVQbk2kQRCknOenff4qIAxvDnneZ73uXw+M2fqtJ325Pf7v5Nzvvk+/ycAAAAAAAAAAAAAAAAAAA ...TRUNCATED...
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+/* ============================================================
+   DESIGN TOKENS — Brand: Black / White / Blue #0029A6 / Yellow #FFCF24 / Red #F63D44
+   Type: Raleway (display) + Poppins (body/UI)
+   ============================================================ */
+:root{
+  --black:#000000;
+  --white:#ffffff;
+  --blue:#0029A6;
+  --blue-dark:#001A6E;
+  --blue-tint-06:rgba(0,41,166,.06);
+  --blue-tint-10:rgba(0,41,166,.10);
+  --blue-tint-18:rgba(0,41,166,.18);
+  --yellow:#FFCF24;
+  --yellow-tint:rgba(255,207,36,.16);
+  --red:#F63D44;
+  --red-tint:rgba(246,61,68,.10);
+  --ink:#0A0A0C;
+  --ink-70:rgba(10,10,12,.70);
+  --ink-50:rgba(10,10,12,.50);
+  --ink-35:rgba(10,10,12,.35);
+  --line:rgba(10,10,12,.10);
+  --line-soft:rgba(10,10,12,.06);
+  --surface:#ffffff;
+  --canvas:#F6F7FB;
+  --radius:14px;
+  --radius-sm:9px;
+  --shadow-sm:0 1px 2px rgba(0,10,60,.06), 0 1px 1px rgba(0,10,60,.04);
+  --shadow-md:0 10px 30px -12px rgba(0,20,90,.18);
+  --shadow-lg:0 24px 60px -20px rgba(0,20,90,.28);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--canvas);
+  color:var(--ink);
+  font-family:'Poppins',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  font-size:14px;
+}
+h1,h2,h3,h4,.display{
+  font-family:'Raleway',sans-serif;
+  font-optical-sizing:auto;
+  margin:0;
+  letter-spacing:-.01em;
+}
+::selection{background:var(--yellow);color:var(--black)}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(0,10,60,.18);border-radius:20px}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,10,60,.32)}
+
+.eyebrow{
+  font-family:'Raleway',sans-serif;
+  font-weight:800;
+  font-size:11px;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--blue);
+}
+
+/* ============ APP SHELL ============ */
+#app{display:grid;grid-template-columns:264px 1fr;min-height:100vh}
+
+/* ---------- SIDEBAR ---------- */
+.sidebar{
+  background:
+    radial-gradient(900px 500px at -10% -10%, rgba(0,41,166,.55), transparent 55%),
+    linear-gradient(180deg,#050506 0%,#0A0A0D 100%);
+  color:#fff;
+  display:flex;
+  flex-direction:column;
+  position:sticky;
+  top:0;
+  height:100vh;
+  overflow-y:auto;
+  border-right:1px solid rgba(255,255,255,.06);
+}
+.brand{
+  display:flex;align-items:center;gap:12px;
+  padding:26px 22px 20px;
+}
+.brand-mark{
+  width:38px;height:38px;border-radius:10px;
+  background:#fff;
+  display:flex;align-items:center;justify-content:center;
+  padding:6px;
+  box-shadow:0 6px 18px rgba(0,41,166,.35);
+  flex-shrink:0;
+}
+.brand-mark img{width:100%;height:100%;object-fit:contain}
+.brand-text .name{font-family:'Raleway',sans-serif;font-weight:800;font-size:15px;line-height:1.15}
+.brand-text .sub{font-size:10.5px;color:rgba(255,255,255,.45);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+
+.nav-scroll{flex:1;padding:8px 12px 12px}
+.nav-group-label{
+  font-family:'Raleway',sans-serif;font-weight:700;font-size:10.5px;
+  letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.32);
+  padding:16px 12px 8px;
+}
+.navitem{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 12px;border-radius:10px;margin-bottom:2px;
+  color:rgba(255,255,255,.68);
+  font-size:13.5px;font-weight:500;
+  border:1px solid transparent;
+  position:relative;
+  transition:background .15s ease, color .15s ease;
+}
+.navitem .ic{width:18px;height:18px;flex-shrink:0;opacity:.85}
+.navitem .cnt{
+  margin-left:auto;font-size:11px;font-weight:700;color:rgba(255,255,255,.4);
+  background:rgba(255,255,255,.06);padding:2px 7px;border-radius:20px;
+}
+.navitem:hover{background:rgba(255,255,255,.06);color:#fff}
+.navitem.active{
+  background:linear-gradient(90deg, rgba(0,41,166,.85), rgba(0,41,166,.35));
+  color:#fff;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.navitem.active::before{
+  content:"";position:absolute;left:-12px;top:8px;bottom:8px;width:4px;border-radius:4px;
+  background:var(--yellow);
+}
+.navitem.active .cnt{background:var(--yellow);color:var(--black)}
+
+.sidebar-foot{padding:14px 16px 22px;border-top:1px solid rgba(255,255,255,.08)}
+.raise-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+  background:linear-gradient(135deg,var(--red),#d4232a);
+  color:#fff;border:none;border-radius:11px;padding:12px 14px;
+  font-weight:600;font-size:13.5px;letter-spacing:.01em;
+  box-shadow:0 10px 24px -8px rgba(246,61,68,.55);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+.raise-btn:hover{transform:translateY(-1px);box-shadow:0 14px 30px -8px rgba(246,61,68,.65)}
+.sync-note{margin-top:12px;font-size:11px;color:rgba(255,255,255,.35);text-align:center;line-height:1.5}
+.sync-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#3ddc84;margin-right:5px}
+.sync-dot.demo{background:var(--yellow)}
+
+/* ---------- MAIN ---------- */
+.main{min-width:0}
+.topbar{
+  position:sticky;top:0;z-index:20;
+  background:rgba(246,247,251,.85);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+  padding:18px 32px;
+  display:flex;align-items:center;gap:18px;
+}
+@media(min-width:901px){ .topbar.home-mode{display:none} }
+@media(max-width:900px){ .topbar.home-mode{padding:12px 16px;border-bottom-color:transparent} }
+.topbar h1{font-size:21px;font-weight:800}
+.topbar .desc{font-size:12.5px;color:var(--ink-50);margin-top:3px;font-weight:400}
+.search-wrap{
+  margin-left:auto;display:flex;align-items:center;gap:10px;
+  background:#fff;border:1px solid var(--line);border-radius:10px;
+  padding:9px 14px;min-width:280px;box-shadow:var(--shadow-sm);
+}
+.search-wrap input{border:none;outline:none;font-size:13px;width:100%;background:transparent}
+.search-wrap svg{width:15px;height:15px;color:var(--ink-35);flex-shrink:0}
+
+.content{padding:26px 32px 80px}
+
+/* ---------- STAT CARDS (Overview) ---------- */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px}
+@media(max-width:1180px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+.stat-card{
+  background:linear-gradient(165deg,var(--glass) 0%,rgba(255,255,255,.55) 100%);
+  backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.6);border-radius:20px;padding:20px;min-height:172px;
+  display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;
+  position:relative;overflow:hidden;box-shadow:0 8px 22px -14px rgba(20,30,60,.18);
+  transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s ease,border-color .25s ease;
+}
+.stat-card::before{
+  content:"";position:absolute;top:-45%;right:-30%;width:75%;height:120%;border-radius:50%;
+  background:radial-gradient(circle,var(--fg) 0%,transparent 65%);opacity:.10;pointer-events:none;
+  transition:opacity .3s ease,transform .3s ease;
+}
+.stat-card:hover{transform:translateY(-6px);box-shadow:0 16px 34px -16px rgba(20,30,60,.28);border-color:var(--fg)}
+.stat-card:hover::before{opacity:.16;transform:scale(1.12)}
+.stat-card-top{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.stat-card .ic-badge{
+  width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(4px);box-shadow:0 4px 10px -4px rgba(20,30,60,.15);
+}
+.stat-card .ic-badge svg{width:18px;height:18px}
+.stat-card .val{font-family:'Raleway',sans-serif;font-weight:800;font-size:32px;line-height:1;color:var(--ink);position:relative;z-index:1;margin-top:16px}
+.stat-card .lbl{font-size:12.5px;color:var(--ink-50);margin-top:5px;font-weight:600;position:relative;z-index:1}
+.stat-explore-btn{
+  margin-top:16px;align-self:flex-start;display:inline-flex;align-items:center;gap:6px;
+  color:#fff;font-size:12px;font-weight:700;padding:8px 13px;border-radius:100px;
+  border:none;position:relative;z-index:1;cursor:pointer;transition:gap .2s ease,padding .2s ease,transform .2s ease;
+}
+.stat-explore-btn svg{width:12px;height:12px;transition:transform .2s ease}
+.stat-card:hover .stat-explore-btn{gap:9px;padding-right:11px}
+.stat-card:hover .stat-explore-btn svg{transform:translateX(2px)}
+
+/* ---------- HOME: WATERMARK LOGO ---------- */
+.content{position:relative}
+.home-watermark{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:560px;height:560px;
+[LINE 218 TRUNCATED, orig_len=20720]   background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABDgAAAQ4CAYAAADsEGyPAAAgAElEQVR4nOzdC7CedX0n8O+bQwhJQCLXchNBRbyAVW4KKpAKikKVbm1FbbXacWe0te1urbuzU2fqbKe7WrXbbjttd7dVK0rVVi3WCygBgSBysRoURAUVQbk2kQRCknOenff4qIAxvDnneZ73uXw+M2fqtJ325Pf7v5Nzvvk+/ycAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA ...TRUNCATED...
+  background-size:contain;background-repeat:no-repeat;background-position:bottom right;
+  opacity:.05;pointer-events:none;z-index:-1;
+}
+@media(max-width:900px){.home-watermark{width:300px;height:300px}}
+
+/* ---------- HOME: HERO BANNER ---------- */
+.hero-banner{
+  position:relative;overflow:hidden;border-radius:20px;margin-bottom:24px;
+  background:linear-gradient(120deg,var(--black) 0%,var(--blue-dark) 55%,var(--blue) 100%);
+  padding:32px 30px;color:#fff;
+}
+.hero-glow{
+  position:absolute;top:-60px;right:-60px;width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,207,36,.35),transparent 70%);pointer-events:none;
+}
+.hero-inner{position:relative;z-index:1;display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.hero-eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--yellow);margin-bottom:8px}
+.hero-title{font-family:'Raleway',sans-serif;font-weight:800;font-size:26px}
+.hero-search-wrap{
+  display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.22);border-radius:11px;padding:11px 16px;min-width:320px;
+  backdrop-filter:blur(4px);
+}
+.hero-search-wrap svg{width:15px;height:15px;color:rgba(255,255,255,.6);flex-shrink:0}
+.hero-search-wrap input{border:none;outline:none;font-size:13px;width:100%;background:transparent;color:#fff}
+.hero-search-wrap input::placeholder{color:rgba(255,255,255,.55)}
+@media(max-width:640px){.hero-inner{flex-direction:column;align-items:stretch}.hero-search-wrap{min-width:0}}
+.hero-live-pill{
+  display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.02em;
+  color:#3ddc84;background:rgba(61,220,132,.14);border:1px solid rgba(61,220,132,.35);
+  padding:7px 12px;border-radius:100px;white-space:nowrap;
+}
+.hero-live-dot{width:6px;height:6px;border-radius:50%;background:#3ddc84;box-shadow:0 0 6px #3ddc84}
+
+/* ---------- HOME: QUICK INSIGHTS ---------- */
+.insights-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.insights-grid{grid-template-columns:1fr}}
+.insight-panel{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm)}
+.insight-panel h4{font-size:13.5px;font-weight:700;margin-bottom:16px}
+.insight-loading{color:var(--ink-35);font-size:12.5px;padding:20px 0;text-align:center}
+.topuni-list{display:flex;flex-direction:column;gap:12px}
+.topuni-row{display:grid;grid-template-columns:150px 1fr 30px;align-items:center;gap:10px;cursor:pointer;border-radius:8px;padding:4px 6px;margin:-4px -6px;transition:background .15s}
+.topuni-row:hover{background:var(--blue-tint-06)}
+.topuni-row:hover .topuni-name{color:var(--blue)}
+.topuni-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topuni-bar-track{height:8px;background:var(--canvas);border-radius:6px;overflow:hidden}
+.topuni-bar-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--blue-dark));border-radius:6px}
+.topuni-count{font-size:12.5px;font-weight:700;text-align:right;color:var(--ink-50)}
+.status-bar{display:flex;height:16px;border-radius:8px;overflow:hidden;background:var(--canvas);margin-bottom:16px}
+.status-bar > div{transition:opacity .15s}
+.status-bar > div:hover{opacity:.8}
+.status-legend{display:flex;flex-wrap:wrap;gap:14px}
+.status-legend-item{font-size:12px;color:var(--ink-70);display:flex;align-items:center;gap:6px}
+.status-legend-item b{color:var(--ink)}
+.status-dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+/* ---------- SECTION HEADER ---------- */
+.section-head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:12px}
+.section-head h2{font-size:24px;font-weight:800}
+.section-head .meta{font-size:12.5px;color:var(--ink-50);margin-top:4px}
+.toolbar-only{display:flex;justify-content:flex-end;margin-bottom:10px}
+.pill{
+  display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;
+  padding:4px 10px;border-radius:20px;letter-spacing:.02em;
+}
+.pill.live{background:rgba(61,220,132,.12);color:#1b9c58}
+.pill.demo{background:var(--yellow-tint);color:#8a6800}
+.pill svg{width:11px;height:11px}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:9px;
+  font-size:13px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink);
+  box-shadow:var(--shadow-sm);transition:all .15s ease;
+}
+.btn:hover{border-color:var(--blue);color:var(--blue)}
+.btn svg{width:14px;height:14px}
+.btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn.primary:hover{background:var(--blue-dark)}
+.btn.ghost-red{color:var(--red);border-color:var(--red-tint);background:var(--red-tint)}
+.btn.ghost-red:hover{background:var(--red);color:#fff}
+
+/* ---------- FILTER BAR ---------- */
+.filterbar{
+  display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0 20px;
+  background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow-sm);
+}
+.filterbar .f-search{flex:1;min-width:200px;display:flex;align-items:center;gap:8px;background:var(--canvas);border-radius:8px;padding:8px 12px}
+.filterbar .f-search input{border:none;background:transparent;outline:none;width:100%;font-size:13px}
+.filterbar .f-search svg{width:14px;height:14px;color:var(--ink-35)}
+.filterbar select{
+  border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;font-size:12.5px;color:var(--ink-70);outline:none;
+}
+.filterbar .count-tag{font-size:12px;color:var(--ink-50);font-weight:600;margin-left:auto;white-space:nowrap}
+
+/* ---------- UNIVERSITY / GROUP CARDS ---------- */
+.uni-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.uni-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden}
+.uni-head{
+  display:flex;align-items:center;gap:14px;padding:16px 18px;cursor:pointer;user-select:none;
+}
+.uni-avatar{
+  width:42px;height:42px;border-radius:10px;background:var(--blue-tint-10);color:var(--blue);
+  display:flex;align-items:center;justify-content:center;font-family:'Raleway',sans-serif;font-weight:800;font-size:15px;flex-shrink:0;
+  overflow:hidden;
+}
+.uni-avatar img{width:100%;height:100%;object-fit:contain;background:#fff;padding:3px;box-sizing:border-box}
+.uni-title{font-family:'Raleway',sans-serif;font-weight:700;font-size:15.5px}
+.uni-sub{font-size:12px;color:var(--ink-50);margin-top:2px}
+.uni-chevron{margin-left:auto;width:18px;height:18px;color:var(--ink-35);transition:transform .2s ease;flex-shrink:0}
+.uni-card.open .uni-chevron{transform:rotate(180deg)}
+.uni-body{max-height:0;overflow:hidden;transition:max-height .28s ease}
+.uni-card.open .uni-body{max-height:6000px}
+.prog-list{padding:0 18px 16px;display:grid;gap:10px}
+.prog-row{
+  border:1px solid var(--line-soft);background:var(--canvas);border-radius:10px;padding:12px 14px;
+  display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;
+}
+.prog-name{font-weight:600;font-size:13.5px;flex:1;min-width:180px}
+.badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.02em;white-space:nowrap}
+.badge.open{background:rgba(61,220,132,.14);color:#1b9c58}
+.badge.closed{background:var(--red-tint);color:var(--red)}
+.badge.soon{background:var(--yellow-tint);color:#8a6800}
+.badge.neutral{background:var(--blue-tint-10);color:var(--blue)}
+.badge.draft{background:var(--red-tint);color:var(--red)}
+.linkrow{display:flex;flex-wrap:wrap;gap:6px;width:100%}
+.link-chip{
+  display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
+  padding:5px 10px;border-radius:7px;background:#fff;border:1px solid var(--line);color:var(--blue);
+  transition:all .12s ease;
+}
+.link-chip:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.link-chip svg{width:11px;height:11px}
+.link-chip.disabled{color:var(--ink-35);border-color:var(--line-soft);pointer-events:none;text-decoration:line-through;opacity:.6}
+.link-chip.primary-chip{background:var(--yellow-tint);border-color:#f0d98c;color:#8a6800}
+.link-chip.primary-chip:hover{background:var(--yellow);color:var(--black);border-color:var(--yellow)}
+
+/* ---------- LANDING PAGES: link-set cards ---------- */
+.link-set-card{background:var(--canvas);border:1px solid var(--line);border-radius:11px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.link-set-tag{display:inline-flex;align-self:flex-start;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--blue);background:var(--blue-tint-10);padding:3px 9px;border-radius:6px}
+.link-set-tag.stray{color:var(--ink-50);background:var(--line-soft)}
+.meta-block{border-top:1px dashed var(--line);padding-top:8px;margin-top:2px}
+.meta-title{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:2px}
+.meta-desc{font-size:11.5px;color:var(--ink-50);line-height:1.5}
+.uni-card.is-draft{border-left:3px solid var(--red)}
+.prog-row.is-draft{background:var(--red-tint);border-radius:10px;padding:10px 12px;margin:-2px 0}
+.req-status{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px}
+.req-status-open{background:var(--blue-tint-10);color:var(--blue)}
+.req-status-soon{background:var(--yellow-tint);color:#8a6800}
+.req-status-done{background:rgba(61,220,132,.14);color:#1b9c58}
+.loc-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-70);background:var(--blue-tint-06);border:1px solid var(--blue-tint-18);border-radius:20px;padding:4px 12px 4px 6px}
+.loc-chip b{font-size:9.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--blue);background:#fff;border-radius:20px;padding:2px 7px}
+
+/* ---------- FLAT TABLE ---------- */
+.table-wrap{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden}
+table{width:100%;border-collapse:collapse}
+thead th{
+  text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-50);
+  font-weight:700;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--canvas);
+}
+tbody td{padding:13px 16px;border-bottom:1px solid var(--line-soft);font-size:13px;vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--blue-tint-06)}
+td.link-cell a{color:var(--blue);font-weight:600;display:inline-flex;align-items:center;gap:5px}
+td.link-cell a:hover{text-decoration:underline}
+.cell-muted{color:var(--ink-35)}
+
+.pager{display:flex;align-items:center;gap:10px;justify-content:center;padding:16px}
+.pager button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 13px;font-size:12.5px;font-weight:600}
+.pager button:disabled{opacity:.35;cursor:not-allowed}
+.pager button:not(:disabled):hover{border-color:var(--blue);color:var(--blue)}
+.pager .pg-info{font-size:12.5px;color:var(--ink-50)}
+
+/* ---------- CARD GRID (locations / free courses / b2b / university flat) ---------- */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.simple-card{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow-sm);transition:.15s;display:flex;flex-direction:column;height:100%;position:relative}
+.simple-card:hover{border-color:var(--blue-tint-18);box-shadow:var(--shadow-md)}
+.simple-card .cat-tag{display:inline-block;align-self:flex-start;font-size:10.5px;font-weight:700;color:var(--blue);background:var(--blue-tint-10);padding:3px 9px;border-radius:6px;margin-bottom:10px}
+.simple-card h4{font-size:14.5px;font-weight:700;line-height:1.35;margin-bottom:6px;font-family:'Poppins',sans-serif}
+.simple-card p{font-size:12px;color:var(--ink-50);line-height:1.55;margin:0 0 10px}
+.simple-card .foot{display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--line-soft);margin-top:auto}
+.card-logo-corner{position:absolute;top:12px;right:12px;width:30px;height:30px;object-fit:contain;border-radius:8px;background:#fff;border:1px solid var(--line);padding:3px;box-sizing:border-box}
+
+/* ---------- EMPTY STATE ---------- */
+.empty-state{
+  text-align:center;padding:70px 30px;background:#fff;border:1.5px dashed var(--line);border-radius:var(--radius);
+}
+.empty-state .ic{width:52px;height:52px;color:var(--blue);margin:0 auto 16px;background:var(--blue-tint-10);border-radius:14px;display:flex;align-items:center;justify-content:center}
+.empty-state .ic svg{width:26px;height:26px}
+.empty-state h3{font-size:17px;font-weight:800;margin-bottom:8px}
+.empty-state p{font-size:13px;color:var(--ink-50);max-width:420px;margin:0 auto 18px;line-height:1.6}
+
+/* ---------- ADD UNIQUE PAGE FORM ---------- */
+.inline-form{background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow-sm);margin-bottom:16px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid.full{grid-template-columns:1fr}
+.field label{display:block;font-size:11.5px;font-weight:700;color:var(--ink-70);margin-bottom:6px;letter-spacing:.01em}
+.field input,.field select,.field textarea{
+  width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13px;outline:none;background:var(--canvas);
+  transition:border-color .15s ease, background .15s ease;
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--blue);background:#fff}
+.field textarea{resize:vertical;min-height:80px}
+
+/* ---------- RICH TEXT REQUEST EDITOR ---------- */
+.rte-toolbar{display:flex;align-items:center;gap:4px;background:var(--canvas);border:1px solid var(--line);border-bottom:none;border-radius:9px 9px 0 0;padding:6px 8px}
+.rte-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--ink-70)}
+.rte-btn svg{width:14px;height:14px}
+.rte-btn:hover{background:#fff;border-color:var(--line);color:var(--blue)}
+.rte-hint{font-size:10.5px;color:var(--ink-35);margin-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rte-body{
+  width:100%;min-height:150px;max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:0 0 9px 9px;
+  padding:12px;font-size:13px;line-height:1.6;background:var(--canvas);outline:none;
+}
+.rte-body:focus{border-color:var(--blue);background:#fff}
+.rte-body:empty::before{content:attr(data-placeholder);color:var(--ink-35)}
+.rte-body img{max-width:100%;border-radius:8px;margin:6px 0;display:block;border:1px solid var(--line)}
+.rte-body a{color:var(--blue);text-decoration:underline}
+
+/* ---------- CHIP PICKER (To / CC recipients) ---------- */
+.chip-picker{position:relative;border:1px solid var(--line);border-radius:9px;background:var(--canvas);padding:8px}
+.chip-picker:focus-within{border-color:var(--blue);background:#fff}
+.chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
+.chip-list:empty{margin-bottom:0}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--blue-tint-10);color:var(--blue);font-size:12px;font-weight:600;padding:4px 6px 4px 10px;border-radius:20px}
+.chip button{display:flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:rgba(0,41,166,.15);color:var(--blue);font-size:11px;line-height:1;border:none}
+.chip button:hover{background:var(--blue);color:#fff}
+.chip-picker input{width:100%;border:none;outline:none;background:transparent;font-size:13px;padding:4px 2px}
+.chip-suggest{
+  position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid var(--line);border-radius:9px;
+  box-shadow:var(--shadow-md);max-height:220px;overflow-y:auto;z-index:30;display:none;
+}
+.chip-suggest.show{display:block}
+.chip-suggest-item{padding:9px 12px;font-size:12.5px;cursor:pointer;display:flex;flex-direction:column;gap:1px}
+.chip-suggest-item:hover{background:var(--blue-tint-06)}
+.chip-suggest-item b{font-weight:600}
+.chip-suggest-item span{font-size:11px;color:var(--ink-50)}
+.chip-suggest-empty{padding:10px 12px;font-size:12px;color:var(--ink-35)}
+.field-hint{font-size:11px;color:var(--blue);margin-top:6px;font-weight:500}
+
+/* ---------- PER-ITEM "RAISE A REQUEST" MINI BUTTON ---------- */
+.raise-mini-btn{
+  display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;
+  border:1px solid var(--line);background:#fff;color:var(--ink-50);cursor:pointer;flex-shrink:0;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.raise-mini-btn:hover{background:var(--yellow);border-color:var(--yellow);color:var(--black)}
+.raise-mini-btn svg{width:12px;height:12px}
+.draft-preview-note{
+  display:inline-block;font-size:11.5px;font-weight:600;color:var(--red);
+  text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;
+  margin-top:6px;cursor:pointer;
+}
+.draft-preview-note:hover{color:#c81f26}
+.draft-preview-note:hover{background:rgba(246,61,68,.16)}
+
+/* ---------- GLOBAL SEARCH RESULTS ---------- */
+.search-hit{padding:9px 0;font-size:13px;border-bottom:1px solid var(--line-soft)}
+.search-hit:last-child{border-bottom:none}
+
+/* ---------- MODAL ---------- */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(5,5,10,.55);backdrop-filter:blur(3px);
+  display:none;align-items:flex-start;justify-content:center;z-index:100;padding:5vh 16px;overflow-y:auto;
+}
+.modal-overlay.show{display:flex}
+.modal{
+  background:#fff;border-radius:18px;max-width:560px;width:100%;box-shadow:var(--shadow-lg);
+  animation:pop .22s ease;position:relative;overflow:hidden;
+}
+.modal-body{position:relative;z-index:1}
+.modal-watermark{
+  position:absolute;right:-30px;bottom:-30px;width:220px;height:220px;
+[LINE 492 TRUNCATED, orig_len=20720]   background-image:url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABDgAAAQ4CAYAAADsEGyPAAAgAElEQVR4nOzdC7CedX0n8O+bQwhJQCLXchNBRbyAVW4KKpAKikKVbm1FbbXacWe0te1urbuzU2fqbKe7WrXbbjttd7dVK0rVVi3WCygBgSBysRoURAUVQbk2kQRCknOenff4qIAxvDnneZ73uXw+M2fqtJ325Pf7v5Nzvvk+/ycAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA ...TRUNCATED...
+  background-size:contain;background-repeat:no-repeat;background-position:bottom right;
+  opacity:.05;pointer-events:none;z-index:0;
+}
+
+@keyframes pop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.modal-head{
+  display:flex;align-items:center;gap:12px;padding:22px 24px;border-bottom:1px solid var(--line);
+  background:linear-gradient(135deg,var(--blue),#001a6e);border-radius:18px 18px 0 0;color:#fff;
+}
+.modal-head .ic{width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-head .ic svg{width:19px;height:19px}
+.modal-head h3{font-size:17px;font-weight:800}
+.modal-head p{font-size:12px;color:rgba(255,255,255,.7);margin-top:2px}
+.modal-close{margin-left:auto;background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-close:hover{background:rgba(255,255,255,.28)}
+.modal-body{padding:22px 24px}
+.modal-foot{padding:16px 24px 24px;display:flex;gap:10px;justify-content:flex-end}
+.priority-select{display:flex;gap:8px}
+.pchip{flex:1;text-align:center;padding:9px 6px;border-radius:9px;border:1.5px solid var(--line);font-size:12px;font-weight:700;color:var(--ink-50)}
+.pchip input{display:none}
+.pchip.low{border-color:rgba(61,220,132,.3)}
+.pchip.medium{border-color:rgba(255,207,36,.5)}
+.pchip.high{border-color:rgba(246,61,68,.35)}
+.pchip.urgent{border-color:var(--red)}
+input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px currentColor inset}
+.pchip.low:has(input:checked){background:rgba(61,220,132,.14);color:#1b9c58}
+.pchip.medium:has(input:checked){background:var(--yellow-tint);color:#8a6800}
+.pchip.high:has(input:checked){background:var(--red-tint);color:var(--red)}
+.pchip.urgent:has(input:checked){background:var(--red);color:#fff}
+.toast{
+  position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:14px 18px;border-radius:12px;
+  display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-lg);z-index:200;font-size:13px;font-weight:500;
+  transform:translateY(20px);opacity:0;pointer-events:none;transition:.25s ease;max-width:340px;
+}
+.toast.show{transform:none;opacity:1}
+.toast .dot{width:8px;height:8px;border-radius:50%;background:#3ddc84;flex-shrink:0}
+.toast.err .dot{background:var(--red)}
+
+.footer-note{text-align:center;font-size:11.5px;color:var(--ink-35);padding:30px 0 10px}
+
+@media(max-width:900px){
+  #app{grid-template-columns:1fr}
+  .sidebar{position:fixed;left:-280px;z-index:50;width:264px;transition:left .2s ease;box-shadow:var(--shadow-lg)}
+  .sidebar.open{left:0}
+  .menu-btn{display:flex!important}
+  .search-wrap{min-width:0}
+  .stat-grid{grid-template-columns:1fr 1fr}
+}
+.menu-btn{display:none;border:1px solid var(--line);background:#fff;border-radius:9px;width:38px;height:38px;align-items:center;justify-content:center;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+[LINE 550 TRUNCATED, orig_len=20764]       <div class="brand-mark"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABDgAAAQ4CAYAAADsEGyPAAAgAElEQVR4nOzdC7CedX0n8O+bQwhJQCLXchNBRbyAVW4KKpAKikKVbm1FbbXacWe0te1urbuzU2fqbKe7WrXbbjttd7dVK0rVVi3WCygBgSBysRoURAUVQbk2kQRCknOenff4qIAxvDnneZ73uXw+M2fqtJ325Pf7v5Nzvvk+/ycAAAAAAAAAAAAAAAAAAA ...TRUNCATED...
+      <div class="brand-text">
+        <div class="name">Jaro Education</div>
+        <div class="sub">Web Pages Command Center</div>
+      </div>
+    </div>
+    <div class="nav-scroll">
+      <div class="nav-group-label">Overview</div>
+      <div class="navitem" data-nav="home">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>
+        <span>Dashboard Home</span>
+      </div>
+      <div class="nav-group-label">Web Page Categories</div>
+      <div id="navItems"></div>
+      <div class="nav-group-label">Requests</div>
+      <div class="navitem" data-nav="requirements">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Requirements Log</span>
+      </div>
+    </div>
+    <div class="sidebar-foot">
+      <button class="raise-btn" id="openRequestBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+        Raise a Request
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="topbar" id="topbar">
+      <button class="menu-btn" id="menuBtn" aria-label="Menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <div id="topbarTitleWrap">
+        <h1 id="pageTitle">Dashboard Home</h1>
+        <div class="desc" id="pageDesc">A single source of truth for every live web page across Jaro Education</div>
+      </div>
+      <div class="search-wrap" id="globalSearchWrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="globalSearch" placeholder="Search universities, programs, links…">
+      </div>
+      <button class="btn" id="refreshDataBtn" title="Refresh this section's data from Google Sheets now" style="flex-shrink:0">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        Refresh
+      </button>
+    </div>
+    <div class="content" id="content"></div>
+    <div class="footer-note">Jaro Education · Web Pages Dashboard — data refreshes automatically from linked Google Sheets</div>
+  </main>
+</div>
+
+<!-- ============ REQUEST MODAL ============ -->
+<div class="modal-overlay" id="requestOverlay">
+  <div class="modal">
+    <div class="modal-watermark"></div>
+    <div class="modal-head">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div>
+        <h3>Raise a Request</h3>
+        <p>Tell us what needs to change — we'll get an email right away</p>
+      </div>
+      <button class="modal-close" id="closeRequestBtn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <form id="requestForm">
+      <div class="modal-body" style="display:grid;gap:14px">
+        <div class="form-grid">
+          <div class="field"><label>Your Name *</label><input type="text" id="rf_name" required placeholder="e.g. Ananya Rao"></div>
+          <div class="field"><label>Work Email *</label><input type="email" id="rf_email" required placeholder="you@jaroeducation.com"></div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Team / Department</label>
+            <input type="text" id="rf_team" placeholder="e.g. Growth Marketing">
+          </div>
+          <div class="field">
+            <label>Related Section *</label>
+            <select id="rf_section" required></select>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Send To *</label>
+            <div class="chip-picker" id="rf_to_picker">
+              <div class="chip-list" id="rf_to_chips"></div>
+              <input type="text" id="rf_to_input" placeholder="Type a name/email or pick below…" autocomplete="off">
+              <div class="chip-suggest" id="rf_to_suggest"></div>
+            </div>
+          </div>
+          <div class="field">
+            <label>CC (optional)</label>
+            <div class="chip-picker" id="rf_cc_picker">
+              <div class="chip-list" id="rf_cc_chips"></div>
+              <input type="text" id="rf_cc_input" placeholder="Type a name/email or pick below…" autocomplete="off">
+              <div class="chip-suggest" id="rf_cc_suggest"></div>
+            </div>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field" id="rf_university_wrap">
+            <label>University / Institute *</label>
+            <input type="text" id="rf_university" list="rf_university_list" placeholder="e.g. IIT Bombay">
+            <datalist id="rf_university_list"></datalist>
+          </div>
+          <div class="field" id="rf_program_wrap">
+            <label>Program Name *</label>
+            <input type="text" id="rf_program" list="rf_program_list" placeholder="e.g. Certificate Course in ...">
+            <datalist id="rf_program_list"></datalist>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label>Request Type *</label>
+            <select id="rf_type" required>
+              <option value="">Select type</option>
+              <option>New Page Request</option>
+              <option>Update Existing Page</option>
+              <option>Brochure Change</option>
+              <option>Content / Meta Change</option>
+              <option>Broken Link / Bug</option>
+              <option>Data Correction in Tracker</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Priority *</label>
+            <div class="priority-select">
+              <label class="pchip low"><input type="radio" name="rf_priority" value="Low"><span>Low</span></label>
+              <label class="pchip medium"><input type="radio" name="rf_priority" value="Medium" checked><span>Medium</span></label>
+              <label class="pchip high"><input type="radio" name="rf_priority" value="High"><span>High</span></label>
+              <label class="pchip urgent"><input type="radio" name="rf_priority" value="Urgent"><span>Urgent</span></label>
+            </div>
+          </div>
+        </div>
+        <div class="field"><label>Relevant Page / Program Link (optional)</label><input type="text" id="rf_link" placeholder="Paste an existing URL if this relates to one"></div>
+        <div class="field">
+          <label>Subject *</label>
+          <input type="text" id="rf_subject" list="rf_subject_list" required placeholder="e.g. Brochure Change – IIT Bombay – Investment Strategies Course">
+          <datalist id="rf_subject_list"></datalist>
+          <div class="field-hint" id="rf_subject_hint" style="display:none">This matches a request you raised before — it'll be sent in that same email thread.</div>
+        </div>
+        <div class="field">
+          <label>Describe your requirement *</label>
+          <div class="rte-toolbar">
+            <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/></svg></button>
+            <button type="button" class="rte-btn" data-cmd="italic" title="Italic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4h-9M14 20H5M15 4 9 20"/></svg></button>
+            <button type="button" class="rte-btn" id="rteLinkBtn" title="Insert hyperlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></svg></button>
+            <button type="button" class="rte-btn" id="rteImageBtn" title="Attach a screenshot / image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
+            <input type="file" id="rteImageInput" accept="image/*" multiple hidden>
+            <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V) — just like an email body</span>
+          </div>
+          <div class="rte-body" id="rf_desc" contenteditable="true" data-placeholder="What needs to be added, changed, or fixed? Include as much detail as possible — paste screenshots straight in…"></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn" id="cancelRequestBtn">Cancel</button>
+        <button type="submit" class="btn primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m22 2-7 20-4-9-9-4 20-7Z"/></svg>
+          Submit Request
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span class="dot"></span><span id="toastMsg">Saved</span></div>
+
+<script>
 /* ================================================================================================
-   JARO DASHBOARD — UNIFIED BACKEND (Apps Script)
+   JARO EDUCATION — WEB PAGES DASHBOARD
    ================================================================================================
-   This single project does four jobs, each independent of the others:
-     1. doPost()               — receives "Raise a Request" submissions from the dashboard, appends
-                                  them to the "Requirements Log" tab, and emails the recipients.
-     2. refreshCoreWebVitals()  — calls PageSpeed Insights for a rolling batch of pages and writes
-                                  scores into the "Core Web Vitals" tab.
-     3. refreshGa4Insights()    — pulls pageviews/engagement per URL from GA4 into "Page Traffic (GA4)".
-     4. refreshSearchConsole()  — pulls clicks/impressions/CTR/position per URL from Search Console
-                                  into "Search Performance (GSC)".
-     5. refreshPageAudit()      — fetches each page's live HTML and checks title/meta/alt-text/status,
-                                  writing results into "On-Page Audit".
-
-   The dashboard never calls this script for #2–#5 — it just reads those tabs the exact same way it
-   already reads every other tab (CONFIG.sheets + gviz/Sheets API). Only the "Raise a Request" form
-   POSTs here directly. This keeps the dashboard's client-side code unchanged for these additions.
-
-   ONE-TIME SETUP (see the accompanying procedure doc for the full walkthrough):
-     A. Create a Google Sheet with 5 tabs, named exactly as in SHEET_TABS below.
-     B. Paste this file into Extensions > Apps Script for that Sheet, and add the appsscript.json
-        manifest shown in the procedure doc (Project Settings > "Show appsscript.json").
-     C. Fill in the CONFIG block below (spreadsheet ID is auto-detected if bound to the sheet — only
-        GA4_PROPERTY_ID and GSC_SITE_URL need to be typed in).
-     D. Deploy > New deployment > Web app > Execute as "Me" > Who has access "Anyone" > Deploy.
-        Copy the resulting /exec URL into CONFIG.requestForm.webAppUrl in the dashboard file.
-     E. Triggers (clock icon, left sidebar) > Add Trigger, once each for:
-          refreshCoreWebVitals   — Time-driven, every 10 minutes
-          refreshGa4Insights     — Time-driven, day timer, once a day
-          refreshSearchConsole   — Time-driven, day timer, once a day
-          refreshPageAudit       — Time-driven, day timer, once a day
+   HOW TO GO LIVE (read this!):
+   1. Publish each Google Sheet tab: File > Share > Publish to web (or just "Anyone with link: Viewer").
+   2. Grab the Sheet ID from its URL:  https://docs.google.com/spreadsheets/d/  >>SHEET_ID<<  /edit
+   3. Grab each tab's GID from its URL:  ...edit#gid=>>GID<<   (0 is usually the first tab)
+   4. Paste both into CONFIG.sheets below for each section. Leave blank to keep showing demo data.
+   5. For the request form to auto-email you, see the "REQUEST FORM SETUP" comment further down.
    ================================================================================================ */
 
 const CONFIG = {
-  ADMIN_EMAIL: "lalit.rade@jaro.in",
+  // ---- ADMIN EMAIL: shown in the UI + used as a last-resort mailto fallback ----
+  adminEmail: "lalit.rade@jaro.in",
 
-  // Leave blank to use the sheet this script is bound to.
-  SPREADSHEET_ID: "",
+  // ---- GOOGLE API KEY: makes the dashboard ignore any active Filter on your sheets ----
+  // Without this, live data is read via a method that respects filters/hidden rows (so a Filter
+  // left on by anyone editing the sheet can silently make rows disappear from the dashboard).
+  // With a key here, every row is always fetched regardless of filters. See SETUP_GUIDE.md for
+  // the 5-minute steps to get one — paste it in place of the placeholder below.
+  googleApiKey: "AIzaSyDXFlYi-O5yuHZfzOAw5bHpBPUIYZOwGUk",
 
-  // Same key already used in the dashboard's CONFIG.googleApiKey. Make sure "PageSpeed Insights
-  // API" is enabled for it in Google Cloud Console (APIs & Services > Library).
-  PAGESPEED_API_KEY: "AIzaSyDXFlYi-O5yuHZfzOAw5bHpBPUIYZOwGUk",
+  // ---- GOOGLE SHEET SOURCES ----
+  // sheetId is already filled in from the links you shared. You only need to paste each
+  // tab's GID (Sheet > click the tab > look at the URL after "#gid="). Sheet ID stays the
+  // same for every tab inside the same spreadsheet — only the GID changes per tab.
+  sheets: {
+    // ===== From: Web Pages<>JARO =====
+    programPages:        { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "0" },
+    b2bPages:             { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "889169730" },
+    locationPages:        { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "1233923897" },
+    blogPages:            { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "349249058" },
+    universityPages:      { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "122777466" },
+    freeCoursePages:      { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "968247667" },
+    pillarPages:          { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "1492220598" },
+    uniquePages:          { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "378473248" },
+    // NOTE: "LSQ wise Product&University Name" and "Zipteams - Detailed PV programs" tabs are
+    // intentionally NOT wired in — you asked to leave those two out of this dashboard.
 
-  // GA4 property ID (numbers only, e.g. "123456789") — found in GA4 Admin > Property Settings.
-  // The Google account that deploys this script must have at least Viewer access to this property.
-  GA4_PROPERTY_ID: "",
+    // ===== From: Landing Pages Tracker =====
+    // Per your latest instruction: Landing Pages now reads from "Domain Tracker" (plain) + the
+    // "Channel (PR)" tab. "Domain Tracker with Meta data" is intentionally NOT used anymore.
+    // ⚠️ landingPages below still needs the real "Domain Tracker" tab's GID — open that tab and
+    // copy the number after #gid= in the URL, then paste it in below.
+    landingPages:         { sheetId: "1nIZ_qZmugMslTFxS2QosDYNZzjNzoYKPNxxApQsBkiA", gid: "21334152" },
+    landingPagesChannel:  { sheetId: "1nIZ_qZmugMslTFxS2QosDYNZzjNzoYKPNxxApQsBkiA", gid: "1870442308" },
 
-  // Exact Search Console property as it appears in Search Console's property switcher, e.g.
-  // "https://www.jaroeducation.com/" or "sc-domain:jaroeducation.com". Deploying account must have
-  // at least "Full user" or "Restricted user" access verified on this property.
-  GSC_SITE_URL: "",
+    // ===== Requirements Log (created by the Apps Script in step 2 of the setup guide) =====
+    requirementsLog:      { sheetId: "", gid: "" }
+  },
 
-  // How many URLs to run through PageSpeed per trigger firing (keep this low — each check takes
-  // 5-25 seconds and Apps Script kills a run after 6 minutes).
-  VITALS_BATCH_SIZE: 12,
-
-  // Source tabs to scan for page URLs (mirrors CONFIG.sheets in the dashboard file — every "*Pages"
-  // entry except requirementsLog). Add/remove rows here if the dashboard's sources change.
-  URL_SOURCE_TABS: [
-    { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "0" },          // programPages
-    { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "889169730" },  // b2bPages
-    { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "1233923897" }, // locationPages
-    { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "349249058" },  // blogPages
-    { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "122777466" },  // universityPages
-    { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "968247667" },  // freeCoursePages
-    { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "1492220598" }, // pillarPages
-    { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "378473248" },  // uniquePages
-    { sheetId: "1nIZ_qZmugMslTFxS2QosDYNZzjNzoYKPNxxApQsBkiA", gid: "21334152" },   // landingPages (Domain Tracker)
-    { sheetId: "1nIZ_qZmugMslTFxS2QosDYNZzjNzoYKPNxxApQsBkiA", gid: "1870442308" }  // landingPagesChannel
-  ]
+  // ---- REQUEST FORM SETUP (captures requests, writes them to the Requirements Log sheet, and emails you) ----
+  // Paste the Web App URL you get after deploying the attached Code.gs (see SETUP_GUIDE.md, Step 2).
+  // Until this is filled in, submitting a request falls back to opening a pre-filled email instead.
+  requestForm: {
+    webAppUrl: "" // e.g. "https://script.google.com/macros/s/AKfycb.../exec"
+  }
 };
-
-const SHEET_TABS = {
-  requirements: "Requirements Log",
-  vitals: "Core Web Vitals",
-  ga4: "Page Traffic (GA4)",
-  gsc: "Search Performance (GSC)",
-  audit: "On-Page Audit"
-};
-
-function ss_() {
-  return CONFIG.SPREADSHEET_ID ? SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
-}
-function tab_(name) {
-  const ss = ss_();
-  return ss.getSheetByName(name) || ss.insertSheet(name);
-}
 
 /* ================================================================================================
-   1. REQUEST FORM SUBMISSIONS  →  Requirements Log tab + email
+   ICONS (inline SVG, stroke style, brand-tinted per section)
    ================================================================================================ */
-function doPost(e) {
-  try {
-    const payload = JSON.parse(e.postData.contents);
-    const sheet = tab_(SHEET_TABS.requirements);
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(["Timestamp", "University", "Program", "Request Type", "Priority",
-        "Requested By", "Email", "Team", "Section", "Related Link", "Subject",
-        "Description", "To", "Cc", "Status", "Thread Key"]);
-    }
-    sheet.appendRow([
-      new Date(), payload.university || "", payload.program || "", payload.type || "",
-      payload.priority || "", payload.name || "", payload.email || "", payload.team || "",
-      payload.section || "", payload.link || "", payload.subject || "",
-      payload.descriptionText || "", (payload.to || []).join(", "), (payload.cc || []).join(", "),
-      "Open", payload.threadKey || ""
-    ]);
+const ICONS = {
+  program: `<path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/>`,
+  landing: `<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M7 13h4"/><path d="M7 16h7"/>`,
+  unique: `<path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/>`,
+  b2b: `<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/>`,
+  location: `<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>`,
+  blog: `<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/><path d="M9 7h7M9 11h7"/>`,
+  university: `<path d="m2 9 10-6 10 6-10 6-10-6Z"/><path d="M6 11.5V17c0 1.1 2.7 3 6 3s6-1.9 6-3v-5.5"/><path d="M22 9v7"/>`,
+  free: `<circle cx="12" cy="12" r="10"/><path d="m9.5 8.5 6 3.5-6 3.5v-7Z"/>`,
+  home: `<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/>`,
+  link: `<path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/>`,
+  external: `<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/>`,
+  chevron: `<path d="m6 9 6 6 6-6"/>`,
+  plus: `<path d="M12 5v14M5 12h14"/>`,
+  search: `<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>`,
+  map: `<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>`,
+  phone: `<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .7 2.9a2 2 0 0 1-.4 2.1L8.1 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.4 1.9.6 2.9.7a2 2 0 0 1 1.7 2Z"/>`,
+  clock: `<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>`,
+  bolt: `<path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/>`,
+  pillar: `<path d="M6 20V10M12 20V4M18 20v-7"/><path d="M3 20h18"/>`,
+  requirements: `<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>`,
+  image: `<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>`,
+  bold: `<path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/>`,
+  italic: `<path d="M19 4h-9M14 20H5M15 4 9 20"/>`,
+};
+function ic(name, extra=""){ return `<svg class="${extra}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||""}</svg>`; }
 
-    const recipients = (payload.to && payload.to.length) ? payload.to.join(",") : CONFIG.ADMIN_EMAIL;
-    const cc = (payload.cc || []).join(",");
-    const plainBody = `New request from ${payload.name} (${payload.email})\n\n` +
-      `University: ${payload.university}\nProgram: ${payload.program}\nSection: ${payload.section}\n` +
-      `Type: ${payload.type}\nPriority: ${payload.priority}\nRelated link: ${payload.link}\n\n` +
-      `${payload.descriptionText}`;
-    GmailApp.sendEmail(recipients, payload.subject || "New dashboard request", plainBody, {
-      cc: cc,
-      htmlBody: payload.descriptionHtml ? `<p>${plainBody.replace(/\n/g, "<br>")}</p><hr>${payload.descriptionHtml}` : undefined,
-      name: "Jaro Dashboard"
+/* ================================================================================================
+   SECTION DEFINITIONS
+   ================================================================================================ */
+const SECTIONS = {
+  program: { key:"program", label:"Program Pages", desc:"Every program page, grouped by university partner", icon:"program", type:"grouped",
+    groupField:"University/Institute", itemField:"Program Name", statusField:"Admission Status",
+    linkFields:[["Webpage Link","Live Page"],["Brochure Link","Brochure"],["Payment Link","Payment"],["Login Link","Login"],["Enrolment Link","Enrolment"]] },
+  landing: { key:"landing", label:"Landing Pages", desc:"Campaign & channel landing pages by university", icon:"landing", type:"landing-tabs" },
+  unique: { key:"unique", label:"Unique Pages", desc:"Standalone / one-off pages that don't fit other buckets", icon:"unique", type:"unique" },
+  b2b: { key:"b2b", label:"B2B Pages", desc:"Corporate & partner-branded landing pages", icon:"b2b", type:"flat-cards",
+    titleField:"Remarks", linkField:"B2B Pages Links" },
+  location: { key:"location", label:"Location Pages", desc:"Branch offices & study centres across cities", icon:"location", type:"location" },
+  blog: { key:"blog", label:"Blogs", desc:"Published blog articles across all categories", icon:"blog", type:"blog-cards" },
+  university: { key:"university", label:"University Pages", desc:"Core association / partner university pages", icon:"university", type:"flat-cards",
+    titleField:"University/Institute", linkField:"Webpage Link" },
+  free: { key:"free", label:"Free Course Pages", desc:"Free courses grouped by category", icon:"free", type:"free-courses" },
+  pillar: { key:"pillar", label:"Pillar Pages", desc:"Evergreen pillar & trending-topic pages", icon:"pillar", type:"flat-cards",
+    titleField:"Page", linkField:"Webpage Link", tagField:"Column 4", tagFallback:"Pillar Page" },
+  requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" }
+};
+const NAV_ORDER = ["program","landing","unique","b2b","location","blog","university","free","pillar"];
+
+/* ================================================================================================
+   DEMO / SEED DATA  (small real samples pulled from the uploaded trackers — replace via CONFIG.sheets)
+   ================================================================================================ */
+const DEMO = {};
+
+[LINE 836 TRUNCATED, orig_len=167969] DEMO.programPages = [{"University/Institute": "Adani", "Category / Domain": "Data Science & Business Analytics", "Type": "Certification", "Admission Status": "Closed", "Application Closure Date": "Closed", "Program Name": "Executive Programme in Business Analytics", "Webpage Link": "https://www.jaro ...TRUNCATED...
+
+[LINE 838 TRUNCATED, orig_len=2279] DEMO.b2bPages = [{"B2B Pages Links": "https://www.jaroeducation.com/b2b-bfil/", "Remarks": ""}, {"B2B Pages Links": "https://www.jaroeducation.com/b2b-digitide", "Remarks": ""}, {"B2B Pages Links": "https://www.jaroeducation.com/b2b-dtdc", "Remarks": ""}, {"B2B Pages Links": "https://www.jaroeducati ...TRUNCATED...
+
+[LINE 840 TRUNCATED, orig_len=3403] DEMO.freeCoursePages = [{"Column 4": "Finance", "Title": "Finance for All - Free Finance Certification Course", "Duration": "2-4 Hours", "Webpage Link": "https://www.jaroeducation.com/free-online-courses/finance-for-all"}, {"Column 4": "Data Science & Business Analytics", "Title": "Python for Data A ...TRUNCATED...
+
+[LINE 842 TRUNCATED, orig_len=783621] DEMO.blogPages = [{"Published Date": "2021-09-20", "Category": "HR Management", "Webpage Link": "https://www.jaroeducation.com/blog/7-steps-to-strategic-human-resource-management/", "Title": "7 Steps to Strategic Human Resource Management", "Meta Title": "7 Essential Steps for HR Certification Cours ...TRUNCATED...
+
+DEMO.universityPages = [{"University/Institute": "Amity University", "Webpage Link": "https://www.jaroeducation.com/our-associations/amity-university"}, {"University/Institute": "Chandigarh University", "Webpage Link": "https://www.jaroeducation.com/our-associations/chandigarh-university"}, {"University/Institute": "DSU", "Webpage Link": "https://www.jaroeducation.com/our-associations/dayananda-sagar-university-bengaluru"}, {"University/Institute": "DPU", "Webpage Link": "https://www.jaroeducation.com/our-associations/dr-dy-patil-vidyapeeth"}, {"University/Institute": "IITM Pravartak", "Webpage Link": "https://www.jaroeducation.com/our-associations/iitm-pravartak"}, {"University/Institute": "LIBA", "Webpage Link": "https://www.jaroeducation.com/our-associations/loyola-institute-of-business-administration"}, {"University/Institute": "MUJ", "Webpage Link": "https://www.jaroeducation.com/our-associations/manipal-university-jaipur"}, {"University/Institute": "Symbiosis", "Webpage Link": "https://www.jaroeducation.com/our-associations/symbiosis-international-university"}, {"University/Institute": "IIT Bombay", "Webpage Link": "https://www.jaroeducation.com/our-associations/iit-bombay"}];
+
+[LINE 846 TRUNCATED, orig_len=3010] DEMO.pillarPages = [{"Column 4": "Trending Programs", "Page": "Doctorate and PHD Courses", "Webpage Link": "https://www.jaroeducation.com/doctorate-and-phd-courses/"}, {"Column 4": "Trending Programs", "Page": "Online MBA Courses", "Webpage Link": "https://www.jaroeducation.com/online-mba-courses/"} ...TRUNCATED...
+
+[LINE 848 TRUNCATED, orig_len=13838] DEMO.locationPages = [{"Location": "Mumbai", "Centre Type": "Branch Office & Study Centre", "Area Name": "Chembur Head Office", "Address": "Jaro Institute of Technology Management and Research Ltd, 1101 & 1102, 11th floor, Vikas Centre, Near Golf Club, Dr. C.G. Road, Chembur (East), Mumbai – 400074. ...TRUNCATED...
+
+[LINE 850 TRUNCATED, orig_len=3003] DEMO.uniquePages = [{"Names": "Home Page", "URLs": "https://www.jaroeducation.com/"}, {"Names": "Corporate Connect", "URLs": "https://www.jaroeducation.com/corporate-partnership"}, {"Names": "Contact Us", "URLs": "https://www.jaroeducation.com/contact-us"}, {"Names": "Blog Home", "URLs": "https://ww ...TRUNCATED...
+
+[LINE 852 TRUNCATED, orig_len=117129] DEMO.landingPages = [{"University/Institute": "Amity University", "Landing Page Link": "https://landingpages.onlinembacourse.in/pages/amity/online-mba/", "Thank You Page": "https://landingpages.onlinembacourse.in/pages/amity/online-mba/thankyou", "Website Link  ( CMS )": "https://www.jaroeducation.c ...TRUNCATED...
+
+[LINE 854 TRUNCATED, orig_len=10060] DEMO.landingPagesChannel = [{"University/Institute": "Amrita Vishwa Vidyapeetham", "Program Name": "MBA(General Management", "LP Status": "", "Landing Page Link": "1: https://www.jaroeducation.com/channel/amrita-onlinemba\n2: https://amritaonline.jaroeducation.com/channel/\n3: https://amritaonline.j ...TRUNCATED...
+
+
+/* live cache + session-only additions for Unique Pages */
+const LIVE = {};
+const LIVE_CACHE_TTL_MS = 5 * 60 * 1000; // re-fetch from Google Sheets at most every 5 minutes per section
+const uniquePagesSession = [];
+
+/* ================================================================================================
+   HEADER-AWARE CSV LOADER
+   Handles sheets that have banner/legend rows above the real header (like "Program Pages").
+   ================================================================================================ */
+/* If a sheet's header text for one of these drifts (extra spaces, added legend rows shifting
+   things, minor rewording) the exact-match lookups elsewhere in the app would otherwise silently
+   go blank for every row. These fuzzy tests catch the header anyway. Order matters — first match
+   wins, and more specific tests should come first so e.g. "Program Name" doesn't grab a header
+   meant for something else that merely contains "program". */
+const FIELD_ALIASES = [
+  { canonical:"University/Institute", test:h => h.includes("university") || h.includes("institute") },
+  { canonical:"Program Name",          test:h => h.includes("program") && h.includes("name") },
+  { canonical:"Admission Status",      test:h => h.includes("admission") && h.includes("status") },
+  { canonical:"Category / Domain",     test:h => h.includes("category") || h.includes("domain") },
+  { canonical:"Webpage Link",          test:h => h.includes("webpage") && h.includes("link") },
+];
+/* Turns a raw 2D array of cell values (from either fetch method below) into the array of row
+   objects the rest of the app expects — finds the header row, aliases drifted field names, and
+   forward-fills merged cells. Shared so both fetch strategies produce identical output. */
+function parseRowsToObjects(rows, expectedHeaderHints){
+  let headerIdx = -1;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const rowVals = (rows[i]||[]).map(v=>(v||"").toString().toLowerCase());
+    const matches = expectedHeaderHints.filter(h => rowVals.some(v=>v.includes(h.toLowerCase()))).length;
+    if(matches >= Math.max(2, expectedHeaderHints.length-1)){ headerIdx = i; break; }
+  }
+  if(headerIdx === -1) headerIdx = 0;
+  const header = (rows[headerIdx]||[]).map(h=>(h||"").toString().trim());
+  const out = [];
+  let lastFill = {};
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const r = rows[i];
+    if(!r || r.every(v=>!v || !v.toString().trim())) continue;
+    const obj = {};
+    header.forEach((h,idx)=>{ if(h) obj[h] = (r[idx]||"").toString().trim(); });
+    // Safety net: if the sheet's header text for a critical field drifts slightly (extra spaces,
+    // reworded, a legend row shifting things) don't let the whole grouping silently go blank —
+    // fuzzy-alias it onto the exact field name the rest of the app expects.
+    FIELD_ALIASES.forEach(({canonical, test})=>{
+      if(obj[canonical]) return; // exact header already provided it, leave as-is
+      header.forEach((h,idx)=>{
+        if(obj[canonical]) return;
+        if(h && test(h.toLowerCase()) && obj[h]) obj[canonical] = obj[h];
+      });
     });
-
-    return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(err) })).setMimeType(ContentService.MimeType.JSON);
+    // Forward-fill for vertically-merged cells: Google Sheets only stores a merged cell's value
+    // in the top row of the merge, so continuation rows would otherwise come through blank here
+    // (this only ever fills in a value on a row that already has other real content — fully
+    // blank spacer rows were already skipped just above).
+    ["University/Institute","Category / Domain"].forEach(field=>{
+      if(obj[field]) lastFill[field] = obj[field];
+      else if(lastFill[field]) obj[field] = lastFill[field];
+    });
+    out.push(obj);
   }
+  return out;
 }
 
-/* ================================================================================================
-   Shared helper: collect every unique http(s) URL out of the configured source tabs
-   ================================================================================================ */
-function collectAllPageUrls_() {
-  const urls = new Set();
-  const urlRegex = /https?:\/\/[^\s",]+/g;
-  CONFIG.URL_SOURCE_TABS.forEach(src => {
-    try {
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${src.sheetId}/export?format=csv&gid=${src.gid}`;
-      const resp = UrlFetchApp.fetch(csvUrl, { muteHttpExceptions: true });
-      if (resp.getResponseCode() !== 200) return;
-      const text = resp.getContentText();
-      const matches = text.match(urlRegex) || [];
-      matches.forEach(m => urls.add(m.replace(/["')]+$/, "")));
-    } catch (err) { /* skip a bad tab, keep going */ }
-  });
-  return [...urls];
-}
-function writeRows_(tabName, header, rows) {
-  const sheet = tab_(tabName);
-  sheet.clearContents();
-  sheet.appendRow(header);
-  if (rows.length) sheet.getRange(2, 1, rows.length, header.length).setValues(rows);
+/* ---- Fetch strategy A: gviz CSV export ----
+   Simple, needs no API key, but reads the *rendered view* of the sheet — meaning it silently
+   omits any rows currently hidden by an active Filter (not Filter View) or manually hidden rows.
+   Used automatically as a fallback when no Google API key is configured. */
+async function loadSheetViaGviz(cfg, expectedHeaderHints){
+  const url = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv&gid=${cfg.gid||"0"}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Sheet fetch failed: " + res.status);
+  const csvText = await res.text();
+  const rows = Papa.parse(csvText, { skipEmptyLines:false }).data;
+  return parseRowsToObjects(rows, expectedHeaderHints);
 }
 
-/* ================================================================================================
-   2. CORE WEB VITALS  (rolling batch via PageSpeed Insights)
-   ================================================================================================ */
-function refreshCoreWebVitals() {
-  const props = PropertiesService.getScriptProperties();
-  const allUrls = collectAllPageUrls_();
-  if (!allUrls.length) return;
-
-  let cursor = parseInt(props.getProperty("VITALS_CURSOR") || "0", 10);
-  if (cursor >= allUrls.length) cursor = 0;
-  const batch = allUrls.slice(cursor, cursor + CONFIG.VITALS_BATCH_SIZE);
-  props.setProperty("VITALS_CURSOR", String(cursor + batch.length));
-
-  const sheet = tab_(SHEET_TABS.vitals);
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(["URL", "Performance Score", "LCP (s)", "CLS", "INP (ms)", "Last Checked"]);
+/* ---- Fetch strategy B: Google Sheets API v4 ----
+   Reads the underlying data model directly, so it always returns every row regardless of any
+   active Filter, Filter View, or hidden rows/columns — exactly what "ignore filters, fetch
+   everything" needs. Requires CONFIG.googleApiKey to be set (see SETUP_GUIDE.md). */
+const SHEET_TITLE_CACHE = {};
+async function resolveSheetTitle(sheetId, gid){
+  if(!SHEET_TITLE_CACHE[sheetId]){
+    const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties&key=${CONFIG.googleApiKey}`;
+    const res = await fetch(metaUrl);
+    if(!res.ok) throw new Error("Sheet metadata fetch failed: " + res.status);
+    const json = await res.json();
+    const map = {};
+    (json.sheets||[]).forEach(s=>{ map[String(s.properties.sheetId)] = s.properties.title; });
+    SHEET_TITLE_CACHE[sheetId] = map;
   }
-  const existing = sheet.getDataRange().getValues();
-  const rowIndexByUrl = {};
-  existing.forEach((r, i) => { if (i > 0) rowIndexByUrl[r[0]] = i + 1; });
+  return SHEET_TITLE_CACHE[sheetId][String(gid||"0")];
+}
+async function loadSheetViaApi(cfg, expectedHeaderHints){
+  const title = await resolveSheetTitle(cfg.sheetId, cfg.gid);
+  if(!title) throw new Error(`Could not find a tab with gid ${cfg.gid} in sheet ${cfg.sheetId}`);
+  const range = encodeURIComponent(`${title}!A1:ZZ`);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${range}?key=${CONFIG.googleApiKey}&valueRenderOption=UNFORMATTED_VALUE`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Sheet values fetch failed: " + res.status);
+  const json = await res.json();
+  return parseRowsToObjects(json.values || [], expectedHeaderHints);
+}
 
-  batch.forEach(url => {
-    try {
-      const api = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${CONFIG.PAGESPEED_API_KEY}&strategy=mobile&category=performance`;
-      const resp = UrlFetchApp.fetch(api, { muteHttpExceptions: true });
-      if (resp.getResponseCode() !== 200) return;
-      const json = JSON.parse(resp.getContentText());
-      const perf = json.lighthouseResult && json.lighthouseResult.categories.performance.score;
-      const audits = (json.lighthouseResult && json.lighthouseResult.audits) || {};
-      const lcp = audits["largest-contentful-paint"] ? audits["largest-contentful-paint"].numericValue / 1000 : "";
-      const cls = audits["cumulative-layout-shift"] ? audits["cumulative-layout-shift"].numericValue : "";
-      const inp = audits["interaction-to-next-paint"] ? audits["interaction-to-next-paint"].numericValue : "";
-      const row = [url, perf != null ? Math.round(perf * 100) : "", lcp, cls, inp, new Date()];
-      if (rowIndexByUrl[url]) sheet.getRange(rowIndexByUrl[url], 1, 1, row.length).setValues([row]);
-      else sheet.appendRow(row);
-    } catch (err) { /* skip this URL, continue with the rest of the batch */ }
-  });
+function hasApiKey(){
+  return !!(CONFIG.googleApiKey && !CONFIG.googleApiKey.startsWith("PASTE"));
+}
+async function loadSheet(sectionKey, expectedHeaderHints){
+  const cfg = CONFIG.sheets[sectionKey];
+  if(!cfg || !cfg.sheetId){ return null; } // no live source configured -> caller falls back to demo
+  if(hasApiKey()) return loadSheetViaApi(cfg, expectedHeaderHints);
+  return loadSheetViaGviz(cfg, expectedHeaderHints);
+}
+
+/* Returns {data, isLive} for a section, using live sheet if configured else demo.
+   Cached per-section for LIVE_CACHE_TTL_MS so repeated navigation doesn't re-hit Google Sheets on
+   every click, but data still refreshes automatically without needing a full page reload. */
+async function getData(sectionKey, hints){
+  const cached = LIVE[sectionKey];
+  if(cached && (Date.now() - cached.fetchedAt) < LIVE_CACHE_TTL_MS) return cached;
+  let data = null, isLive = false;
+  try{
+    const live = await loadSheet(sectionKey, hints);
+    if(live && live.length){ data = live; isLive = true; }
+  }catch(e){ console.warn("Live load failed for", sectionKey, e); }
+  if(!data) data = DEMO[sectionKey] || [];
+  const result = { data, isLive, fetchedAt: Date.now() };
+  LIVE[sectionKey] = result;
+  return result;
 }
 
 /* ================================================================================================
-   3. GA4 PAGE TRAFFIC  (one call covers every page)
+   HELPERS
    ================================================================================================ */
-function refreshGa4Insights() {
-  if (!CONFIG.GA4_PROPERTY_ID) return;
-  const url = `https://analyticsdata.googleapis.com/v1beta/properties/${CONFIG.GA4_PROPERTY_ID}:runReport`;
-  const body = {
-    dateRanges: [{ startDate: "28daysAgo", endDate: "today" }],
-    dimensions: [{ name: "pagePath" }],
-    metrics: [
-      { name: "screenPageViews" }, { name: "activeUsers" },
-      { name: "averageSessionDuration" }, { name: "engagementRate" }
-    ],
-    limit: 100000
-  };
-  const resp = UrlFetchApp.fetch(url, {
-    method: "post", contentType: "application/json", payload: JSON.stringify(body),
-    headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }, muteHttpExceptions: true
-  });
-  if (resp.getResponseCode() !== 200) { console.warn("GA4 fetch failed: " + resp.getContentText()); return; }
-  const json = JSON.parse(resp.getContentText());
-  const rows = (json.rows || []).map(r => [
-    r.dimensionValues[0].value,
-    Number(r.metricValues[0].value || 0),
-    Number(r.metricValues[1].value || 0),
-    Number(r.metricValues[2].value || 0),
-    Number(r.metricValues[3].value || 0)
-  ]);
-  writeRows_(SHEET_TABS.ga4, ["Page Path", "Pageviews (28d)", "Active Users (28d)", "Avg. Engagement Time (s)", "Engagement Rate"], rows);
+function esc(s){ return (s||"").toString().replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+/* Small per-item "Raise a Request" button — prefills the request modal for this exact item.
+   prefill: { university, program, section, link } — all optional. */
+function raiseBtn(prefill){
+  const p = prefill || {};
+  return `<button type="button" class="raise-mini-btn" title="Raise a request for this"
+    data-university="${esc(p.university||"")}" data-program="${esc(p.program||"")}"
+    data-section="${esc(p.section||"")}" data-link="${esc(p.link||"")}">${ic("plus")}</button>`;
+}
+/* Shown on Draft rows so the requester can ask for a preview link instead of a live one. */
+function draftNote(prefill){
+  const p = prefill || {};
+  return `<span class="draft-preview-note raise-mini-btn-trigger"
+    data-university="${esc(p.university||"")}" data-program="${esc(p.program||"")}"
+    data-section="${esc(p.section||"")}" data-link="${esc(p.link||"")}">For Preview Page Link, Raise a Request</span>`;
+}
+function isValidLink(v){ if(!v) return false; const s=v.toString().trim(); if(!s || s==="-" || /page not created/i.test(s) || /^nill?$/i.test(s)) return false; return true; }
+function firstLink(v){ if(!isValidLink(v)) return ""; const s=v.toString().trim(); const m = s.match(/https?:\/\/[^\s\n]+/); return m ? m[0] : (s.startsWith("http")? s.split(/\s|\n/)[0] : ""); }
+function initials(name){ return (name||"?").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase() || "?"; }
+/* ================================================================================================
+   UNIVERSITY / INSTITUTE LOGOS — replaces the initials avatar wherever we recognize the name.
+   Batch 1 (18 logos + Jaro J for "Any"). More to be added in later batches.
+   ================================================================================================ */
+const UNIVERSITY_LOGO_DATA = {
+[LINE 1015 TRUNCATED, orig_len=19986]   "iim_nagpur": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+d ...TRUNCATED...
+[LINE 1016 TRUNCATED, orig_len=12914]   "iim_trichy": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+d ...TRUNCATED...
+[LINE 1017 TRUNCATED, orig_len=6845]   "adani": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//A ...TRUNCATED...
+[LINE 1018 TRUNCATED, orig_len=10273]   "iim_kozhikode": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeX ...TRUNCATED...
+[LINE 1019 TRUNCATED, orig_len=11941]   "iit_delhi": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dL ...TRUNCATED...
+[LINE 1020 TRUNCATED, orig_len=7556]   "kpmg": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//AG ...TRUNCATED...
+[LINE 1021 TRUNCATED, orig_len=6716]   "mahe": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//AG ...TRUNCATED...
+[LINE 1022 TRUNCATED, orig_len=11474]   "sikkim_manipal": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADe ...TRUNCATED...
+[LINE 1023 TRUNCATED, orig_len=10731]   "weschool_mislabeled_wharton": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDm ...TRUNCATED...
+[LINE 1024 TRUNCATED, orig_len=22422]   "iit_kanpur": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+d ...TRUNCATED...
+[LINE 1025 TRUNCATED, orig_len=15201]   "amity": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//A ...TRUNCATED...
+[LINE 1026 TRUNCATED, orig_len=8534]   "amrita": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA// ...TRUNCATED...
+[LINE 1027 TRUNCATED, orig_len=24080]   "bvdu": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//AG ...TRUNCATED...
+[LINE 1028 TRUNCATED, orig_len=10610]   "cu": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//AGvb ...TRUNCATED...
+[LINE 1029 TRUNCATED, orig_len=10967]   "dpu": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//AGv ...TRUNCATED...
+[LINE 1030 TRUNCATED, orig_len=11103]   "dsu": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//AGv ...TRUNCATED...
+[LINE 1031 TRUNCATED, orig_len=15637]   "iim_a": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//A ...TRUNCATED...
+[LINE 1032 TRUNCATED, orig_len=10006]   "iim_indore": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+d ...TRUNCATED...
+[LINE 1033 TRUNCATED, orig_len=13574]   "iim_mumbai": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+d ...TRUNCATED...
+};
+[LINE 1035 TRUNCATED, orig_len=20722] const JARO_J_LOGO_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABDgAAAQ4CAYAAADsEGyPAAAgAElEQVR4nOzdC7CedX0n8O+bQwhJQCLXchNBRbyAVW4KKpAKikKVbm1FbbXacWe0te1urbuzU2fqbKe7WrXbbjttd7dVK0rVVi3WCygBgSBysRoURAUVQbk2kQRCknOenff4qIAxvDnneZ73uXw+M2fqtJ325Pf7v5Nzvvk+/ycAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA ...TRUNCATED...
+/* University/Institute logos — Batch 2 */
+const UNIVERSITY2_LOGO_DATA = {
+[LINE 1038 TRUNCATED, orig_len=14169]   "siu_symbiosis": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeX ...TRUNCATED...
+[LINE 1039 TRUNCATED, orig_len=9417]   "iim_v": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//A ...TRUNCATED...
+[LINE 1040 TRUNCATED, orig_len=9556]   "iisc": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//AG ...TRUNCATED...
+[LINE 1041 TRUNCATED, orig_len=12549]   "iit_b": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//A ...TRUNCATED...
+[LINE 1042 TRUNCATED, orig_len=12222]   "iitm_pravartak": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADe ...TRUNCATED...
+[LINE 1043 TRUNCATED, orig_len=20900]   "iit_palakkad": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh ...TRUNCATED...
+[LINE 1044 TRUNCATED, orig_len=24921]   "iit_r": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//A ...TRUNCATED...
+[LINE 1045 TRUNCATED, orig_len=15653]   "imt_ghaziabad": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeX ...TRUNCATED...
+[LINE 1046 TRUNCATED, orig_len=13188]   "liba": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//AG ...TRUNCATED...
+[LINE 1047 TRUNCATED, orig_len=6391]   "muj": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//AGv ...TRUNCATED...
+[LINE 1048 TRUNCATED, orig_len=5725]   "parul": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA//A ...TRUNCATED...
+};
+const UNIVERSITY2_LOGO_ALIASES = [
+  { key:"siu_symbiosis", aliases:["symbiosis school for online and digital learning", "symbiosis", "ssodl", "siu"] },
+  { key:"iim_v", aliases:["iim visakhapatnam"] },
+  { key:"iisc", aliases:["iisc", "indian institute of science"] },
+  { key:"iit_b", aliases:["iit bombay"] },
+  { key:"iitm_pravartak", aliases:["iitm pravartak", "iit madras pravartak", "iit madras"] },
+  { key:"iit_palakkad", aliases:["iit palakkad"] },
+  { key:"iit_r", aliases:["iit roorkee"] },
+  { key:"imt_ghaziabad", aliases:["imt ghaziabad"] },
+  { key:"liba", aliases:["liba"] },
+  { key:"muj", aliases:["manipal university jaipur", "muj"] },
+  { key:"parul", aliases:["parul university", "parul"] },
+];
+
+/* B2B Partner logos — Batch 1 */
+const PARTNER_LOGO_DATA = {
+[LINE 1066 TRUNCATED, orig_len=8188]   "hdfc": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAARIAAAAwCAYAAADdJPWqAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAABd3SURBVHhe7V0JWFRV+7/aYotlKuSXC30BrmiWWqaisgyI4laZlamZf7dcMktLv3IrlGEGxAVQTFER98RSXCrTxBWXUtTcRVkEhmFRQJTt/T/vudxx7rnbXBg+/PL+nuf3oDNnu/ee87vnvO97zjAMw9R ...TRUNCATED...
+[LINE 1067 TRUNCATED, orig_len=43308]   "aditya_birla": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALAAAACfCAYAAABZTVO9AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAH5USURBVHhe7b0HfFVV1v99bSjSSe+9d5q994pKFcFCEUGQXsU6zswzvTgzOjZUuoINRXpNSEjvJEBCEpKQntze7/f9rH0TRMTnfZ3/zP+Jz5vlZ5nLveeec+7Zv7322qtq6KM++hmT5sI3+qi ...TRUNCATED...
+[LINE 1068 TRUNCATED, orig_len=7408]   "altruist": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHgAAAB4CAYAAAA5ZDbSAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAABUrSURBVHhe7V0JlFTVmWbOTFRc2EFREFTcMDGKMeoYJyaamBgnOk5mJmdyJpmoiY7kOCaOx9HE6AD2vkHTTdNssrqgIggoyBpk6669qjea3vd9o7u6qpdvznfrVVP9upqu5b7qolLfOf+heVX13n3 ...TRUNCATED...
+[LINE 1069 TRUNCATED, orig_len=4004]   "au_bank": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFl ...TRUNCATED...
+[LINE 1070 TRUNCATED, orig_len=15828]   "bfil": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKsAAABbCAYAAAAMenUAAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAC3XSURBVHhe7V0HWFRH18YYjb33rmhMYhJNYvoXS0xiYrom9liigqJYsIJdFOwVG3ZRFFEQkCKgAiLSO4IgoCIosEvZ3t//ObPssoUWNcnH9+/7POeBnXtn7tx73zlzzplyzWCCCfUEZoYJJpjw3woTWU2 ...TRUNCATED...
+[LINE 1071 TRUNCATED, orig_len=45601]   "can_fin_homes": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAACRCAIAAAByn6I6AACFPElEQVR42ux9dZwd1fn+e87IdVl3zcY9IQmQEByCu0uxAoVCS9EKdaOlOBR3t4RgCQmQEHfZ3WzWXe9e15Fz3t8fc+/NZrOBpKXfX0kZ9sMne+/szJkz73nPK8/7vAQR4ftjPwcCAAIhI3ylo84ZyKK4sz+8vNHfHtQ6ffHRuaa/nlxFgCAARxAI3PBB/dOrujfdNnNmkYtzFCjhCJ ...TRUNCATED...
+[LINE 1072 TRUNCATED, orig_len=2789]   "digitide": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWF ...TRUNCATED...
+[LINE 1073 TRUNCATED, orig_len=12700]   "dtdc": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMwAAAAuCAYAAABkrvZ7AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAACSvSURBVHhe7V0HVFRXE16sUWM0McYeNRakK6jRqBEVu7FFY2zR2AtSpAjYEMSCDSygYgEFwa6IihVEBBELooBK7yzL0jvLfv+Zu7R9uxjzx5bonDMnQt4t77373Zn5Zu6Dh8/yWd6SFAXcR9rUWYhr2gG ...TRUNCATED...
+[LINE 1074 TRUNCATED, orig_len=8276]   "hcltech": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCADOAM4DASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAA ...TRUNCATED...
+};
+const PARTNER_LOGO_ALIASES = [
+  { key:"hdfc", aliases:["hdfc"] },
+  { key:"aditya_birla", aliases:["aditya birla"] },
+  { key:"altruist", aliases:["altruist"] },
+  { key:"au_bank", aliases:["au"] },
+  { key:"bfil", aliases:["bfil", "bharat financial inclusion"] },
+  { key:"can_fin_homes", aliases:["can fin homes", "canfin"] },
+  { key:"digitide", aliases:["digitide"] },
+  { key:"dtdc", aliases:["dtdc"] },
+  { key:"hcltech", aliases:["hcltech", "hcl tech", "hcl"] },
+];
+
+const UNIVERSITY_LOGO_ALIASES = [
+  { key:"iim_nagpur", aliases:["iim nagpur"] },
+  { key:"iim_trichy", aliases:["iim trichy", "iim tiruchirappalli"] },
+  { key:"adani", aliases:["adani"] },
+  { key:"iim_kozhikode", aliases:["iim kozhikode", "iim khozhikode"] },
+  { key:"iit_delhi", aliases:["iit delhi"] },
+  { key:"kpmg", aliases:["kpmg","kpgm"] },
+  { key:"mahe", aliases:["mahe", "manipal academy of higher education"] },
+  { key:"sikkim_manipal", aliases:["smu", "sikkim manipal"] },
+  { key:"weschool_mislabeled_wharton", aliases:["weschool", "we school", "welingkar"] },
+  { key:"iit_kanpur", aliases:["iit kanpur"] },
+  { key:"amity", aliases:["amity"] },
+  { key:"amrita", aliases:["amrita"] },
+  { key:"bvdu", aliases:["bharati vidyapeeth", "bvdu"] },
+  { key:"cu", aliases:["chandigarh university", "chandigarh"] },
+  { key:"dpu", aliases:["d y patil", "dy patil", "dpu"] },
+  { key:"dsu", aliases:["dayananda sagar", "dsu"] },
+  { key:"iim_a", aliases:["iim ahmedabad", "iima"] },
+  { key:"iim_indore", aliases:["iim indore"] },
+  { key:"iim_mumbai", aliases:["iim mumbai"] },
+];
+
+function normUniName(s){ return (s||"").toLowerCase().replace(/[-_]+/g," ").replace(/[^a-z0-9 ]/g,"").replace(/\s+/g," ").trim(); }
+/* Word-boundary phrase match — plain substring matching would let "dpu" falsely match inside
+   "jamshedpur", so we compare whole words instead of raw character substrings. */
+function containsPhrase(nameWords, aliasWords){
+  if(aliasWords.length > nameWords.length) return false;
+  for(let i=0;i<=nameWords.length-aliasWords.length;i++){
+    let ok = true;
+    for(let j=0;j<aliasWords.length;j++){ if(nameWords[i+j] !== aliasWords[j]){ ok=false; break; } }
+    if(ok) return true;
+  }
+  return false;
+}
+/* University/Institute logos — Batch 3 */
+const UNIVERSITY3_LOGO_DATA = {
+[LINE 1124 TRUNCATED, orig_len=7916]   "iit_guwahati": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKOmlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYU3cXPvfe7MFKiICMsJdsgQAiI+whU5aoxCRAGCGGBNwDERWsKCqyFEWqAhasliF1IoqDgqjgtiBFRK3FKi4cfaLP09o+/b6vX98/7n2f8zvn3t9533MAaAEhInEWqgKQKZZJI/292XHxCWxiD6BABgLYAfD42ZLQKL9oAIBAXy4 ...TRUNCATED...
+[LINE 1125 TRUNCATED, orig_len=11652]   "imperial": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAABrCAYAAABJ9A8SAAAhy0lEQVR42u1deZQdVZn/3ar3+r3udGdPSEIgYUcWGTSQEQgkrCYEBTQZNxBkG2dGlBkJywzTHRAHYVBkRHFEQUCBjlFASYgBEgiySVwgkAUIYclOlk53v7Wqvvmjftd3u6h67/USB8+5v3Pe6e5Xt27d+91v/+6tBiwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCwsLCw ...TRUNCATED...
+[LINE 1126 TRUNCATED, orig_len=15489]   "nhsre": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAE22lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSfvu78nIGlkPSdXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQnPz4KPHg6eG1wbWV0YSB4bWxuczp4PSdhZG9iZTpuczptZXRhLyc+CjxyZGY6UkRGIHhtbG5zOnJkZj0naHR0cD ...TRUNCATED...
+[LINE 1127 TRUNCATED, orig_len=9879]   "wharton": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAE22lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSfvu78nIGlkPSdXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQnPz4KPHg6eG1wbWV0YSB4bWxuczp4PSdhZG9iZTpuczptZXRhLyc+CjxyZGY6UkRGIHhtbG5zOnJkZj0naHR0 ...TRUNCATED...
+[LINE 1128 TRUNCATED, orig_len=5252]   "xlri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAE22lUWHRYTUw6Y29tLmFkb2JlLnhtcAAAAAAAPD94cGFja2V0IGJlZ2luPSfvu78nIGlkPSdXNU0wTXBDZWhpSHpyZVN6TlRjemtjOWQnPz4KPHg6eG1wbWV0YSB4bWxuczp4PSdhZG9iZTpuczptZXRhLyc+CjxyZGY6UkRGIHhtbG5zOnJkZj0naHR0cDo ...TRUNCATED...
+[LINE 1129 TRUNCATED, orig_len=15390]   "dr_mgr": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAFAAAABQCAYAAACOEfKtAAAKSWlDQ1BzUkdCIElFQzYxOTY2LTIuMQAASImdU3dYk/cWPt/3ZQ9WQtjwsZdsgQAiI6wIyBBZohCSAGGEEBJAxYWIClYUFRGcSFXEgtUKSJ2I4qAouGdBiohai1VcOO4f3Ke1fXrv7e371/u855zn/M55zw+AERImkeaiagA5UoU8Otgfj09IxMm9gAIVSOAEIBDmy8JnBcUAAPADeXh+dLA// ...TRUNCATED...
+};
+const UNIVERSITY3_LOGO_ALIASES = [
+  { key:"iit_guwahati", aliases:["iit guwahati"] },
+  { key:"imperial", aliases:["imperial college business school", "imperial college"] },
+  { key:"nhsre", aliases:["nhsre"] },
+  { key:"wharton", aliases:["wharton interactive", "wharton"] },
+  { key:"xlri", aliases:["xlri jamshedpur", "xlri"] },
+  { key:"dr_mgr", aliases:["dr m g r university", "dr mgr university", "dr mgr"] },
+];
+
+/* B2B Partner logos — Batch 2 */
+const PARTNER2_LOGO_DATA = {
+[LINE 1142 TRUNCATED, orig_len=4151]   "safran": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFla ...TRUNCATED...
+[LINE 1143 TRUNCATED, orig_len=15237]   "sapphirefoods": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOMAAABOCAYAAADSDKF8AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAACwXSURBVHhe7X0JeBvVubahQClQtkQzNgVCrDlnZCdhC0vIJs0ZSTaEtZQu/BTaQku5behte9sL/aFpb/npdqFQaFnK2uW2DWsSS7LjJE5CCEvCFgIJCVlsS5oZrd4tzXb+5zuSgjJ2YifAhd ...TRUNCATED...
+[LINE 1144 TRUNCATED, orig_len=15074]   "sutherland": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAABMCAYAAABTXTqcAAAr0UlEQVR42u2dd5hV1b33P2vtctr0wgyM9CIgCoIIYgGNPTHG5Fpzc2OMiTcmCmhikhtNjDGWGBWwJdcUjcZYbkyxRUMsqGBFqgICQxnKDJ0pp+y91nr/2PucOTPMIMQk732fd3+fZz/imXP2Xu37W7+2flsYYwwRIkT4fxIyGoIIESICR4gQISJwhAgRIgJHiBAROEKECBGBI0SIEBE4Q ...TRUNCATED...
+[LINE 1145 TRUNCATED, orig_len=12288]   "wns": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wgARCADIAMgDASIAAhEBAxEB/8QAHQAAAQQDAQEAAAAAAAAAAAAAAwA ...TRUNCATED...
+[LINE 1146 TRUNCATED, orig_len=26248]   "inventia": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAABACAYAAABfuzgrAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAExcSURBVHhe7b0HnFbVue+/3zYz9I6axJicc3L+556bk5xzkphmo01/y/Tee2MoInaJGsVeAMEYFbFRZoZiBTVWrBRBqdIRpLepb/3ez7PW3jMDoiY5N/mb+2ENm7ftsvZaz+/pz9pGhP/JX4gInUA ...TRUNCATED...
+[LINE 1147 TRUNCATED, orig_len=14489]   "kalpataru": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAPAAAABPCAYAAADVyUgyAAAqGklEQVR42u2deXhV5bX/v2u9e58pJxMZmBEQRbAOFXEANCBoFbRXrQev1Vtb2zq16u1t6692irGzXrVea1WuY6u2erxaFS0ICGFGTVGpqIjIGELm4cx7v+/6/XFOYgwJhMlquz/Pc3hCss/e77Tetd611vtuwMPDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw8PDw+PAoD3+tb ...TRUNCATED...
+[LINE 1148 TRUNCATED, orig_len=2391]   "lt_finance": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRn ...TRUNCATED...
+[LINE 1149 TRUNCATED, orig_len=3211]   "northern_trust": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAA ...TRUNCATED...
+[LINE 1150 TRUNCATED, orig_len=7744]   "pnb_metlife": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wgARCADIAMgDASIAAhEBAxEB/8QAHQABAAICAwEBAAAAAAA ...TRUNCATED...
+[LINE 1151 TRUNCATED, orig_len=7094]   "rapido": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAJMAAABCCAYAAABTh+SfAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAABQ/SURBVHhe7V0JeFTV2U4m+z5JJskkmZm7QC1qFS2oqNgW9622rqVarcWK4oZad6gsVUDAhUp/oaIIilhZpCoqoIAoJJN9AyJWa6WCC1bFDUxm3j7vuXPj5N47S5KJ9MfL87xPEuacc8/ynnO+7/2+m ...TRUNCATED...
+[LINE 1152 TRUNCATED, orig_len=6591]   "rsb_retail": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRn ...TRUNCATED...
+[LINE 1153 TRUNCATED, orig_len=8557]   "skoda": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIQAAABbCAYAAACyLC1dAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAABiKSURBVHhe7V0JmCRFla4ZkJmujMhiBhBQdmfFQWaq8r2s7pquiMjqpsBPEI/1Wgdc1gvvA+VQWRXXAQX5XHbFFVxARRQ5PsCDY0VYRRbvXcABHcHl2plhuARF5j6a6f3ei8zqrKjquqYZZpf8v+99XV ...TRUNCATED...
+};
+const PARTNER2_LOGO_ALIASES = [
+  { key:"safran", aliases:["safran"] },
+  { key:"sapphirefoods", aliases:["sapphirefood", "sapphire foods"] },
+  { key:"sutherland", aliases:["sutherland"] },
+  { key:"wns", aliases:["wns"] },
+  { key:"inventia", aliases:["inventia"] },
+  { key:"kalpataru", aliases:["kalpataru"] },
+  { key:"lt_finance", aliases:["larsentoubro finance", "larsen toubro finance", "l t finance"] },
+  { key:"northern_trust", aliases:["northern trust"] },
+  { key:"pnb_metlife", aliases:["pnb metlife"] },
+  { key:"rapido", aliases:["rapido"] },
+  { key:"rsb_retail", aliases:["rsb retail india ltd", "rsb retail"] },
+  { key:"skoda", aliases:["skoda auto", "skoda"] },
+];
+
+const JARO_PLACEHOLDER_PHRASES = ["atke mat raho","campaign","camapign","ifeel","jain university","jain","michigan","naveenwithjaro","online mba","rotman","sainawithjaro","swiss school","b2b generic page","b2b generic"];
+const UNIVERSITY_DISPLAY_OVERRIDES = { "kpgm": "KPMG" };
+function displayNameFor(name){
+  const n = normUniName(name);
+  return UNIVERSITY_DISPLAY_OVERRIDES[n] || name;
+}
+/* Returns a logo data-URI if we recognize this university/institute/partner name, else null (caller falls back to initials). */
+/* B2B Partner logos — Batch 3 */
+const PARTNER3_LOGO_DATA = {
+[LINE 1179 TRUNCATED, orig_len=40334]   "aadhar_housing": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAABWCAYAAACKNNmtAAAAA3NCSVQICAjb4U/gAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAHWNSURBVHhe7X1ngF1V1fZze52emfQOJJCEhBZ6h0BCkyov6IsF9EUFbAiIBamKiIqoqFiwg4rSeyf0hISQkIQkpCeT6Xfm9vY9zzr3TG7GSQBj+X64kjOn7bP32 ...TRUNCATED...
+[LINE 1180 TRUNCATED, orig_len=9361]   "iifl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAeAB4AAD/4QAiRXhpZgAATU0AKgAAAAgAAQESAAMAAAABAAEAAAAAAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAz/wAARCA ...TRUNCATED...
+[LINE 1181 TRUNCATED, orig_len=9970]   "vee_healthtek": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QAiRXhpZgAATU0AKgAAAAgAAQESAAMAAAABAAEAAAAAAAD/2wBDAAIBAQIBAQICAgICAgICAwUDAwMDAwYEBAMFBwYHBwcGBwcICQsJCAgKCAcHCg0KCgsMDAwMBwkODw0MDgsMDAz/2wBDAQICAgMDAwYDAwYMCAcIDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD ...TRUNCATED...
+};
+const PARTNER3_LOGO_ALIASES = [
+  { key:"aadhar_housing", aliases:["aadhar housing finance"] },
+  { key:"iifl", aliases:["iifl"] },
+  { key:"vee_healthtek", aliases:["vee healthtek"] },
+];
+
+const LOGO_SOURCES = [
+  { data: UNIVERSITY_LOGO_DATA, aliases: UNIVERSITY_LOGO_ALIASES },
+  { data: UNIVERSITY2_LOGO_DATA, aliases: UNIVERSITY2_LOGO_ALIASES },
+  { data: UNIVERSITY3_LOGO_DATA, aliases: UNIVERSITY3_LOGO_ALIASES },
+  { data: PARTNER_LOGO_DATA, aliases: PARTNER_LOGO_ALIASES },
+  { data: PARTNER2_LOGO_DATA, aliases: PARTNER2_LOGO_ALIASES },
+  { data: PARTNER3_LOGO_DATA, aliases: PARTNER3_LOGO_ALIASES },
+];
+function findUniversityLogo(name){
+  const n = normUniName(name);
+  if(!n) return null;
+  if(n === "any") return JARO_J_LOGO_B64;
+  const nWords = n.split(" ");
+  for(const phrase of JARO_PLACEHOLDER_PHRASES){
+    if(containsPhrase(nWords, phrase.split(" "))) return JARO_J_LOGO_B64;
+  }
+  for(const source of LOGO_SOURCES){
+    for(const entry of source.aliases){
+      for(const alias of entry.aliases){
+        if(containsPhrase(nWords, alias.split(" "))) return source.data[entry.key];
+      }
+    }
+  }
+  return null;
+}
+/* Drop-in replacement for initials(uni) — returns logo <img> markup when recognized, initials otherwise. */
+function avatarFor(name){
+  const logo = findUniversityLogo(name);
+  if(logo) return `<img src="${logo}" alt="${esc(name||"")}">`;
+  return initials(name);
+}
+/* Small standalone logo shown above the card title on University Pages / B2B Pages cards.
+   Returns "" (nothing) when unrecognized, rather than a placeholder — keeps unmatched cards clean. */
+function logoChipFor(name){
+  const logo = findUniversityLogo(name);
+  return logo ? `<img class="card-logo-corner" src="${logo}" alt="${esc(name||"")}">` : "";
 }
 
-/* ================================================================================================
-   4. SEARCH CONSOLE PERFORMANCE  (one call covers every page)
-   ================================================================================================ */
-function refreshSearchConsole() {
-  if (!CONFIG.GSC_SITE_URL) return;
-  const url = `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(CONFIG.GSC_SITE_URL)}/searchAnalytics/query`;
-  const end = new Date();
-  const start = new Date(); start.setDate(start.getDate() - 28);
-  const body = {
-    startDate: Utilities.formatDate(start, "UTC", "yyyy-MM-dd"),
-    endDate: Utilities.formatDate(end, "UTC", "yyyy-MM-dd"),
-    dimensions: ["page"], rowLimit: 25000
-  };
-  const resp = UrlFetchApp.fetch(url, {
-    method: "post", contentType: "application/json", payload: JSON.stringify(body),
-    headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() }, muteHttpExceptions: true
-  });
-  if (resp.getResponseCode() !== 200) { console.warn("GSC fetch failed: " + resp.getContentText()); return; }
-  const json = JSON.parse(resp.getContentText());
-  const rows = (json.rows || []).map(r => [r.keys[0], r.clicks, r.impressions, r.ctr, r.position]);
-  writeRows_(SHEET_TABS.gsc, ["Page URL", "Clicks (28d)", "Impressions (28d)", "CTR", "Avg. Position"], rows);
+function statusBadge(status){
+  const s = (status||"").toLowerCase();
+  if(!s) return "";
+  let cls = "neutral";
+  if(s.includes("draft")) cls = "draft";
+  else if(s.includes("open")) cls = "open";
+  else if(s.includes("closing")) cls = "soon";
+  else if(s.includes("closed")) cls = "closed";
+  return `<span class="badge ${cls}">${esc(status)}</span>`;
 }
+function toast(msg, isErr=false){
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  t.classList.toggle("err", isErr);
+  t.classList.add("show");
+  clearTimeout(window.__toastT);
+  window.__toastT = setTimeout(()=>t.classList.remove("show"), 3600);
+}
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
 
 /* ================================================================================================
-   5. ON-PAGE SEO AUDIT  (fetches each page's live HTML)
+   RENDER: SIDEBAR NAV
    ================================================================================================ */
-function refreshPageAudit() {
-  const urls = collectAllPageUrls_();
-  const rows = [];
-  urls.forEach(url => {
-    try {
-      const resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true, followRedirects: true });
-      const code = resp.getResponseCode();
-      const html = resp.getContentText();
-      const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i) || [, ""])[1].trim();
-      const metaDesc = (html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i) || [, ""])[1];
-      const imgTags = html.match(/<img[^>]*>/gi) || [];
-      const imgsMissingAlt = imgTags.filter(t => !/alt=["'][^"']+["']/i.test(t)).length;
-      rows.push([
-        url, code, title, title.length, metaDesc, metaDesc.length,
-        imgTags.length, imgsMissingAlt, code >= 400 ? "BROKEN" : (title ? "OK" : "MISSING TITLE")
-      ]);
-    } catch (err) {
-      rows.push([url, "ERROR", "", 0, "", 0, 0, 0, "FETCH FAILED"]);
+function renderNav(counts={}){
+  const wrap = document.getElementById("navItems");
+  wrap.innerHTML = NAV_ORDER.map(key=>{
+    const s = SECTIONS[key];
+    const cnt = counts[key];
+    return `<div class="navitem" data-nav="${key}">
+      ${ic(s.icon,"ic")}
+      <span>${s.label}</span>
+      ${cnt!==undefined ? `<span class="cnt">${cnt}</span>` : ""}
+    </div>`;
+  }).join("");
+}
+
+let currentRoute = "home";
+let LAST_SEARCH_QUERY = "";
+/* Searches every category's dataset (live if connected, demo otherwise) for a query string,
+   returning only the sections that actually contain a match. */
+async function performGlobalSearch(query){
+  const q = (query||"").toLowerCase();
+  const resultsBySection = {};
+  for(const key of NAV_ORDER){
+    const {data} = await getData(sheetKeyFor(key));
+    const matches = (data||[]).filter(row => JSON.stringify(row).toLowerCase().includes(q));
+    if(matches.length) resultsBySection[key] = matches;
+  }
+  return resultsBySection;
+}
+function bestLabelFor(row){
+  return row["Program Name"] || row["Title"] || row["Page"] || row["University/Institute"] ||
+    row["University"] || row["Names"] || row["Location"] || row["Remarks"] ||
+    Object.values(row).find(v=>typeof v==="string" && v.trim()) || "Untitled";
+}
+async function renderGlobalSearchResults(query){
+  const el = document.getElementById("content");
+  el.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Searching every category…</div>`;
+  const resultsBySection = await performGlobalSearch(query);
+  const keys = Object.keys(resultsBySection);
+  if(!keys.length){
+    el.innerHTML = emptyStateHTML(`No results for "${esc(query)}"`, "Try a shorter or differently spelled term.");
+    return;
+  }
+  el.innerHTML = `
+    <div class="section-head"><div><h2>${keys.length} categor${keys.length===1?"y":"ies"} matched</h2>
+    <div class="meta">Click into any category to see the full filtered list</div></div></div>
+    ${keys.map(key=>{
+      const sec = SECTIONS[key];
+      const rows = resultsBySection[key];
+      const preview = rows.slice(0,4).map(r=>`<div class="search-hit">${esc(String(bestLabelFor(r)))}</div>`).join("");
+      return `
+      <div class="insight-panel" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:10px">
+          <h4 style="margin:0">${esc(sec.label)} <span style="color:var(--ink-35);font-weight:600">(${rows.length})</span></h4>
+          <button type="button" class="btn" data-goto="${key}">View all ${ic("chevron")}</button>
+        </div>
+        ${preview}
+      </div>`;
+    }).join("")}
+  `;
+  el.querySelectorAll("[data-goto]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const key = btn.dataset.goto;
+      navigate(key);
+      setTimeout(()=>{
+        const s = document.getElementById("sec_search") || document.getElementById("lp_search");
+        if(s){ s.value = query; s.dispatchEvent(new Event("input")); }
+      }, 150);
+    });
+  });
+}
+function setActiveNav(route){
+  document.querySelectorAll(".navitem").forEach(el=>{
+    el.classList.toggle("active", el.dataset.nav === route);
+  });
+}
+
+
+/* ================================================================================================
+   OVERVIEW (HOME)
+   ================================================================================================ */
+const STAT_COLORS = {
+  program:{bg:"var(--blue-tint-10)",fg:"var(--blue)"}, landing:{bg:"var(--yellow-tint)",fg:"#8a6800"},
+  unique:{bg:"var(--red-tint)",fg:"var(--red)"}, b2b:{bg:"var(--blue-tint-10)",fg:"var(--blue)"},
+  location:{bg:"var(--yellow-tint)",fg:"#8a6800"}, blog:{bg:"var(--red-tint)",fg:"var(--red)"},
+  university:{bg:"var(--blue-tint-10)",fg:"var(--blue)"}, free:{bg:"var(--yellow-tint)",fg:"#8a6800"},
+  pillar:{bg:"var(--blue-tint-10)",fg:"var(--blue)"}
+};
+
+
+async function renderHome(){
+  const el = document.getElementById("content");
+  const now = new Date();
+  const hh = now.getHours();
+  const greeting = hh<12 ? "Good morning" : hh<17 ? "Good afternoon" : "Good evening";
+  const dateStr = now.toLocaleDateString("en-IN", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+
+  el.innerHTML = `
+    <div class="home-watermark"></div>
+    <div class="hero-banner">
+      <div class="hero-glow"></div>
+      <div class="hero-inner">
+        <div>
+          <div class="hero-eyebrow">${dateStr}</div>
+          <h2 class="hero-title">${greeting}, team 👋</h2>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="hero-live-pill" id="heroLivePill" style="display:none">
+            <span class="hero-live-dot"></span>Live
+          </span>
+          <div class="hero-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="heroSearch" placeholder="Search universities, programs, links…">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <div><h2>Website Stats</h2><div class="meta">Every category, refreshed straight from your Google Sheets</div></div>
+      <button class="btn" id="refreshHomeBtn">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+        Refresh All
+      </button>
+    </div>
+    <div class="stat-grid" id="statGrid">${NAV_ORDER.map(k=>{
+      return `
+    <div class="stat-card" data-go="${k}" style="--glass:${STAT_COLORS[k].bg};--fg:${STAT_COLORS[k].fg}">
+      <div class="stat-card-top">
+        <div class="ic-badge" style="background:rgba(255,255,255,.55);color:${STAT_COLORS[k].fg}">${ic(SECTIONS[k].icon)}</div>
+      </div>
+      <div>
+        <div class="val" id="stat-${k}">…</div>
+        <div class="lbl">${SECTIONS[k].label}</div>
+      </div>
+      <button type="button" class="stat-explore-btn" style="background:${STAT_COLORS[k].fg}">
+        Explore
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>`;}).join("")}</div>
+
+    <div class="section-head"><div><h2>Quick Insights</h2><div class="meta">A live snapshot of your program portfolio</div></div></div>
+    <div class="insights-grid">
+      <div class="insight-panel">
+        <h4>Programs by Type</h4>
+        <div id="typeBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+      </div>
+      <div class="insight-panel">
+        <h4>Program Status Breakdown</h4>
+        <div id="statusBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+      </div>
+      <div class="insight-panel">
+        <h4>Landing Pages by Source</h4>
+        <div id="landingSourceBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+      </div>
+      <div class="insight-panel">
+        <h4>Landing Page Link Completeness</h4>
+        <div id="landingLinkBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+      </div>
+    </div>
+  `;
+  el.querySelectorAll("[data-go]").forEach(c=>c.addEventListener("click", ()=>navigate(c.dataset.go)));
+  document.getElementById("refreshHomeBtn").addEventListener("click", forceRefreshCurrentSection);
+  const heroSearchEl = document.getElementById("heroSearch");
+  if(heroSearchEl) heroSearchEl.addEventListener("keydown", (e)=>{
+    if(e.key === "Enter"){
+      const q = e.target.value.trim();
+      if(!q) return;
+      LAST_SEARCH_QUERY = q;
+      navigate("search");
     }
   });
-  writeRows_(SHEET_TABS.audit,
-    ["Page URL", "HTTP Status", "Title", "Title Length", "Meta Description", "Meta Length", "Image Count", "Images Missing Alt", "Flag"],
-    rows);
+
+  const hintMap = {
+    program:["University","Program Name","Webpage Link"], landing:["University/Institute","Landing Page Link"],
+    unique:["Names","URLs"], b2b:["B2B Pages Links"], location:["Location","Centre Type"],
+    blog:["Category","Title","Webpage Link"], university:["University","Webpage Link"], free:["Title","Duration"], pillar:["Title","Webpage Link"]
+  };
+  for(const key of NAV_ORDER){
+    getData(sheetKeyFor(key), hintMap[key]).then(({data,isLive})=>{
+      // Some sections (B2B/University/Pillar) drop rows that have neither a title nor a valid
+      // link when actually rendering cards — mirror that exact filter here so the Home stat and
+      // sidebar badge always match what you see when you open the section, not the raw row count.
+      const sec = SECTIONS[key];
+      const n = (sec.type === "flat-cards")
+        ? data.filter(row => (row[sec.titleField]||"").trim() || isValidLink(row[sec.linkField])).length
+        : data.length;
+      const target = document.getElementById(`stat-${key}`);
+      if(target) target.textContent = n;
+      updateNavCount(key, n);
+      if(isLive){
+        const pill = document.getElementById("heroLivePill");
+        if(pill) pill.style.display = "inline-flex";
+      }
+      if(key==="program") renderQuickInsights(data);
+    });
+  }
+  loadLandingInsights();
 }
+const STATUS_COLORS = { open:"#1b9c58", soon:"#8a6800", closed:"var(--red)", draft:"var(--blue)", other:"var(--ink-35)" };
+const TYPE_COLORS = ["var(--blue)","var(--yellow)","var(--red)","#7c5cff","#1b9c58","#8a6800","#0aa5a0"];
+function renderQuickInsights(data){
+  const typeCounts = new Map();
+  data.forEach(r=>{
+    const t = (r["Type"]||"Unspecified").trim() || "Unspecified";
+    typeCounts.set(t, (typeCounts.get(t)||0)+1);
+  });
+  const typeEntries = [...typeCounts.entries()].sort((a,b)=>b[1]-a[1]);
+  const typeTotal = data.length || 1;
+  const typeEl = document.getElementById("typeBreakdown");
+  if(typeEl){
+    typeEl.innerHTML = `
+      <div class="status-bar">${typeEntries.map(([t,c],i)=>
+        `<div style="width:${(c/typeTotal)*100}%;background:${TYPE_COLORS[i%TYPE_COLORS.length]}" title="${esc(t)}: ${c}"></div>`
+      ).join("")}</div>
+      <div class="status-legend">${typeEntries.map(([t,c],i)=>`
+        <div class="status-legend-item">
+          <span class="status-dot" style="background:${TYPE_COLORS[i%TYPE_COLORS.length]}"></span>${esc(t)} <b>${c}</b>
+        </div>`).join("")}</div>`;
+  }
+  const counts = { open:0, soon:0, closed:0, draft:0, other:0 };
+  data.forEach(r=>{
+    const s = (r["Admission Status"]||"").toLowerCase();
+    if(s.includes("draft")) counts.draft++;
+    else if(s.includes("open")) counts.open++;
+    else if(s.includes("closing")) counts.soon++;
+    else if(s.includes("closed")) counts.closed++;
+    else counts.other++;
+  });
+  const total = data.length || 1;
+  const labels = { open:"Open", soon:"Closing Soon", closed:"Closed", draft:"Draft", other:"Unspecified" };
+  const statusEl = document.getElementById("statusBreakdown");
+  if(statusEl){
+    statusEl.innerHTML = `
+      <div class="status-bar">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>
+        `<div style="width:${(counts[k]/total)*100}%;background:${STATUS_COLORS[k]}" title="${labels[k]}: ${counts[k]}"></div>`
+      ).join("")}</div>
+      <div class="status-legend">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>`
+        <div class="status-legend-item">
+          <span class="status-dot" style="background:${STATUS_COLORS[k]}"></span>${labels[k]} <b>${counts[k]}</b>
+        </div>`).join("")}</div>`;
+  }
+}
+/* Fetches both Landing Pages tabs (Domain Tracker + Channel/PR) once, independent of the per-card
+   NAV_ORDER loop above, since "by source" needs both counts side by side. */
+async function loadLandingInsights(){
+  try{
+    const [domain, channel] = await Promise.all([
+      getData("landingPages", ["University/Institute","Landing Page Link"]),
+      getData("landingPagesChannel", ["University/Institute","Landing Page Link"])
+    ]);
+    renderLandingInsights(domain.data, channel.data);
+  }catch(e){ console.warn("Landing insights failed to load", e); }
+}
+function renderLandingInsights(domainData, channelData){
+  const sourceEl = document.getElementById("landingSourceBreakdown");
+  if(sourceEl){
+    const total = (domainData.length + channelData.length) || 1;
+    const parts = [
+      { label:"Domain Tracker", count:domainData.length, color:"var(--blue)" },
+      { label:"Channel (PR)",   count:channelData.length, color:"#8a6800" },
+    ].filter(p=>p.count>0);
+    sourceEl.innerHTML = `
+      <div class="status-bar">${parts.map(p=>
+        `<div style="width:${(p.count/total)*100}%;background:${p.color}" title="${esc(p.label)}: ${p.count}"></div>`
+      ).join("")}</div>
+      <div class="status-legend">${parts.map(p=>`
+        <div class="status-legend-item"><span class="status-dot" style="background:${p.color}"></span>${esc(p.label)} <b>${p.count}</b></div>
+      `).join("")}</div>`;
+  }
+  const linkEl = document.getElementById("landingLinkBreakdown");
+  if(linkEl){
+    const counts = { both:0, cmsOnly:0, subOnly:0, neither:0 };
+    domainData.forEach(r=>{
+      const hasCms = isValidLink(r["Website Link  ( CMS )"]);
+      const hasSub = isValidLink(r["Subdomain Link"]);
+      if(hasCms && hasSub) counts.both++;
+      else if(hasCms) counts.cmsOnly++;
+      else if(hasSub) counts.subOnly++;
+      else counts.neither++;
+    });
+    const total = domainData.length || 1;
+    const labels = { both:"Both Links", cmsOnly:"Landing Page Only", subOnly:"Subdomain Only", neither:"Missing Both" };
+    const colors = { both:"#1b9c58", cmsOnly:"var(--blue)", subOnly:"#8a6800", neither:"var(--red)" };
+    linkEl.innerHTML = `
+      <div class="status-bar">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>
+        `<div style="width:${(counts[k]/total)*100}%;background:${colors[k]}" title="${labels[k]}: ${counts[k]}"></div>`
+      ).join("")}</div>
+      <div class="status-legend">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>`
+        <div class="status-legend-item"><span class="status-dot" style="background:${colors[k]}"></span>${labels[k]} <b>${counts[k]}</b></div>
+      `).join("")}</div>`;
+  }
+}
+function sheetKeyFor(navKey){
+  return { program:"programPages", landing:"landingPages", unique:"uniquePages", b2b:"b2bPages",
+    location:"locationPages", blog:"blogPages", university:"universityPages", free:"freeCoursePages",
+    pillar:"pillarPages" }[navKey];
+}
+function updateNavCount(navKey, n){
+  const item = document.querySelector(`.navitem[data-nav="${navKey}"]`);
+  if(!item) return;
+  let tag = item.querySelector(".cnt");
+  if(!tag){ tag = document.createElement("span"); tag.className="cnt"; item.appendChild(tag); }
+  tag.textContent = n;
+}
+
+/* ================================================================================================
+   GROUPED VIEW (Program Pages) — University -> Programs
+   ================================================================================================ */
+function buildLinkChips(row, linkFields){
+  return linkFields.map(([field,label])=>{
+    const raw = row[field];
+    const href = firstLink(raw);
+    if(!href) return `<span class="link-chip disabled">${ic("link")}${label}</span>`;
+    return `<a class="link-chip" href="${esc(href)}" target="_blank" rel="noopener">${ic("external")}${label}</a>`;
+  }).join("");
+}
+
+function groupBy(data, field){
+  const map = new Map();
+  data.forEach(row=>{
+    const key = (row[field]||"Unspecified").toString().trim() || "Unspecified";
+    if(!map.has(key)) map.set(key, []);
+    map.get(key).push(row);
+  });
+  return map;
+}
+
+async function renderGroupedSection(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec);
+  const listWrap = document.getElementById("listWrap");
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
+
+  const {data, isLive} = await getData(sheetKeyFor(sec.key), ["University","Program Name","Webpage Link"]);
+  setLivePill(isLive);
+  const groups = groupBy(data, sec.groupField);
+
+  function draw(filterText, statusFilter){
+    const q = (filterText||"").toLowerCase();
+    let html = "";
+    let visibleUnis = 0, visiblePrograms = 0;
+    [...groups.keys()].sort().forEach(uni=>{
+      let items = groups.get(uni);
+      if(statusFilter) items = items.filter(r => (r[sec.statusField]||"").toLowerCase() === statusFilter.toLowerCase());
+      if(q){
+        items = items.filter(r => (uni+" "+(r[sec.itemField]||"")+" "+(r["Category / Domain"]||"")).toLowerCase().includes(q));
+      }
+      if(!items.length) return;
+      visibleUnis++; visiblePrograms += items.length;
+      const allDraft = sec.statusField && items.every(r=>(r[sec.statusField]||"").toLowerCase().includes("draft"));
+      html += `<div class="uni-card${allDraft?" is-draft":""}" data-uni>
+        <div class="uni-head">
+          <div class="uni-avatar">${avatarFor(uni)}</div>
+          <div>
+            <div class="uni-title">${esc(displayNameFor(uni))}</div>
+            <div class="uni-sub">${items.length} program${items.length!==1?"s":""}</div>
+          </div>
+          <div class="uni-chevron">${ic("chevron")}</div>
+        </div>
+        <div class="uni-body"><div class="prog-list">
+          ${items.map(row=>{
+            const isDraft = sec.statusField && (row[sec.statusField]||"").toLowerCase().includes("draft");
+            return `
+            <div class="prog-row${isDraft?" is-draft":""}">
+              <div class="prog-name">${esc(row[sec.itemField]||"Untitled Program")}</div>
+              ${statusBadge(row[sec.statusField])}
+              ${row["Category / Domain"] ? `<span class="badge neutral">${esc(row["Category / Domain"])}</span>` : ""}
+              ${raiseBtn({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" })}
+              <div class="linkrow">${buildLinkChips(row, sec.linkFields)}</div>
+              ${isDraft ? draftNote({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" }) : ""}
+            </div>`;}).join("")}
+        </div></div>
+      </div>`;
+    });
+    listWrap.innerHTML = html || emptyStateHTML("No matches found", "Try a different search term or clear filters.");
+    document.getElementById("resultCount").textContent = `${visibleUnis} universities · ${visiblePrograms} programs`;
+    listWrap.querySelectorAll(".uni-head").forEach(h=>{
+      h.addEventListener("click", ()=> h.closest(".uni-card").classList.toggle("open"));
+    });
+  }
+  draw("", "");
+  wireFilterBar(sec, draw, data, sec.statusField);
+}
+
+/* ================================================================================================
+   LANDING PAGES — numbered multi-link cell parser
+   Many cells in "Domain Tracker" look like:
+     "1: https://link-one/ \n2: https://link-two/ \n3: https://link-three/"
+   and (when Meta columns are present) the Meta Title / Meta Description columns are numbered the
+   exact same way, so "2:" in the Landing Page column lines up with "2:" in Meta Title. This parses
+   each column into an
+   {index -> value} map, plus any stray un-numbered links found before the first "N:" marker.
+   ================================================================================================ */
+function parseNumberedField(raw){
+  const map = {}, extra = [];
+  if(!raw) return { map, extra };
+  const text = raw.toString();
+  if(!/\d+\s*:\s*/.test(text)){
+    // no numbering — could be one link, or several links on separate lines
+    const parts = text.split(/\n+/).map(s=>s.trim()).filter(isValidLink);
+    if(parts.length) map["1"] = parts[0];
+    parts.slice(1).forEach(p=>extra.push(p));
+    return { map, extra };
+  }
+  const prefix = text.split(/\d+\s*:\s*/)[0];
+  prefix.split(/\n+/).map(s=>s.trim()).filter(isValidLink).forEach(p=>extra.push(p));
+  const re = /(\d+)\s*:\s*([\s\S]*?)(?=(?:\n\s*\d+\s*:\s*)|$)/g;
+  let m;
+  while((m = re.exec(text))){
+    const val = m[2].trim();
+    if(isValidLink(val) || val) map[m[1]] = val;
+  }
+  return { map, extra };
+}
+function explodeLandingRow(row, cfg){
+  const cols = {};
+  cfg.linkCols.forEach(([field])=> cols[field] = parseNumberedField(row[field]));
+  cfg.metaCols.forEach(([field])=> cols[field] = parseNumberedField(row[field]));
+  const indices = new Set();
+  Object.values(cols).forEach(({map})=>Object.keys(map).forEach(k=>indices.add(k)));
+  if(!indices.size) indices.add("1");
+  const sorted = [...indices].sort((a,b)=>Number(a)-Number(b));
+  const out = sorted.map(idx=>{
+    const entry = { "University/Institute": row["University/Institute"]||row["University Name"], "Program Name": row["Program Name"], _idx: idx };
+    [...cfg.linkCols, ...cfg.metaCols].forEach(([field])=> entry[field] = cols[field].map[idx] || "");
+    return entry;
+  });
+  // stray un-numbered links (old/duplicate URLs sitting above the numbered list) get their own lightweight card
+  const strayFields = new Set();
+  [...cfg.linkCols].forEach(([field])=>cols[field].extra.forEach(v=>strayFields.add(field+"|||"+v)));
+  strayFields.forEach(key=>{
+    const [field, val] = key.split("|||");
+    const entry = { "University/Institute": row["University/Institute"]||row["University Name"], "Program Name": row["Program Name"], _idx:"extra", _stray:true };
+    [...cfg.linkCols, ...cfg.metaCols].forEach(([f])=> entry[f] = f===field ? val : "");
+    out.push(entry);
+  });
+  return out;
+}
+
+/* ================================================================================================
+   LANDING PAGES (tabs: Domain Tracker / Channel-PR) — one card per link, grouped by university
+   ================================================================================================ */
+async function renderLandingTabs(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <div class="toolbar-only"><span class="pill" id="livePill" style="display:none">${ic("bolt")} Live from Google Sheets</span></div>
+    <div class="toolbar" style="margin-bottom:14px">
+      <button class="btn primary" id="tabDomain">Domain Tracker</button>
+      <button class="btn" id="tabChannel">Channel (PR)</button>
+    </div>
+    <div class="filterbar">
+      <div class="f-search">${ic("search")}<input type="text" id="lp_search" placeholder="Search university or program…"></div>
+      <span class="count-tag" id="resultCount"></span>
+    </div>
+    <div id="listWrap"></div>`;
+
+  // Per your instruction: Meta Title / Meta Description are not shown anywhere in Landing Pages,
+  // for either tab — regardless of whether a cell happens to have that data.
+  // Domain Tracker: 269 rows, 41 universities, one link per cell (same program can span several
+  // rows as separate campaign variants). Only columns D (Website/CMS link, renamed "Landing Page"
+  // below) and E (Subdomain) are shown — columns B (Landing Page Link) and C (Thank You Page) are
+  // intentionally ignored per your instruction.
+  const domainCfg = {
+    groupField:"University/Institute", itemField:"Program Name", numbered:false,
+    linkCols:[["Website Link  ( CMS )","Landing Page",true],["Subdomain Link","Subdomain",true]],
+    metaCols:[]
+  };
+  // Channel (PR): 17 rows. Some cells still pack several numbered links ("1: url\n2: url…") into
+  // one cell, so the numbering logic stays. Only column D (Landing Page Link) is shown — column E
+  // (Backend Login) is intentionally ignored per your instruction.
+  const channelCfg = {
+    groupField:"University/Institute", itemField:"Program Name", numbered:true,
+    linkCols:[["Landing Page Link","Landing Page",true]],
+    metaCols:[]
+  };
+
+  let active = "domain";
+  async function draw(){
+    document.getElementById("tabDomain").className = "btn " + (active==="domain"?"primary":"");
+    document.getElementById("tabChannel").className = "btn " + (active==="channel"?"primary":"");
+    const listWrap = document.getElementById("listWrap");
+    listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
+    const key = active==="domain" ? "landingPages" : "landingPagesChannel";
+    const hints = ["University/Institute","Program Name"];
+    const cfg = active==="domain" ? domainCfg : channelCfg;
+    const {data, isLive} = await getData(key, hints);
+    setLivePill(isLive);
+    const exploded = data.flatMap(row=>explodeLandingRow(row, cfg));
+    const groups = groupBy(exploded, cfg.groupField);
+    const q = (document.getElementById("lp_search").value||"").toLowerCase();
+    let html = "", visibleUnis=0, visibleItems=0;
+    [...groups.keys()].sort().forEach(uni=>{
+      let items = groups.get(uni);
+      if(q) items = items.filter(r => (uni+" "+(r[cfg.itemField]||"")).toLowerCase().includes(q));
+      if(!items.length) return;
+      visibleUnis++; visibleItems += items.length;
+      // group this university's exploded rows by Program Name so each program shows all its link-set cards together
+      const byProgram = groupBy(items, cfg.itemField);
+      html += `<div class="uni-card" data-uni>
+        <div class="uni-head">
+          <div class="uni-avatar">${avatarFor(uni)}</div>
+          <div><div class="uni-title">${esc(displayNameFor(uni))}</div><div class="uni-sub">${items.length} link set${items.length!==1?"s":""}</div></div>
+          <div class="uni-chevron">${ic("chevron")}</div>
+        </div>
+        <div class="uni-body"><div class="prog-list">
+          ${[...byProgram.entries()].map(([prog, rows])=>`
+            <div class="prog-row" style="flex-direction:column;align-items:stretch;gap:10px">
+              <div class="prog-name" style="display:flex;align-items:center;gap:8px">
+                <span>${esc(prog||"Landing Page")}${rows.length>1?` <span class="badge neutral">${rows.length} variants</span>`:""}</span>
+                ${raiseBtn({ university: uni, program: prog||"", section: "Landing Pages", link: firstLink(rows[0][cfg.linkCols[0][0]]) })}
+              </div>
+              ${rows.map((row,i)=>`
+                <div class="link-set-card">
+                  ${row._stray ? `<span class="link-set-tag stray">Older / duplicate link</span>` :
+                    (cfg.numbered ? `<span class="link-set-tag">Link set ${esc(row._idx)}</span>` :
+                     (rows.length>1 ? `<span class="link-set-tag">Variant ${i+1}</span>` : ""))}
+                  <div class="linkrow">${cfg.linkCols.map(([field,label,primary])=>{
+                    const href = firstLink(row[field]);
+                    if(!href) return `<span class="link-chip disabled">${ic("link")}${label}</span>`;
+                    return `<a class="link-chip${primary?" primary-chip":""}" href="${esc(href)}" target="_blank" rel="noopener">${ic("external")}${label}${primary?" ★":""}</a>`;
+                  }).join("")}</div>
+                  ${(isValidLink(row["Meta Title"])||isValidLink(row["Meta Description"])) ? `
+                    <div class="meta-block">
+                      ${isValidLink(row["Meta Title"]) ? `<div class="meta-title">${esc(row["Meta Title"])}</div>` : ""}
+                      ${isValidLink(row["Meta Description"]) ? `<div class="meta-desc">${esc(row["Meta Description"])}</div>` : ""}
+                    </div>` : ""}
+                </div>`).join("")}
+            </div>`).join("")}
+        </div></div>
+      </div>`;
+    });
+    listWrap.innerHTML = html || emptyStateHTML("No landing pages found","Try a different search term.");
+    document.getElementById("resultCount").textContent = `${visibleUnis} universities · ${visibleItems} link sets`;
+    listWrap.querySelectorAll(".uni-head").forEach(h=> h.addEventListener("click", ()=> h.closest(".uni-card").classList.toggle("open")));
+  }
+  document.getElementById("tabDomain").addEventListener("click", ()=>{active="domain"; draw();});
+  document.getElementById("tabChannel").addEventListener("click", ()=>{active="channel"; draw();});
+  document.getElementById("lp_search").addEventListener("input", debounce(draw, 220));
+  draw();
+}
+
+/* ================================================================================================
+   FLAT CARDS (University Pages, B2B Pages)
+   ================================================================================================ */
+async function renderFlatCards(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
+  const {data, isLive} = await getData(sheetKeyFor(sec.key), sec.key==="b2b" ? ["B2B Pages Links"] : ["University","Webpage Link"]);
+  setLivePill(isLive);
+
+  function titleize(slug){
+    const ACRONYMS = ["Bfil","Dtdc","Hcl","Hdfc","Iifl","Rsb","Wns","Pnb","Au"];
+    let title = slug.replace(/^b2b-?/i,"").replace(/[-_]+/g," ").replace(/\/$/,"").trim()
+      .replace(/\b\w/g, c=>c.toUpperCase()) || "B2B Partner Page";
+    ACRONYMS.forEach(a=>{ title = title.replace(new RegExp("\\b"+a+"\\b","g"), a.toUpperCase()); });
+    return title;
+  }
+  function draw(q){
+    q=(q||"").toLowerCase();
+    let items = data.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+    items = items.filter(row => (row[sec.titleField]||"").trim() || isValidLink(row[sec.linkField]));
+    listWrap.innerHTML = items.length ? `<div class="card-grid">${items.map(row=>{
+      const link = firstLink(row[sec.linkField]);
+      let title = row[sec.titleField] || "";
+      if(!title && sec.key==="b2b" && link) title = titleize(link.split("/").filter(Boolean).pop()||"");
+      title = title || "Untitled";
+      const sub = sec.subField ? row[sec.subField] : "";
+      const tag = sec.tagField ? (row[sec.tagField] || sec.tagFallback || "General") :
+                  (sec.key==="university" ? "University Partner" : "B2B Partner");
+      const tagStyle = sec.key==="university" ? "" :
+        (sec.key==="pillar" ? `style="background:var(--yellow-tint);color:#8a6800"` : `style="background:var(--red-tint);color:var(--red)"`);
+      return `<div class="simple-card">
+        ${(sec.key==="university"||sec.key==="b2b") ? logoChipFor(title) : ""}
+        <span class="cat-tag" ${tagStyle}>${esc(tag)}</span>
+        <h4>${esc(title)}</h4>
+        ${sub ? `<p>${esc(sub)}</p>` : ""}
+        <div class="foot">
+          ${link ? `<a class="link-chip" href="${esc(link)}" target="_blank" rel="noopener">${ic("external")}Visit Page</a>` : `<span class="link-chip disabled">${ic("link")}No link yet</span>`}
+          ${raiseBtn({ university: sec.key==="university" ? title : "", section: sec.label, link: link||"" })}
+        </div>
+      </div>`;
+    }).join("")}</div>` : emptyStateHTML("No results", "Try a different search term.");
+    document.getElementById("resultCount").textContent = `${items.length} pages`;
+  }
+  draw("");
+  document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+}
+
+/* ================================================================================================
+   LOCATIONS
+   ================================================================================================ */
+async function renderLocations(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
+  const {data, isLive} = await getData("locationPages", ["Location","Centre Type"]);
+  setLivePill(isLive);
+  const groups = groupBy(data, "Location");
+
+  function draw(q){
+    q=(q||"").toLowerCase();
+    let html = "";
+    let visibleCities=0, visibleCentres=0;
+    [...groups.keys()].sort().forEach(city=>{
+      let items = groups.get(city);
+      if(q) items = items.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+      if(!items.length) return;
+      visibleCities++; visibleCentres += items.length;
+      html += `<div class="uni-card" data-uni>
+        <div class="uni-head">
+          <div class="uni-avatar">${ic("map")}</div>
+          <div><div class="uni-title">${esc(city)}</div><div class="uni-sub">${items.length} centre${items.length!==1?"s":""}</div></div>
+          <div class="uni-chevron">${ic("chevron")}</div>
+        </div>
+        <div class="uni-body"><div class="prog-list">
+          ${items.map(row=>`
+            <div class="prog-row" style="align-items:flex-start">
+              <div style="flex:1;min-width:220px">
+                <div class="prog-name" style="margin-bottom:4px">${esc(row["Area Name"]||row["Centre Type"]||"Centre")}</div>
+                <div style="font-size:12px;color:var(--ink-50);line-height:1.5">${esc(row["Address"]||"")}</div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px">
+                  ${row["Phone"] ? `<span class="loc-chip"><b>Call</b>${esc(row["Phone"])}</span>` : ""}
+                  ${row["Timings"] ? `<span class="loc-chip"><b>Hours</b>${esc(row["Timings"])}</span>` : ""}
+                </div>
+              </div>
+              <div class="linkrow" style="width:auto">
+                ${firstLink(row["Location Webpage"]) ? `<a class="link-chip" href="${esc(firstLink(row["Location Webpage"]))}" target="_blank" rel="noopener">${ic("external")}Contact Page</a>` : ""}
+                ${row["Latitude"] && row["Longitude"] ? `<a class="link-chip" href="https://www.google.com/maps?q=${row["Latitude"]},${row["Longitude"]}" target="_blank" rel="noopener">${ic("map")}Map</a>` : ""}
+                ${raiseBtn({ section: "Location Pages", link: firstLink(row["Location Webpage"])||"" })}
+              </div>
+            </div>`).join("")}
+        </div></div>
+      </div>`;
+    });
+    listWrap.innerHTML = html || emptyStateHTML("No locations found","Try a different search term.");
+    document.getElementById("resultCount").textContent = `${visibleCities} cities · ${visibleCentres} centres`;
+    listWrap.querySelectorAll(".uni-head").forEach(h=> h.addEventListener("click", ()=> h.closest(".uni-card").classList.toggle("open")));
+  }
+  draw("");
+  document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+}
+
+/* ================================================================================================
+   FREE COURSES (grouped by category, card grid)
+   ================================================================================================ */
+async function renderFreeCourses(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
+  const {data, isLive} = await getData("freeCoursePages", ["Title","Duration","Webpage Link"]);
+  setLivePill(isLive);
+
+  function draw(q){
+    q=(q||"").toLowerCase();
+    let items = data.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+    listWrap.innerHTML = items.length ? `<div class="card-grid">${items.map(row=>`
+      <div class="simple-card">
+        <img class="card-logo-corner" src="${JARO_J_LOGO_B64}" alt="Jaro Education">
+        <span class="cat-tag" style="background:var(--yellow-tint);color:#8a6800">${esc(row["Column 4"]||"General")}</span>
+        <h4>${esc(row["Title"]||"Untitled Course")}</h4>
+        ${row["Duration"] ? `<div style="margin:2px 0 6px"><span class="loc-chip"><b>Duration</b>${esc(row["Duration"])}</span></div>` : ""}
+        <div class="foot">
+          ${firstLink(row["Webpage Link"]) ? `<a class="link-chip" href="${esc(firstLink(row["Webpage Link"]))}" target="_blank" rel="noopener">${ic("external")}View Course</a>` : `<span class="link-chip disabled">${ic("link")}No link yet</span>`}
+          ${raiseBtn({ section: "Free Course Pages", link: firstLink(row["Webpage Link"]) })}
+        </div>
+      </div>`).join("")}</div>` : emptyStateHTML("No courses found","Try a different search term.");
+    document.getElementById("resultCount").textContent = `${items.length} courses`;
+  }
+  draw("");
+  document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+}
+
+/* ================================================================================================
+   BLOGS (flat, paginated table)
+   ================================================================================================ */
+async function renderBlogCards(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
+  const {data, isLive} = await getData("blogPages", ["Category","Title","Webpage Link"]);
+  setLivePill(isLive);
+
+  const categories = [...new Set(data.map(r=>r["Category"]).filter(Boolean))].sort();
+  const filterbar = document.querySelector(".filterbar");
+  const catSelect = document.createElement("select");
+  catSelect.innerHTML = `<option value="">All Categories</option>` + categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  filterbar.insertBefore(catSelect, document.getElementById("resultCount"));
+
+  let page = 1;
+  const pageSize = 12;
+  function draw(){
+    const q = (document.getElementById("sec_search").value||"").toLowerCase();
+    const cat = catSelect.value;
+    let items = data.filter(r => (!cat || r["Category"]===cat) && JSON.stringify(r).toLowerCase().includes(q));
+    items = items.slice().sort((a,b)=> (b["Published Date"]||"").localeCompare(a["Published Date"]||""));
+    const totalPages = Math.max(1, Math.ceil(items.length/pageSize));
+    page = Math.min(Math.max(page,1), totalPages);
+    const pageItems = items.slice((page-1)*pageSize, page*pageSize);
+
+    const pagerHTML = `
+      <div class="pager">
+        <button id="pgFirst" ${page<=1?"disabled":""}>« First</button>
+        <button id="pgPrev" ${page<=1?"disabled":""}>← Prev</button>
+        <span class="pg-info">Page ${page} of ${totalPages}</span>
+        <button id="pgNext" ${page>=totalPages?"disabled":""}>Next →</button>
+        <button id="pgLast" ${page>=totalPages?"disabled":""}>Last »</button>
+      </div>`;
+
+    listWrap.innerHTML = pageItems.length ? `
+      ${pagerHTML}
+      <div class="card-grid">${pageItems.map(row=>{
+        const link = firstLink(row["Webpage Link"]);
+        return `<div class="simple-card">
+          <span class="cat-tag" style="background:var(--red-tint);color:var(--red)">${esc(row["Category"]||"General")}</span>
+          <h4>${esc(row["Title"]||"Untitled Article")}</h4>
+          ${isValidLink(row["Meta Title"]) ? `<p>${esc(row["Meta Title"])}</p>` : ""}
+          <div class="foot">
+            <span class="cell-muted" style="font-size:11.5px">${esc((row["Published Date"]||"").toString().slice(0,10))}</span>
+            ${link ? `<a class="link-chip" href="${esc(link)}" target="_blank" rel="noopener">${ic("external")}Read Article</a>` : `<span class="link-chip disabled">${ic("link")}No link yet</span>`}
+            ${raiseBtn({ section: "Blogs", link: link||"" })}
+          </div>
+        </div>`;
+      }).join("")}</div>
+      ${pagerHTML}
+    ` : emptyStateHTML("No blogs found", "Try a different search term or category.");
+
+    document.getElementById("resultCount").textContent = `${items.length} articles`;
+    listWrap.querySelectorAll("#pgPrev").forEach(b=>b.addEventListener("click", ()=>{page--; draw(); scrollToTop();}));
+    listWrap.querySelectorAll("#pgNext").forEach(b=>b.addEventListener("click", ()=>{page++; draw(); scrollToTop();}));
+    listWrap.querySelectorAll("#pgFirst").forEach(b=>b.addEventListener("click", ()=>{page=1; draw(); scrollToTop();}));
+    listWrap.querySelectorAll("#pgLast").forEach(b=>b.addEventListener("click", ()=>{page=totalPages; draw(); scrollToTop();}));
+  }
+  function scrollToTop(){ document.querySelector(".content").scrollIntoView({behavior:"smooth", block:"start"}); }
+  draw();
+  document.getElementById("sec_search").addEventListener("input", debounce(()=>{page=1;draw();}, 220));
+  catSelect.addEventListener("change", ()=>{page=1;draw();});
+}
+
+/* ================================================================================================
+   UNIQUE PAGES (empty-state + "add" form, session-only until a sheet is linked)
+   ================================================================================================ */
+async function renderUnique(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <div class="toolbar-only">
+      <span class="pill" id="livePill" style="display:none">${ic("bolt")} Live from Google Sheets</span>
+      <button class="btn primary" id="addUniqueBtn">${ic("plus")}Add Unique Page</button>
+    </div>
+    <div id="uniqueForm" class="inline-form" style="display:none">
+      <div class="form-grid">
+        <div class="field"><label>Page Name *</label><input type="text" id="u_name" placeholder="e.g. Diwali Campaign Microsite"></div>
+        <div class="field"><label>Page Link *</label><input type="text" id="u_link" placeholder="https://…"></div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+        <button class="btn" id="u_cancel">Cancel</button>
+        <button class="btn primary" id="u_save">${ic("plus")}Save</button>
+      </div>
+    </div>
+    <div class="filterbar">
+      <div class="f-search">${ic("search")}<input type="text" id="sec_search" placeholder="Search…"></div>
+      <span class="count-tag" id="resultCount"></span>
+    </div>
+    <div id="listWrap"></div>`;
+
+  const {data, isLive} = await getData("uniquePages", ["Names","URLs"]);
+  setLivePill(isLive);
+
+  function draw(q){
+    q=(q||"").toLowerCase();
+    const all = [
+      ...data.map(r=>({name:r["Names"], link:r["URLs"]})),
+      ...uniquePagesSession
+    ].filter(r=>r.name && isValidLink(r.link));
+    const items = all.filter(r => (r.name+" "+r.link).toLowerCase().includes(q));
+    const listWrap = document.getElementById("listWrap");
+    listWrap.innerHTML = items.length ? `<div class="card-grid">${items.map(row=>`
+      <div class="simple-card">
+        <span class="cat-tag" style="background:var(--red-tint);color:var(--red)">Unique Page</span>
+        <h4>${esc(row.name)}</h4>
+        ${row.notes ? `<p>${esc(row.notes)}</p>` : ""}
+        <div class="foot">
+          <a class="link-chip" href="${esc(firstLink(row.link))}" target="_blank" rel="noopener">${ic("external")}Open Page</a>
+          ${raiseBtn({ section: "Unique Pages", link: firstLink(row.link)||"" })}
+        </div>
+      </div>`).join("")}</div>` : emptyStateHTML("No unique pages found", "Try a different search term.");
+    document.getElementById("resultCount").textContent = `${items.length} pages`;
+  }
+  document.getElementById("addUniqueBtn").addEventListener("click", ()=>{
+    document.getElementById("uniqueForm").style.display = "block";
+  });
+  document.getElementById("u_cancel").addEventListener("click", ()=>{
+    document.getElementById("uniqueForm").style.display = "none";
+  });
+  document.getElementById("u_save").addEventListener("click", ()=>{
+    const name = document.getElementById("u_name").value.trim();
+    const link = document.getElementById("u_link").value.trim();
+    if(!name || !link){ toast("Please add both a name and a link", true); return; }
+    uniquePagesSession.push({name, link});
+    document.getElementById("uniqueForm").style.display = "none";
+    document.getElementById("u_name").value = ""; document.getElementById("u_link").value="";
+    draw();
+    updateNavCount("unique", data.length + uniquePagesSession.length);
+    toast("Added for this session — link a Google Sheet in CONFIG to keep this permanently");
+  });
+  document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+  draw("");
+}
+
+/* ================================================================================================
+   SHARED UI PIECES
+   ================================================================================================ */
+function sectionShell(sec, withStatus){
+  return `
+    <div class="toolbar-only"><span class="pill" id="livePill" style="display:none">${ic("bolt")} Live from Google Sheets</span></div>
+    <div class="filterbar">
+      <div class="f-search">${ic("search")}<input type="text" id="sec_search" placeholder="Search…"></div>
+      ${withStatus ? `<select id="statusFilter"><option value="">All Statuses</option><option>Open</option><option>Closing Soon</option><option>Closed</option><option>Draft</option></select>` : ""}
+      <span class="count-tag" id="resultCount"></span>
+    </div>
+    <div id="listWrap"></div>`;
+}
+function wireFilterBar(sec, draw, data, statusField){
+  const searchEl = document.getElementById("sec_search");
+  const statusEl = document.getElementById("statusFilter");
+  searchEl.addEventListener("input", debounce(()=> draw(searchEl.value, statusEl?statusEl.value:""), 220));
+  if(statusEl) statusEl.addEventListener("change", ()=> draw(searchEl.value, statusEl.value));
+}
+function emptyStateHTML(title, sub, showIcon){
+  return `<div class="empty-state">
+    <div class="ic">${ic(showIcon?"unique":"search")}</div>
+    <h3>${esc(title)}</h3>
+    <p>${esc(sub)}</p>
+  </div>`;
+}
+function setLivePill(isLive){
+  const pill = document.getElementById("livePill");
+  if(!pill) return;
+  if(isLive){
+    pill.className = "pill live";
+    pill.style.display = "";
+    pill.innerHTML = `${ic("bolt")} Live from Google Sheets`;
+  } else {
+    pill.style.display = "none";
+  }
+}
+
+/* ================================================================================================
+   ROUTER
+   ================================================================================================ */
+async function navigate(route){
+  currentRoute = route;
+  setActiveNav(route);
+  document.getElementById("globalSearch").value = "";
+  if(window.innerWidth <= 900) document.getElementById("sidebar").classList.remove("open");
+
+  const topbarEl = document.getElementById("topbar");
+  const topbarTitleWrap = document.getElementById("topbarTitleWrap");
+  const globalSearchWrap = document.getElementById("globalSearchWrap");
+  const refreshBtn = document.getElementById("refreshDataBtn");
+
+  if(route === "home"){
+    topbarEl.classList.add("home-mode");
+    topbarTitleWrap.style.display = "none";
+    globalSearchWrap.style.display = "none";
+    refreshBtn.style.display = "none";
+    await renderHome();
+    return;
+  }
+  topbarEl.classList.remove("home-mode");
+  topbarTitleWrap.style.display = "";
+  globalSearchWrap.style.display = "";
+  refreshBtn.style.display = (route === "search") ? "none" : "";
+
+  if(route === "search"){
+    document.getElementById("pageTitle").textContent = "Search Results";
+    document.getElementById("pageDesc").textContent = `Results for "${LAST_SEARCH_QUERY}" across every category`;
+    await renderGlobalSearchResults(LAST_SEARCH_QUERY);
+    return;
+  }
+
+  const sec = SECTIONS[route];
+  document.getElementById("pageTitle").textContent = sec.label;
+  document.getElementById("pageDesc").textContent = sec.desc;
+
+  if(sec.type === "grouped") await renderGroupedSection(sec);
+  else if(sec.type === "landing-tabs") await renderLandingTabs(sec);
+  else if(sec.type === "flat-cards") await renderFlatCards(sec);
+  else if(sec.type === "location") await renderLocations(sec);
+  else if(sec.type === "blog-cards") await renderBlogCards(sec);
+  else if(sec.type === "free-courses") await renderFreeCourses(sec);
+  else if(sec.type === "unique") await renderUnique(sec);
+  else if(sec.type === "requirements-table") await renderRequirementsGateOrTable(sec);
+}
+
+/* ================================================================================================
+   REQUEST MODAL
+   ================================================================================================ */
+const CONTACTS = [
+  { name:"Lalit Sanjiv Rade", email:"lalit.rade@jaro.in" },
+  { name:"Nidhi Parikh", email:"nidhi.p@jaro.in" },
+  { name:"Jasmeet Kaur", email:"jasmeet.kaur@jaro.in" },
+  { name:"Omkar Sharma", email:"omkar17.runtime@gmail.com" },
+  { name:"Pooja Yadav", email:"Pooja.yadav@jaro.in" },
+  { name:"Chirag Prajapati", email:"chirag@runtime-solutions.com" },
+  { name:"Ishaan", email:"ishaan.b@jaro.in" },
+  { name:"Tanmay Jain", email:"tanmay.j@jaro.in" },
+  { name:"Aditya K", email:"aditya@runtime-solutions.com" },
+  { name:"Anirban Chatterjee", email:"anirban@runtime-solutions.com" },
+  { name:"Supriya Gade", email:"supriya.g@jaro.in" },
+  { name:"Puja Mahimkar", email:"puja.m@jaro.in" },
+  { name:"Rohan Kadam", email:"rohan.kadam@jaro.in" },
+  { name:"Abhijeet Dinda", email:"abhijit.runtime@gmail.com" },
+  { name:"Sudesh Jadhav", email:"sudesh@runtime-solutions.com" },
+  { name:"Durgesh Kekare", email:"durgesh.kekare@jaro.in" },
+  { name:"Omkar Indapure", email:"omkar.i@jaro.in" },
+  { name:"Adarsh Rai", email:"Adarsh.rai@jaro.in" },
+  { name:"Omkar Sharma", email:"runtimeomkar@gmail.com" },
+  { name:"Rakesh Parab", email:"rakesh.p@jaro.in" },
+  { name:"Jeel Shah", email:"jeel.s@jaro.in" },
+  { name:"Tushar", email:"seo@jaro.in" }
+];
+
+/* ---- Chip picker: multi-recipient input backed by CONTACTS, with free-text email support ---- */
+function createChipPicker(prefix, defaultEmails){
+  const chipsEl = document.getElementById(`rf_${prefix}_chips`);
+  const inputEl = document.getElementById(`rf_${prefix}_input`);
+  const suggestEl = document.getElementById(`rf_${prefix}_suggest`);
+  let selected = []; // {name, email}
+
+  function render(){
+    chipsEl.innerHTML = selected.map((c,i)=>`
+      <span class="chip">${esc(c.name||c.email)}<button type="button" data-i="${i}" aria-label="Remove">✕</button></span>
+    `).join("");
+    chipsEl.querySelectorAll("button").forEach(b=>{
+      b.addEventListener("click", ()=>{ selected.splice(+b.dataset.i,1); render(); });
+    });
+  }
+  function add(contact){
+    if(selected.some(c=>c.email.toLowerCase()===contact.email.toLowerCase())) return;
+    selected.push(contact);
+    inputEl.value = "";
+    hideSuggest();
+    render();
+  }
+  function isValidEmailStr(s){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s); }
+  function hideSuggest(){ suggestEl.classList.remove("show"); }
+  function showSuggest(query){
+    const q = (query||"").toLowerCase();
+    const matches = CONTACTS.filter(c => !selected.some(s=>s.email.toLowerCase()===c.email.toLowerCase()) &&
+      (c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)));
+    let html = matches.map(c=>`
+      <div class="chip-suggest-item" data-email="${esc(c.email)}" data-name="${esc(c.name)}"><b>${esc(c.name)}</b><span>${esc(c.email)}</span></div>
+    `).join("");
+    if(!html){
+      html = isValidEmailStr(query.trim())
+        ? `<div class="chip-suggest-item" data-email="${esc(query.trim())}" data-name="${esc(query.trim())}"><b>Add "${esc(query.trim())}"</b><span>Use this typed email address</span></div>`
+        : `<div class="chip-suggest-empty">Type a full email address to add someone not listed</div>`;
+    }
+    suggestEl.innerHTML = html;
+    suggestEl.querySelectorAll(".chip-suggest-item[data-email]").forEach(item=>{
+      item.addEventListener("click", ()=> add({ name:item.dataset.name, email:item.dataset.email }));
+    });
+    suggestEl.classList.add("show");
+  }
+  inputEl.addEventListener("focus", ()=> showSuggest(inputEl.value));
+  inputEl.addEventListener("input", ()=> showSuggest(inputEl.value));
+  inputEl.addEventListener("keydown", (e)=>{
+    if((e.key==="Enter" || e.key===",") && inputEl.value.trim()){
+      e.preventDefault();
+      const v = inputEl.value.trim();
+      const known = CONTACTS.find(c=>c.email.toLowerCase()===v.toLowerCase() || c.name.toLowerCase()===v.toLowerCase());
+      if(known) add(known);
+      else if(isValidEmailStr(v)) add({ name:v, email:v });
+    }
+  });
+  document.addEventListener("click", (e)=>{
+    if(!e.target.closest(`#rf_${prefix}_picker`)) hideSuggest();
+  });
+  if(defaultEmails && defaultEmails.length){
+    defaultEmails.forEach(email=>{
+      const known = CONTACTS.find(c=>c.email.toLowerCase()===email.toLowerCase());
+      add(known || { name:email, email });
+    });
+  }
+  return {
+    get: ()=>selected.slice(),
+    reset: (emails)=>{ selected = []; render(); (emails||[]).forEach(email=>{
+      const known = CONTACTS.find(c=>c.email.toLowerCase()===email.toLowerCase());
+      add(known || { name:email, email });
+    }); }
+  };
+}
+let toPicker, ccPicker;
+
+function populateSectionDropdown(){
+  const sel = document.getElementById("rf_section");
+  sel.innerHTML = `<option value="">Select a section</option><option>General / Not sure</option>` +
+    NAV_ORDER.map(k=>`<option>${SECTIONS[k].label}</option>`).join("");
+}
+
+let PROGRAM_ROWS_CACHE = null;
+async function populateRequestDatalists(){
+  try{
+    const {data} = await getData("programPages", ["University/Institute","Program Name"]);
+    PROGRAM_ROWS_CACHE = data;
+    const unis = [...new Set(data.map(r=>r["University/Institute"]).filter(Boolean))].sort();
+    document.getElementById("rf_university_list").innerHTML = unis.map(u=>`<option value="${esc(u)}">`).join("");
+    refreshProgramOptionsFor(""); // full list until a university is chosen
+  }catch(e){ /* datalists are a nice-to-have, fail silently */ }
+}
+function refreshProgramOptionsFor(universityTyped){
+  if(!PROGRAM_ROWS_CACHE) return;
+  const uni = (universityTyped||"").trim().toLowerCase();
+  const rows = uni
+    ? PROGRAM_ROWS_CACHE.filter(r => (r["University/Institute"]||"").trim().toLowerCase() === uni)
+    : PROGRAM_ROWS_CACHE;
+  const progs = [...new Set(rows.map(r=>r["Program Name"]).filter(Boolean))].sort();
+  document.getElementById("rf_program_list").innerHTML = progs.map(p=>`<option value="${esc(p)}">`).join("");
+}
+
+/* ---- Subject suggestions: shows the requester's own past subjects once they enter an email ---- */
+let SUBJECT_HISTORY_CACHE = null;
+async function refreshSubjectSuggestionsFor(email){
+  const listEl = document.getElementById("rf_subject_list");
+  if(!listEl) return;
+  if(!email){ listEl.innerHTML = ""; return; }
+  try{
+    if(SUBJECT_HISTORY_CACHE === null){
+      const {data, isLive} = await getData("requirementsLog", ["Timestamp","University","Program"]);
+      SUBJECT_HISTORY_CACHE = isLive ? data : [];
+    }
+    const mine = SUBJECT_HISTORY_CACHE.filter(r => (r["Requested By"]||r["Email"]||"").toLowerCase() === email.toLowerCase());
+    const subjects = [...new Set(mine.map(r=>r["Subject"]).filter(Boolean))];
+    listEl.innerHTML = subjects.map(s=>`<option value="${esc(s)}">`).join("");
+  }catch(e){ /* fine, no history yet */ }
+}
+function checkSubjectMatchesHistory(){
+  const subj = (document.getElementById("rf_subject").value||"").trim().toLowerCase();
+  const hint = document.getElementById("rf_subject_hint");
+  const listEl = document.getElementById("rf_subject_list");
+  const known = subj && [...listEl.options].some(o=>o.value.trim().toLowerCase()===subj);
+  hint.style.display = known ? "block" : "none";
+}
+
+/* Sections where University / Program don't apply at all, or only University applies. */
+const SECTIONS_NO_UNI_PROGRAM = ["Unique Pages","B2B Pages","Location Pages","Blogs","Free Course Pages","Pillar Pages"];
+const SECTIONS_UNI_ONLY = ["University Pages"];
+function updateUniProgVisibility(){
+  const section = document.getElementById("rf_section").value;
+  const uniWrap = document.getElementById("rf_university_wrap");
+  const progWrap = document.getElementById("rf_program_wrap");
+  if(!uniWrap || !progWrap) return;
+  if(SECTIONS_UNI_ONLY.includes(section)){
+    uniWrap.style.display = ""; progWrap.style.display = "none";
+    document.getElementById("rf_program").value = "";
+  } else if(SECTIONS_NO_UNI_PROGRAM.includes(section)){
+    uniWrap.style.display = "none"; progWrap.style.display = "none";
+    document.getElementById("rf_university").value = "";
+    document.getElementById("rf_program").value = "";
+  } else {
+    uniWrap.style.display = ""; progWrap.style.display = "";
+  }
+}
+function openRequestModal(prefill){
+  document.getElementById("requestOverlay").classList.add("show");
+  const p = prefill || {};
+  const pre = SECTIONS[currentRoute];
+  document.getElementById("rf_section").value = p.section || (pre ? pre.label : "");
+  if(p.university) document.getElementById("rf_university").value = p.university;
+  if(p.program) document.getElementById("rf_program").value = p.program;
+  if(p.link) document.getElementById("rf_link").value = p.link;
+  updateUniProgVisibility();
+  populateRequestDatalists().then(()=>{
+    if(p.university) refreshProgramOptionsFor(p.university);
+    const subjectEl = document.getElementById("rf_subject");
+    if(subjectEl && !subjectEl.value.trim() && (p.university || p.program)){
+      subjectEl.value = buildRequestSubject({ university: p.university||"", program: p.program||"", type: document.getElementById("rf_type").value });
+    }
+  });
+  if(!toPicker) toPicker = createChipPicker("to", ["lalit.rade@jaro.in"]);
+  if(!ccPicker) ccPicker = createChipPicker("cc", []);
+}
+function closeRequestModal(){
+  document.getElementById("requestOverlay").classList.remove("show");
+}
+/* Delegated click handler — works for buttons rendered dynamically inside any section's list. */
+document.addEventListener("click", (e)=>{
+  const btn = e.target.closest(".raise-mini-btn, .raise-mini-btn-trigger");
+  if(!btn) return;
+  e.preventDefault(); e.stopPropagation();
+  openRequestModal({
+    university: btn.dataset.university || "",
+    program: btn.dataset.program || "",
+    section: btn.dataset.section || "",
+    link: btn.dataset.link || ""
+  });
+});
+
+/* Strip a trailing university name from a program string, e.g.
+   "Certificate Course in X\nIIT Bombay" or "Online MBA, IIT Bombay" -> "Certificate Course in X" */
+function shortProgramName(program, university){
+  if(!program) return "";
+  let p = program.split("\n")[0].trim();
+  if(university){
+    const uniEsc = university.trim().replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+    p = p.replace(new RegExp("[,\\-–—]?\\s*"+uniEsc+"\\s*$","i"), "").trim();
+  }
+  return p || program;
+}
+function buildRequestSubject(payload){
+  const shortProg = shortProgramName(payload.program, payload.university);
+  const bits = [payload.type||"Requirement", payload.university, shortProg].filter(Boolean);
+  return `[Dashboard] ${bits.join(" — ")}`;
+}
+
+/* ---- Rich text editor (bold / italic / hyperlink / pasted or attached images) ---- */
+function wireRichTextEditor(){
+  const body = document.getElementById("rf_desc");
+  document.querySelectorAll(".rte-btn[data-cmd]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ body.focus(); document.execCommand(btn.dataset.cmd, false, null); });
+  });
+  document.getElementById("rteLinkBtn").addEventListener("click", ()=>{
+    const url = prompt("Paste the URL to link:");
+    if(url) { body.focus(); document.execCommand("createLink", false, url); }
+  });
+  const imgInput = document.getElementById("rteImageInput");
+  document.getElementById("rteImageBtn").addEventListener("click", ()=> imgInput.click());
+  imgInput.addEventListener("change", ()=>{
+    [...imgInput.files].forEach(insertImageFile);
+    imgInput.value = "";
+  });
+  body.addEventListener("paste", (e)=>{
+    const items = (e.clipboardData || window.clipboardData).items;
+    for(const item of items){
+      if(item.type.startsWith("image/")){
+        e.preventDefault();
+        insertImageFile(item.getAsFile());
+      }
+    }
+  });
+  function insertImageFile(file){
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      body.focus();
+      document.execCommand("insertHTML", false, `<img src="${reader.result}" alt="attached screenshot">`);
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+async function submitRequest(e){
+  e.preventDefault();
+  const descHtml = document.getElementById("rf_desc").innerHTML.trim();
+  const descText = document.getElementById("rf_desc").innerText.trim();
+  if(!descText && !/<img/.test(descHtml)){ toast("Please describe your requirement", true); return; }
+  const toList = toPicker ? toPicker.get() : [];
+  const ccList = ccPicker ? ccPicker.get() : [];
+  if(!toList.length){ toast("Please add at least one recipient in 'Send To'", true); return; }
+  const uniWrap = document.getElementById("rf_university_wrap");
+  const progWrap = document.getElementById("rf_program_wrap");
+  if(uniWrap.style.display !== "none" && !document.getElementById("rf_university").value.trim()){
+    toast("Please add the University / Institute", true); return;
+  }
+  if(progWrap.style.display !== "none" && !document.getElementById("rf_program").value.trim()){
+    toast("Please add the Program Name", true); return;
+  }
+  const subject = document.getElementById("rf_subject").value.trim();
+  if(!subject){ toast("Please add a subject", true); return; }
+  const payload = {
+    name: document.getElementById("rf_name").value.trim(),
+    email: document.getElementById("rf_email").value.trim(),
+    team: document.getElementById("rf_team").value.trim(),
+    section: document.getElementById("rf_section").value,
+    university: document.getElementById("rf_university").value.trim(),
+    program: document.getElementById("rf_program").value.trim(),
+    type: document.getElementById("rf_type").value,
+    priority: document.querySelector('input[name="rf_priority"]:checked').value,
+    link: document.getElementById("rf_link").value.trim(),
+    subject: subject,
+    to: toList.map(c=>c.email),
+    cc: ccList.map(c=>c.email),
+    descriptionHtml: descHtml,
+    descriptionText: descText,
+  };
+  // Threading rule: same requester + same subject (exact match) -> same email thread
+  payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
+
+  const webAppUrl = CONFIG.requestForm.webAppUrl;
+  const submitBtn = document.querySelector('#requestForm button[type="submit"]');
+  if(webAppUrl){
+    submitBtn.disabled = true;
+    try{
+      const res = await fetch(webAppUrl, {
+        method:"POST",
+        headers:{ "Content-Type":"text/plain;charset=utf-8" }, // avoids a CORS preflight on Apps Script
+        body: JSON.stringify(payload)
+      });
+      toast("Request submitted — an email is on its way!");
+      closeRequestModal();
+      resetRequestForm();
+    }catch(err){
+      toast("Couldn't submit automatically — opening email instead", true);
+      mailtoFallback(payload);
+    }finally{
+      submitBtn.disabled = false;
+    }
+  } else {
+    mailtoFallback(payload);
+    toast("Opening your email client to send this request…");
+    closeRequestModal();
+    resetRequestForm();
+  }
+}
+function resetRequestForm(){
+  document.getElementById("requestForm").reset();
+  document.getElementById("rf_desc").innerHTML = "";
+  document.getElementById("rf_subject_hint").style.display = "none";
+  if(toPicker) toPicker.reset(["lalit.rade@jaro.in"]);
+  if(ccPicker) ccPicker.reset([]);
+}
+function mailtoFallback(payload){
+  const body =
+`Name: ${payload.name}
+Email: ${payload.email}
+Team: ${payload.team}
+University: ${payload.university}
+Program: ${payload.program}
+Section: ${payload.section}
+Type: ${payload.type}
+Priority: ${payload.priority}
+Related Link: ${payload.link}
+
+Description:
+${payload.descriptionText}
+
+(Note: this dashboard isn't yet connected to the automatic mailer — screenshots pasted above won't
+come through via this email fallback. Once CONFIG.requestForm.webAppUrl is set, they will.)`;
+  const url = `mailto:${(payload.to||[CONFIG.adminEmail]).join(",")}?cc=${encodeURIComponent((payload.cc||[]).join(","))}&subject=${encodeURIComponent(payload.subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = url;
+}
+
+/* ================================================================================================
+   REQUIREMENTS LOG (read-only view of the sheet the Apps Script writes to)
+   ================================================================================================ */
+function statusPill(status){
+  const s = (status||"Open").toLowerCase();
+  let cls = "open";
+  if(s.includes("progress")) cls = "soon";
+  else if(s.includes("complete") || s.includes("done") || s.includes("closed")) cls = "done";
+  return `<span class="req-status req-status-${cls}">${esc(status||"Open")}</span>`;
+}
+/* ---------------------------------------------------------------------------------------------- */
+const REQUIREMENTS_LOG_PASSWORD = "Logs@Preview";
+function isRequirementsUnlocked(){
+  return sessionStorage.getItem("reqLogUnlocked") === "1";
+}
+async function renderRequirementsGateOrTable(sec){
+  if(isRequirementsUnlocked()){ await renderRequirementsTable(sec); return; }
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <div style="max-width:380px;margin:70px auto;text-align:center">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--blue-tint-10);color:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <h2 style="margin-bottom:6px">Password Protected</h2>
+      <p style="color:var(--ink-50);font-size:13px;margin-bottom:22px">Enter the password to view the Requirements Log</p>
+      <input type="password" id="reqPasswordInput" placeholder="Password" autocomplete="off"
+        style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;text-align:center;font-size:14px;margin-bottom:12px;box-sizing:border-box">
+      <div id="reqPasswordError" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none">Incorrect password — try again.</div>
+      <button class="btn primary" id="reqPasswordSubmit" style="width:100%;justify-content:center">Unlock</button>
+    </div>`;
+  const input = document.getElementById("reqPasswordInput");
+  const submit = async ()=>{
+    if(input.value === REQUIREMENTS_LOG_PASSWORD){
+      sessionStorage.setItem("reqLogUnlocked", "1");
+      await renderRequirementsTable(sec);
+    } else {
+      document.getElementById("reqPasswordError").style.display = "block";
+      input.value = "";
+      input.focus();
+    }
+  };
+  document.getElementById("reqPasswordSubmit").addEventListener("click", submit);
+  input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
+  input.focus();
+}
+async function renderRequirementsTable(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  const cfg = CONFIG.sheets.requirementsLog;
+  if(!cfg || !cfg.sheetId){
+    listWrap.innerHTML = emptyStateHTML(
+      "Requirements Log isn't linked yet",
+      "Deploy the Apps Script (see SETUP_GUIDE.md), then paste the Requirements Log sheet's ID + GID into CONFIG.sheets.requirementsLog to see every request raised here, with live status."
+    );
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
+  const {data, isLive} = await getData("requirementsLog", ["Timestamp","University","Program"]);
+  setLivePill(isLive);
+  function draw(q){
+    q=(q||"").toLowerCase();
+    let items = data.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+    items = items.slice().reverse(); // newest first
+    listWrap.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Raised</th><th>University</th><th>Program</th><th>Type</th><th>Priority</th><th>Requested By</th><th>Status</th></tr></thead>
+          <tbody>
+            ${items.map(row=>`<tr>
+              <td class="cell-muted">${esc((row["Timestamp"]||"").toString().slice(0,16))}</td>
+              <td>${esc(row["University"]||"—")}</td>
+              <td>${esc(row["Program"]||"—")}</td>
+              <td>${esc(row["Request Type"]||"—")}</td>
+              <td>${esc(row["Priority"]||"—")}</td>
+              <td class="cell-muted">${esc(row["Requested By"]||row["Email"]||"—")}</td>
+              <td>${statusPill(row["Status"])}</td>
+            </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--ink-35)">No requests raised yet</td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+    document.getElementById("resultCount").textContent = `${items.length} requests`;
+  }
+  draw("");
+  document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+}
+
+
+
+/* ================================================================================================
+   GLOBAL SEARCH — searches every category and shows a results-by-category view
+   ================================================================================================ */
+document.getElementById("globalSearch").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter"){
+    const q = e.target.value.trim();
+    if(!q) return;
+    LAST_SEARCH_QUERY = q;
+    navigate("search");
+  }
+});
+
+/* ================================================================================================
+   INIT
+   ================================================================================================ */
+/* Clears cached sheet data so the next getData() call re-fetches from Google Sheets. */
+function clearCacheFor(navKey){
+  if(!navKey || navKey === "home"){ Object.keys(LIVE).forEach(k=>delete LIVE[k]); return; }
+  const key = sheetKeyFor(navKey);
+  if(key) delete LIVE[key];
+  if(navKey === "landing") delete LIVE["landingPagesChannel"];
+  if(navKey === "requirements") delete LIVE["requirementsLog"];
+}
+function forceRefreshCurrentSection(){
+  clearCacheFor(currentRoute);
+  navigate(currentRoute);
+  toast("Refreshing from Google Sheets…");
+}
+function init(){
+  renderNav();
+  populateSectionDropdown();
+  document.getElementById("refreshDataBtn").addEventListener("click", forceRefreshCurrentSection);
+  // Gentle background auto-refresh: checks once a minute, but each section's own 5-minute TTL
+  // (see getData) decides whether that actually triggers a real re-fetch. Skipped while someone
+  // is actively typing or the request form is open, so it never disrupts what they're doing.
+  setInterval(()=>{
+    if(document.getElementById("requestOverlay").classList.contains("show")) return;
+    const active = document.activeElement;
+    const isTyping = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable);
+    if(isTyping) return;
+    if(currentRoute && currentRoute !== "search") navigate(currentRoute);
+  }, 60*1000);
+  document.getElementById("navItems").addEventListener("click", (e)=>{
+    const item = e.target.closest(".navitem");
+    if(item) navigate(item.dataset.nav);
+  });
+  document.querySelector('.navitem[data-nav="home"]').addEventListener("click", ()=>navigate("home"));
+  document.querySelector('.navitem[data-nav="requirements"]').addEventListener("click", ()=>navigate("requirements"));
+  document.getElementById("openRequestBtn").addEventListener("click", ()=>openRequestModal());
+  document.getElementById("closeRequestBtn").addEventListener("click", closeRequestModal);
+  document.getElementById("cancelRequestBtn").addEventListener("click", closeRequestModal);
+  document.getElementById("requestOverlay").addEventListener("click", (e)=>{ if(e.target.id==="requestOverlay") closeRequestModal(); });
+  document.getElementById("requestForm").addEventListener("submit", submitRequest);
+  document.getElementById("menuBtn").addEventListener("click", ()=> document.getElementById("sidebar").classList.toggle("open"));
+  wireRichTextEditor();
+  wireRequestFormDependencies();
+
+  navigate("home");
+}
+function wireRequestFormDependencies(){
+  const uniEl = document.getElementById("rf_university");
+  const progEl = document.getElementById("rf_program");
+  const typeEl = document.getElementById("rf_type");
+  const emailEl = document.getElementById("rf_email");
+  const subjectEl = document.getElementById("rf_subject");
+  const sectionEl = document.getElementById("rf_section");
+
+  sectionEl.addEventListener("change", updateUniProgVisibility);
+  uniEl.addEventListener("input", ()=>{ refreshProgramOptionsFor(uniEl.value); maybeSuggestSubject(); });
+  progEl.addEventListener("input", ()=>{
+    maybeSuggestSubject();
+    // Reverse lookup: if what's typed exactly matches a known program and University is still
+    // empty (or the user picked Program before University), fill University in automatically.
+    if(!PROGRAM_ROWS_CACHE) return;
+    const val = progEl.value.trim().toLowerCase();
+    if(!val || uniEl.value.trim()) return;
+    const match = PROGRAM_ROWS_CACHE.find(r => (r["Program Name"]||"").trim().toLowerCase() === val);
+    if(match && match["University/Institute"]){
+      uniEl.value = match["University/Institute"];
+      refreshProgramOptionsFor(uniEl.value);
+    }
+  });
+  typeEl.addEventListener("change", maybeSuggestSubject);
+  subjectEl.addEventListener("input", checkSubjectMatchesHistory);
+  emailEl.addEventListener("blur", ()=>{
+    SUBJECT_HISTORY_CACHE = null; // force a fresh lookup per email
+    refreshSubjectSuggestionsFor(emailEl.value.trim()).then(checkSubjectMatchesHistory);
+  });
+
+  function maybeSuggestSubject(){
+    if(subjectEl.value.trim()) return; // never overwrite what the user already typed
+    const suggestion = buildRequestSubject({ university: uniEl.value.trim(), program: progEl.value.trim(), type: typeEl.value });
+    if(uniEl.value.trim() || progEl.value.trim() || typeEl.value) subjectEl.value = suggestion;
+  }
+}
+init();
+</script>
+</body>
+</html>
