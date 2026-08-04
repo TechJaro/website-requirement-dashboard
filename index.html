@@ -249,6 +249,12 @@ input,select,textarea{font-family:inherit}
   padding:7px 12px;border-radius:100px;white-space:nowrap;
 }
 .hero-live-dot{width:6px;height:6px;border-radius:50%;background:#3ddc84;box-shadow:0 0 6px #3ddc84}
+.hero-total-pill{
+  display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.02em;
+  color:#fff;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);
+  padding:7px 12px;border-radius:100px;white-space:nowrap;
+}
+.hero-total-pill b{color:var(--yellow);font-size:13.5px;font-weight:800}
 
 /* ---------- HOME: QUICK INSIGHTS ---------- */
 .insights-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -1352,6 +1358,9 @@ async function renderHome(){
           <h2 class="hero-title">${greeting}, team 👋</h2>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
+          <span class="hero-total-pill" id="heroTotalPill">
+            <b id="heroTotalCount">…</b> Total Pages
+          </span>
           <span class="hero-live-pill" id="heroLivePill" style="display:none">
             <span class="hero-live-dot"></span>Live
           </span>
@@ -1423,6 +1432,7 @@ async function renderHome(){
     unique:["Names","URLs"], b2b:["B2B Pages Links"], location:["Location","Centre Type"],
     blog:["Category","Title","Webpage Link"], university:["University","Webpage Link"], free:["Title","Duration"], pillar:["Title","Webpage Link"]
   };
+  const sectionPageCounts = {};
   for(const key of NAV_ORDER){
     getData(sheetKeyFor(key), hintMap[key]).then(({data,isLive})=>{
       // Some sections (B2B/University/Pillar) drop rows that have neither a title nor a valid
@@ -1435,6 +1445,10 @@ async function renderHome(){
       const target = document.getElementById(`stat-${key}`);
       if(target) target.textContent = n;
       updateNavCount(key, n);
+      // Running total across every category, shown as one figure in the hero banner.
+      sectionPageCounts[key] = n;
+      const totalEl = document.getElementById("heroTotalCount");
+      if(totalEl) totalEl.textContent = Object.values(sectionPageCounts).reduce((a,b)=>a+b,0);
       if(isLive){
         const pill = document.getElementById("heroLivePill");
         if(pill) pill.style.display = "inline-flex";
