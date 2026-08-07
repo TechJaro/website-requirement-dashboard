@@ -245,17 +245,24 @@ input,select,textarea{font-family:inherit}
 .hero-search-wrap input::placeholder{color:rgba(255,255,255,.55)}
 @media(max-width:640px){.hero-inner{flex-direction:column;align-items:stretch}.hero-search-wrap{min-width:0}}
 .hero-live-pill{
-  display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.02em;
-  color:#3ddc84;background:rgba(61,220,132,.14);border:1px solid rgba(61,220,132,.35);
-  padding:7px 12px;border-radius:100px;white-space:nowrap;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  color:#3ddc84;background:rgba(61,220,132,.16);border:1px solid rgba(61,220,132,.4);
+  padding:9px 16px;border-radius:100px;white-space:nowrap;
+  font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
 }
-.hero-live-dot{width:6px;height:6px;border-radius:50%;background:#3ddc84;box-shadow:0 0 6px #3ddc84}
+.hero-live-dot{width:7px;height:7px;border-radius:50%;background:#3ddc84;box-shadow:0 0 8px #3ddc84;animation:heroLivePulse 1.4s ease-in-out infinite}
+@keyframes heroLivePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(1.35)}}
 .hero-total-pill{
-  display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.02em;
-  color:#fff;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);
-  padding:7px 12px;border-radius:100px;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.26);
+  padding:8px 16px 8px 10px;border-radius:100px;white-space:nowrap;
+  box-shadow:0 4px 14px -6px rgba(0,0,0,.35);
 }
-.hero-total-pill b{color:var(--yellow);font-size:13.5px;font-weight:800}
+.hero-total-pill .htp-ic{width:30px;height:30px;border-radius:50%;background:rgba(255,207,36,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hero-total-pill .htp-ic svg{width:15px;height:15px;color:var(--yellow)}
+.hero-total-pill .htp-text{display:flex;flex-direction:column;line-height:1.05}
+.hero-total-pill b{color:#fff;font-size:17px;font-weight:800;font-family:'Raleway',sans-serif}
+.hero-total-pill .htp-label{font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.55)}
 
 /* ---------- HOME: QUICK INSIGHTS ---------- */
 .insights-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -781,7 +788,7 @@ const CONFIG = {
     landingPagesChannel:  { sheetId: "1nIZ_qZmugMslTFxS2QosDYNZzjNzoYKPNxxApQsBkiA", gid: "1870442308" },
 
     // ===== Requirements Log (created by the Apps Script in step 2 of the setup guide) =====
-    requirementsLog:      { sheetId: "", gid: "" }
+    requirementsLog:      { sheetId: "1JGsWhpTOalVOPoO0CwlAaCCgPMVv0ExSYTxrRErCVV0", gid: "0" }
   },
 
   // ---- REQUEST FORM SETUP (captures requests, writes them to the Requirements Log sheet, and emails you) ----
@@ -798,6 +805,9 @@ const CONFIG = {
   },
   ga4PropertyId: "281070911", // same GA4 Property ID you put in Code.gs's CONFIG.GA4_PROPERTY_ID
   gscSiteUrl: "https://www.jaroeducation.com/",    // same Search Console property URL you put in Code.gs's CONFIG.GSC_SITE_URL
+
+  // ---- LIVE PAGE VITALS / ON-PAGE AUDIT: run on demand from a button, no sheet, no trigger ----
+  pagespeedApiKey: "AIzaSyAeSWkzQof55kMc6tpPyWqM5WOzMZEk3jA", // paste your PageSpeed-only restricted API key here (the one you created earlier)
 
   requestForm: {
     webAppUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec" // Apps Script backend: handles request-form submissions only now
@@ -1383,10 +1393,11 @@ async function renderHome(){
         </div>
         <div style="display:flex;align-items:center;gap:12px">
           <span class="hero-total-pill" id="heroTotalPill">
-            <b id="heroTotalCount">…</b> Total Pages
+            <span class="htp-ic">${ic("bolt")}</span>
+            <span class="htp-text"><b id="heroTotalCount">…</b><span class="htp-label">Total Pages</span></span>
           </span>
           <span class="hero-live-pill" id="heroLivePill" style="display:none">
-            <span class="hero-live-dot"></span>Live
+            <span class="hero-live-dot"></span>LIVE
           </span>
           <div class="hero-search-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -2603,6 +2614,137 @@ async function fetchGscLive_(){
   if(!res.ok) throw new Error((json.error && json.error.message) || "Search Console request failed");
   return (json.rows||[]).map(r=>({ page:r.keys[0], clicks:r.clicks, impressions:r.impressions, ctr:r.ctr, position:r.position }));
 }
+/* ---- Collects every unique page URL already loaded across your categories (no Apps Script
+   needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
+async function collectAllDashboardUrls_(){
+  const urls = new Set();
+  const urlRegex = /https?:\/\/[^\s",]+/g;
+  const keys = [...NAV_ORDER, "landingPagesChannel"];
+  for(const key of keys){
+    try{
+      const sheetKey = NAV_ORDER.includes(key) ? sheetKeyFor(key) : key;
+      const {data} = await getData(sheetKey);
+      const matches = JSON.stringify(data).match(urlRegex) || [];
+      matches.forEach(m=> urls.add(m.replace(/["')\\]+$/,"")));
+    }catch(e){ /* skip this category, keep going */ }
+  }
+  return [...urls];
+}
+
+/* ---- Core Web Vitals: entirely client-side via PageSpeed Insights, no sheet, no backend ---- */
+let VITALS_SCAN_RUNNING = false;
+async function runVitalsScan_(urls, onProgress, onRow){
+  VITALS_SCAN_RUNNING = true;
+  const CONCURRENCY = 6;
+  let idx = 0, done = 0;
+  async function worker(){
+    while(VITALS_SCAN_RUNNING){
+      const i = idx++; if(i >= urls.length) return;
+      const url = urls[i];
+      try{
+        const api = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${CONFIG.pagespeedApiKey}&strategy=mobile&category=performance`;
+        const res = await fetch(api);
+        const json = await res.json();
+        if(res.ok && json.lighthouseResult){
+          const perf = json.lighthouseResult.categories.performance.score;
+          const audits = json.lighthouseResult.audits || {};
+          onRow({
+            url, score: perf!=null ? Math.round(perf*100) : null,
+            lcp: audits["largest-contentful-paint"] ? (audits["largest-contentful-paint"].numericValue/1000) : null,
+            cls: audits["cumulative-layout-shift"] ? audits["cumulative-layout-shift"].numericValue : null,
+            inp: audits["interaction-to-next-paint"] ? audits["interaction-to-next-paint"].numericValue : null
+          });
+        }
+      }catch(e){ /* skip this URL, keep going */ }
+      done++;
+      onProgress(done, urls.length);
+    }
+  }
+  await Promise.all(Array.from({length:CONCURRENCY}, worker));
+  VITALS_SCAN_RUNNING = false;
+}
+function wireVitalsPanel_(){
+  const btn = document.getElementById("vitalsRunBtn");
+  if(!btn) return;
+  btn.addEventListener("click", async ()=>{
+    if(!CONFIG.pagespeedApiKey){ toast("Add CONFIG.pagespeedApiKey first", true); return; }
+    btn.disabled = true; btn.textContent = "Scanning…";
+    const body = document.getElementById("vitalsBody");
+    const progress = document.getElementById("vitalsProgress");
+    body.innerHTML = "";
+    const rows = [];
+    progress.textContent = "Collecting your page list…";
+    const urls = await collectAllDashboardUrls_();
+    progress.textContent = `Checking ${urls.length} pages — this can take a while (roughly 20-30s per page); feel free to leave this tab open in the background.`;
+    await runVitalsScan_(urls,
+      (done,total)=>{ progress.textContent = `Checked ${done} of ${total} pages…`; },
+      (row)=>{
+        rows.push(row);
+        rows.sort((a,b)=> (a.score??999) - (b.score??999));
+        body.innerHTML = rows.map(r=>`<tr>
+          <td class="cell-muted">${esc(r.url)}</td>
+          <td>${r.score!=null ? r.score : "—"}</td>
+          <td>${r.lcp!=null ? r.lcp.toFixed(1) : "—"}</td>
+          <td>${r.cls!=null ? r.cls.toFixed(3) : "—"}</td>
+          <td>${r.inp!=null ? Math.round(r.inp) : "—"}</td>
+        </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No results yet</td></tr>`;
+      }
+    );
+    btn.disabled = false; btn.textContent = "Run Vitals Scan Again";
+    progress.textContent = `Done — checked ${urls.length} pages.`;
+  });
+}
+
+/* ---- On-Page Audit: needs a tiny relay for CORS (fetching another site's HTML from a browser
+   isn't allowed unless that site opts in) — stateless, no sheet, just "check these 20 URLs". This
+   depends on the same Apps Script web app access fix as the request form. ---- */
+async function runAuditScan_(urls, onProgress, onRows){
+  const BATCH = 20;
+  let done = 0;
+  for(let i=0;i<urls.length;i+=BATCH){
+    const chunk = urls.slice(i, i+BATCH);
+    try{
+      const url = `${CONFIG.requestForm.webAppUrl}?action=auditBatch&urls=${encodeURIComponent(JSON.stringify(chunk))}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if(json.ok) onRows(json.rows);
+    }catch(e){ /* skip this chunk, keep going */ }
+    done += chunk.length;
+    onProgress(done, urls.length);
+  }
+}
+function wireAuditPanel_(){
+  const btn = document.getElementById("auditRunBtn");
+  if(!btn) return;
+  btn.addEventListener("click", async ()=>{
+    if(!CONFIG.requestForm.webAppUrl){ toast("Add CONFIG.requestForm.webAppUrl first", true); return; }
+    btn.disabled = true; btn.textContent = "Scanning…";
+    const body = document.getElementById("auditBody");
+    const progress = document.getElementById("auditProgress");
+    body.innerHTML = "";
+    let rows = [];
+    progress.textContent = "Collecting your page list…";
+    const urls = await collectAllDashboardUrls_();
+    progress.textContent = `Checking ${urls.length} pages, 20 at a time…`;
+    await runAuditScan_(urls,
+      (done,total)=>{ progress.textContent = `Checked ${done} of ${total} pages…`; },
+      (newRows)=>{
+        rows = rows.concat(newRows);
+        rows.sort((a,b)=> (a.flag==="OK"?1:0) - (b.flag==="OK"?1:0));
+        body.innerHTML = rows.map(r=>`<tr>
+          <td class="cell-muted">${esc(r.url)}</td>
+          <td>${esc(String(r.status))}</td>
+          <td>${esc(r.title)} <span class="cell-muted">(${r.titleLength})</span></td>
+          <td>${r.imagesMissingAlt}</td>
+          <td>${r.flag==="OK" ? `<span class="badge open">OK</span>` : `<span class="badge closed">${esc(r.flag)}</span>`}</td>
+        </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No results yet</td></tr>`;
+      }
+    );
+    btn.disabled = false; btn.textContent = "Run Audit Scan Again";
+    progress.textContent = `Done — checked ${urls.length} pages.`;
+  });
+}
+
 async function renderPageInsights(sec){
   const el = document.getElementById("content");
   el.innerHTML = sectionShell(sec, false);
@@ -2647,6 +2789,18 @@ async function renderPageInsights(sec){
   }
   draw("");
   document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+  el.insertAdjacentHTML("beforeend", `
+    <div class="section-head" style="margin-top:26px">
+      <div><h2>Core Web Vitals</h2><div class="meta">Checked live from PageSpeed Insights, on demand — no background job, no sheet</div></div>
+      <button class="btn" id="vitalsRunBtn">${ic("bolt")} Run Vitals Scan</button>
+    </div>
+    <div id="vitalsProgress" style="font-size:12.5px;color:var(--ink-50);margin-bottom:10px"></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Page</th><th>Score</th><th>LCP (s)</th><th>CLS</th><th>INP (ms)</th></tr></thead>
+      <tbody id="vitalsBody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">Click "Run Vitals Scan" to check your pages live</td></tr></tbody>
+    </table></div>
+  `);
+  wireVitalsPanel_();
 }
 async function renderSeoInsights(sec){
   const el = document.getElementById("content");
@@ -2692,6 +2846,18 @@ async function renderSeoInsights(sec){
   }
   draw("");
   document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+  el.insertAdjacentHTML("beforeend", `
+    <div class="section-head" style="margin-top:26px">
+      <div><h2>On-Page Audit</h2><div class="meta">Checked live, on demand — title/meta/alt-text/broken-link scan of every page</div></div>
+      <button class="btn" id="auditRunBtn">${ic("search")} Run Audit Scan</button>
+    </div>
+    <div id="auditProgress" style="font-size:12.5px;color:var(--ink-50);margin-bottom:10px"></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Page</th><th>HTTP Status</th><th>Title</th><th>Images Missing Alt</th><th>Flag</th></tr></thead>
+      <tbody id="auditBody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">Click "Run Audit Scan" to check your pages live</td></tr></tbody>
+    </table></div>
+  `);
+  wireAuditPanel_();
 }
 
 /* ---- Password gates for the two live Insights sections (same pattern as Requirements Log) ---- */
