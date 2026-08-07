@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 /* ============================================================
    DESIGN TOKENS — Brand: Black / White / Blue #0029A6 / Yellow #FFCF24 / Red #F63D44
@@ -786,8 +787,20 @@ const CONFIG = {
   // ---- REQUEST FORM SETUP (captures requests, writes them to the Requirements Log sheet, and emails you) ----
   // Paste the Web App URL you get after deploying the attached Code.gs (see SETUP_GUIDE.md, Step 2).
   // Until this is filled in, submitting a request falls back to opening a pre-filled email instead.
+  // ---- LIVE PAGE/SEO INSIGHTS: signs the visitor in with Google directly in the browser, so
+  // GA4/Search Console are called straight from here — no Apps Script deployment involved, so the
+  // "Anyone within jaro.in" web app restriction doesn't apply to these two. Whoever opens the
+  // dashboard signs in with their own Google account (needs GA4 + Search Console access) once per
+  // session (token lasts ~1hr). See the procedure notes for how to create the OAuth Client ID.
+  oauth: {
+    clientId: "", // paste the OAuth 2.0 Client ID (Web application type) here
+    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly"
+  },
+  ga4PropertyId: "", // same GA4 Property ID you put in Code.gs's CONFIG.GA4_PROPERTY_ID
+  gscSiteUrl: "",    // same Search Console property URL you put in Code.gs's CONFIG.GSC_SITE_URL
+
   requestForm: {
-    webAppUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec" // Apps Script backend: handles request-form submissions + live Page/SEO Insights
+    webAppUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec" // Apps Script backend: handles request-form submissions only now
   }
 };
 
@@ -2526,29 +2539,85 @@ come through via this email fallback. Once CONFIG.requestForm.webAppUrl is set, 
    Nothing is cached client-side beyond the page session, so opening the section or hitting
    "Refresh All" always pulls fresh numbers straight from Google.
    ================================================================================================ */
-async function fetchInsightsApi_(action){
-  const url = CONFIG.requestForm.webAppUrl;
-  if(!url) throw new Error("Backend not configured yet");
-  const res = await fetch(`${url}?action=${action}`);
+let GOOGLE_ACCESS_TOKEN = null;
+let GOOGLE_TOKEN_CLIENT = null;
+function ensureGoogleAuth_(){
+  return new Promise((resolve, reject)=>{
+    if(GOOGLE_ACCESS_TOKEN){ resolve(GOOGLE_ACCESS_TOKEN); return; }
+    if(!window.google || !google.accounts || !google.accounts.oauth2){
+      reject(new Error("Google sign-in script hasn't loaded yet — refresh the page and try again."));
+      return;
+    }
+    if(!GOOGLE_TOKEN_CLIENT){
+      GOOGLE_TOKEN_CLIENT = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.oauth.clientId,
+        scope: CONFIG.oauth.scopes,
+        callback: (resp)=>{
+          if(resp.error){ reject(new Error(resp.error)); return; }
+          GOOGLE_ACCESS_TOKEN = resp.access_token;
+          const ttl = (resp.expires_in || 3500) * 1000;
+          setTimeout(()=>{ GOOGLE_ACCESS_TOKEN = null; }, ttl);
+          resolve(GOOGLE_ACCESS_TOKEN);
+        },
+        error_callback: (err)=> reject(new Error(err.type || "Google sign-in failed or was cancelled"))
+      });
+    }
+    GOOGLE_TOKEN_CLIENT.requestAccessToken();
+  });
+}
+async function fetchGa4Live_(){
+  if(!CONFIG.oauth.clientId) throw new Error("CONFIG.oauth.clientId isn't set yet");
+  if(!CONFIG.ga4PropertyId) throw new Error("CONFIG.ga4PropertyId isn't set yet");
+  const token = await ensureGoogleAuth_();
+  const url = `https://analyticsdata.googleapis.com/v1beta/properties/${CONFIG.ga4PropertyId}:runReport`;
+  const body = {
+    dateRanges: [{ startDate: "28daysAgo", endDate: "today" }],
+    dimensions: [{ name: "pagePath" }],
+    metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }, { name: "averageSessionDuration" }, { name: "engagementRate" }],
+    limit: 100000
+  };
+  const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` }, body: JSON.stringify(body) });
   const json = await res.json();
-  if(!json.ok) throw new Error(json.error || "Unknown error from backend");
-  return json.rows || [];
+  if(!res.ok) throw new Error((json.error && json.error.message) || "GA4 request failed");
+  return (json.rows||[]).map(r=>({
+    pagePath: r.dimensionValues[0].value,
+    pageviews: Number(r.metricValues[0].value||0),
+    activeUsers: Number(r.metricValues[1].value||0),
+    avgEngagementTime: Number(r.metricValues[2].value||0),
+    engagementRate: Number(r.metricValues[3].value||0)
+  }));
+}
+async function fetchGscLive_(){
+  if(!CONFIG.oauth.clientId) throw new Error("CONFIG.oauth.clientId isn't set yet");
+  if(!CONFIG.gscSiteUrl) throw new Error("CONFIG.gscSiteUrl isn't set yet");
+  const token = await ensureGoogleAuth_();
+  const url = `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(CONFIG.gscSiteUrl)}/searchAnalytics/query`;
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 28);
+  const body = {
+    startDate: start.toISOString().slice(0,10), endDate: end.toISOString().slice(0,10),
+    dimensions: ["page"], rowLimit: 25000
+  };
+  const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` }, body: JSON.stringify(body) });
+  const json = await res.json();
+  if(!res.ok) throw new Error((json.error && json.error.message) || "Search Console request failed");
+  return (json.rows||[]).map(r=>({ page:r.keys[0], clicks:r.clicks, impressions:r.impressions, ctr:r.ctr, position:r.position }));
 }
 async function renderPageInsights(sec){
   const el = document.getElementById("content");
   el.innerHTML = sectionShell(sec, false);
   const listWrap = document.getElementById("listWrap");
-  if(!CONFIG.requestForm.webAppUrl){
+  if(!CONFIG.oauth.clientId || !CONFIG.ga4PropertyId){
     listWrap.innerHTML = emptyStateHTML(
       "Page Insights isn't connected yet",
-      "Deploy the Apps Script backend and paste its Web App URL into CONFIG.requestForm.webAppUrl to see live GA4 traffic per page."
+      "Paste your OAuth Client ID into CONFIG.oauth.clientId and your GA4 Property ID into CONFIG.ga4PropertyId to see live traffic per page."
     );
     document.getElementById("resultCount").textContent = "";
     return;
   }
-  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading from Google Analytics…</div>`;
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Sign in with Google if prompted, then loading from Google Analytics…</div>`;
   let rows;
-  try{ rows = await fetchInsightsApi_("ga4"); }
+  try{ rows = await fetchGa4Live_(); }
   catch(e){
     listWrap.innerHTML = emptyStateHTML("Couldn't load Page Insights", e.message || "Check the Apps Script execution log for details.");
     document.getElementById("resultCount").textContent = "";
@@ -2583,17 +2652,17 @@ async function renderSeoInsights(sec){
   const el = document.getElementById("content");
   el.innerHTML = sectionShell(sec, false);
   const listWrap = document.getElementById("listWrap");
-  if(!CONFIG.requestForm.webAppUrl){
+  if(!CONFIG.oauth.clientId || !CONFIG.gscSiteUrl){
     listWrap.innerHTML = emptyStateHTML(
       "SEO Insights isn't connected yet",
-      "Deploy the Apps Script backend and paste its Web App URL into CONFIG.requestForm.webAppUrl to see live Search Console data per page."
+      "Paste your OAuth Client ID into CONFIG.oauth.clientId and your Search Console site URL into CONFIG.gscSiteUrl to see live search performance per page."
     );
     document.getElementById("resultCount").textContent = "";
     return;
   }
-  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading from Search Console…</div>`;
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Sign in with Google if prompted, then loading from Search Console…</div>`;
   let rows;
-  try{ rows = await fetchInsightsApi_("gsc"); }
+  try{ rows = await fetchGscLive_(); }
   catch(e){
     listWrap.innerHTML = emptyStateHTML("Couldn't load SEO Insights", e.message || "Check the Apps Script execution log for details.");
     document.getElementById("resultCount").textContent = "";
