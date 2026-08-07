@@ -2181,8 +2181,8 @@ async function navigate(route){
   else if(sec.type === "free-courses") await renderFreeCourses(sec);
   else if(sec.type === "unique") await renderUnique(sec);
   else if(sec.type === "requirements-table") await renderRequirementsGateOrTable(sec);
-  else if(sec.type === "page-insights") await renderPageInsights(sec);
-  else if(sec.type === "seo-insights") await renderSeoInsights(sec);
+  else if(sec.type === "page-insights") await renderPageInsightsGateOrTable(sec);
+  else if(sec.type === "seo-insights") await renderSeoInsightsGateOrTable(sec);
 }
 
 /* ================================================================================================
@@ -2692,6 +2692,70 @@ async function renderSeoInsights(sec){
   }
   draw("");
   document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+}
+
+/* ---- Password gates for the two live Insights sections (same pattern as Requirements Log) ---- */
+const PAGE_INSIGHTS_PASSWORD = "Pageinsights@Jaro";
+function isPageInsightsUnlocked(){ return sessionStorage.getItem("pageInsightsUnlocked") === "1"; }
+async function renderPageInsightsGateOrTable(sec){
+  if(isPageInsightsUnlocked()){ await renderPageInsights(sec); return; }
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <div style="max-width:380px;margin:70px auto;text-align:center">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--blue-tint-10);color:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <h2 style="margin-bottom:6px">Password Protected</h2>
+      <p style="color:var(--ink-50);font-size:13px;margin-bottom:22px">Enter the password to view Page Insights</p>
+      <input type="password" id="piPasswordInput" placeholder="Password" autocomplete="off"
+        style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;text-align:center;font-size:14px;margin-bottom:12px;box-sizing:border-box">
+      <div id="piPasswordError" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none">Incorrect password — try again.</div>
+      <button class="btn primary" id="piPasswordSubmit" style="width:100%;justify-content:center">Unlock</button>
+    </div>`;
+  const input = document.getElementById("piPasswordInput");
+  const submit = async ()=>{
+    if(input.value === PAGE_INSIGHTS_PASSWORD){
+      sessionStorage.setItem("pageInsightsUnlocked", "1");
+      await renderPageInsights(sec);
+    } else {
+      document.getElementById("piPasswordError").style.display = "block";
+      input.value = ""; input.focus();
+    }
+  };
+  document.getElementById("piPasswordSubmit").addEventListener("click", submit);
+  input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
+  input.focus();
+}
+const SEO_INSIGHTS_PASSWORD = "Seoinsights@Jaro";
+function isSeoInsightsUnlocked(){ return sessionStorage.getItem("seoInsightsUnlocked") === "1"; }
+async function renderSeoInsightsGateOrTable(sec){
+  if(isSeoInsightsUnlocked()){ await renderSeoInsights(sec); return; }
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <div style="max-width:380px;margin:70px auto;text-align:center">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--blue-tint-10);color:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <h2 style="margin-bottom:6px">Password Protected</h2>
+      <p style="color:var(--ink-50);font-size:13px;margin-bottom:22px">Enter the password to view SEO Insights</p>
+      <input type="password" id="siPasswordInput" placeholder="Password" autocomplete="off"
+        style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;text-align:center;font-size:14px;margin-bottom:12px;box-sizing:border-box">
+      <div id="siPasswordError" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none">Incorrect password — try again.</div>
+      <button class="btn primary" id="siPasswordSubmit" style="width:100%;justify-content:center">Unlock</button>
+    </div>`;
+  const input = document.getElementById("siPasswordInput");
+  const submit = async ()=>{
+    if(input.value === SEO_INSIGHTS_PASSWORD){
+      sessionStorage.setItem("seoInsightsUnlocked", "1");
+      await renderSeoInsights(sec);
+    } else {
+      document.getElementById("siPasswordError").style.display = "block";
+      input.value = ""; input.focus();
+    }
+  };
+  document.getElementById("siPasswordSubmit").addEventListener("click", submit);
+  input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
+  input.focus();
 }
 
 /* ================================================================================================
