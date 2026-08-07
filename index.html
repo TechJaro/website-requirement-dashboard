@@ -819,13 +819,13 @@ const CONFIG = {
   // session (token lasts ~1hr). See the procedure notes for how to create the OAuth Client ID.
   oauth: {
     clientId: "169035673500-5rjm58tf5n27qlfaajbr553ie3th8q5s.apps.googleusercontent.com", // paste the OAuth 2.0 Client ID (Web application type) here
-    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/gmail.send"
+    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email"
   },
   ga4PropertyId: "281070911", // same GA4 Property ID you put in Code.gs's CONFIG.GA4_PROPERTY_ID
   gscSiteUrl: "https://www.jaroeducation.com/",    // same Search Console property URL you put in Code.gs's CONFIG.GSC_SITE_URL
 
   // ---- LIVE PAGE VITALS / ON-PAGE AUDIT: run on demand from a button, no sheet, no trigger ----
-  pagespeedApiKey: "AIzaSyAeSWkzQof55kMc6tpPyWqM5WOzMZEk3jA", // paste your PageSpeed-only restricted API key here (the one you created earlier)
+  pagespeedApiKey: "281070911", // paste your PageSpeed-only restricted API key here (the one you created earlier)
 
   requestForm: {
     webAppUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec" // Apps Script backend: handles request-form submissions only now
@@ -2643,46 +2643,128 @@ async function resolveSheetTitleOAuth_(token, sheetId, gid){
   if(!match) throw new Error(`Couldn't find a tab with gid ${gid} in that spreadsheet`);
   return match.properties.title;
 }
+/* RFC 2047 encoding — required for any email header (Subject, etc.) that contains non-ASCII
+   characters like — em dashes, curly quotes, etc. Without this, different mail clients guess the
+   header's character set differently and you get mojibake like "Ã¢Â€Â"" instead of "—". */
+function encodeMimeHeader_(str){
+  return "=?UTF-8?B?" + btoa(unescape(encodeURIComponent(str||""))) + "?=";
+}
+function b64UrlEncodeUtf8_(str){
+  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+/* Verifies who's actually signed in right now — the "Requested By" email is always taken from
+   here, never from whatever was typed in the form, so nobody can submit a request under someone
+   else's email address. */
+async function getSignedInEmail_(token){
+  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers:{ Authorization:`Bearer ${token}` } });
+  const json = await res.json();
+  if(!res.ok || !json.email) throw new Error("Couldn't verify your signed-in Google account");
+  return json.email;
+}
+const REQUEST_LOG_HEADER = ["Timestamp","University","Program","Request Type","Priority","Requested By","Email",
+  "Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key","Gmail Message ID","Gmail Thread ID"];
+function requestEmailHtml_(payload){
+  const rows = [
+    ["University", payload.university], ["Program", payload.program], ["Section", payload.section],
+    ["Request Type", payload.type], ["Priority", payload.priority],
+    ["Related Link", payload.link ? `<a href="${esc(payload.link)}" style="color:#0029A6">${esc(payload.link)}</a>` : "—"]
+  ].map(([label,val])=>`<tr>
+      <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${esc(label)}</td>
+      <td style="padding:7px 14px;font-size:13px;color:#111;border-bottom:1px solid #eef0f3">${val || "—"}</td>
+    </tr>`).join("");
+  return `
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto">
+  <div style="background:#0029A6;padding:20px 26px;border-radius:12px 12px 0 0">
+    <div style="color:#FFCF24;font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase">Jaro Dashboard</div>
+    <div style="color:#fff;font-weight:700;font-size:19px;margin-top:6px">New Request Raised</div>
+  </div>
+  <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:22px 26px">
+    <p style="font-size:13px;color:#333;margin:0 0 16px">Raised by <b>${esc(payload.name)}</b> (${esc(payload.email)})</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px">${rows}</table>
+    <div style="font-size:13px;color:#333">
+      <div style="font-weight:700;margin-bottom:8px">Description</div>
+      <div style="line-height:1.5">${payload.descriptionHtml && payload.descriptionHtml.trim() ? payload.descriptionHtml : esc(payload.descriptionText).replace(/\n/g,"<br>")}</div>
+    </div>
+  </div>
+  <p style="font-size:11px;color:#9aa1ab;margin:14px 4px 0">Subject: ${esc(payload.subject)} · Sent from the Jaro Web Pages Dashboard</p>
+</div>`;
+}
 async function submitRequestDirect_(payload){
   const cfg = CONFIG.sheets.requirementsLog;
   if(!cfg || !cfg.sheetId) throw new Error("CONFIG.sheets.requirementsLog isn't set");
   const token = await ensureGoogleAuth_();
-  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
 
-  const headerCheck = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1:P1")}`,
+  // Lock "Requested By" to whoever is actually signed in — overrides anything typed in the form.
+  const verifiedEmail = await getSignedInEmail_(token);
+  payload.email = verifiedEmail;
+  payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
+
+  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
+  const headerCheck = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1:R1")}`,
     { headers:{ Authorization:`Bearer ${token}` } });
   const headerJson = await headerCheck.json();
   if(!headerJson.values || !headerJson.values.length){
     await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1")}?valueInputOption=RAW`, {
       method:"PUT", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
-      body: JSON.stringify({ values:[["Timestamp","University","Program","Request Type","Priority","Requested By","Email","Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key"]] })
+      body: JSON.stringify({ values:[REQUEST_LOG_HEADER] })
     });
   }
+
+  // Our own Message-ID (for later threaded replies) — generated before sending so it can be both
+  // stamped on the outgoing email AND stored in the sheet for the status-update reply to reference.
+  const messageId = `<req-${Date.now()}-${Math.random().toString(36).slice(2)}@jaro-dashboard>`;
+  const to = (payload.to && payload.to.length) ? payload.to.join(",") : CONFIG.adminEmail;
+  const cc = (payload.cc||[]).join(",");
+  const mime = [
+    `To: ${to}`, cc ? `Cc: ${cc}` : null, `Message-ID: ${messageId}`,
+    `Subject: ${encodeMimeHeader_(payload.subject)}`, `Content-Type: text/html; charset=UTF-8`, "",
+    requestEmailHtml_(payload)
+  ].filter(Boolean).join("\r\n");
+  const mailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
+    method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ raw: b64UrlEncodeUtf8_(mime) })
+  });
+  const mailJson = await mailRes.json();
+  if(!mailRes.ok) throw new Error((mailJson.error && mailJson.error.message) || "Couldn't send the email");
+
   const row = [ new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
     payload.name||"", payload.email||"", payload.team||"", payload.section||"", payload.link||"", payload.subject||"",
-    payload.descriptionText||"", (payload.to||[]).join(", "), (payload.cc||[]).join(", "), "Open", payload.threadKey||"" ];
+    payload.descriptionText||"", (payload.to||[]).join(", "), (payload.cc||[]).join(", "), "Not Started", payload.threadKey||"",
+    messageId, mailJson.threadId || "" ];
   const appendRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A:A")}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
     method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
     body: JSON.stringify({ values:[row] })
   });
-  if(!appendRes.ok){ const j = await appendRes.json(); throw new Error((j.error && j.error.message) || "Couldn't save the request to the sheet"); }
+  if(!appendRes.ok){ const j = await appendRes.json(); throw new Error((j.error && j.error.message) || "Email sent, but couldn't save the request to the sheet"); }
+}
+/* ---- Status updates: writes the new Status into the sheet + replies in the same Gmail thread ---- */
+async function updateRequestStatus_({sheetRow, status, threadId, messageId, email, subject}){
+  const cfg = CONFIG.sheets.requirementsLog;
+  const token = await ensureGoogleAuth_();
+  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
+  const statusRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!O"+sheetRow)}?valueInputOption=RAW`, {
+    method:"PUT", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ values:[[status]] })
+  });
+  if(!statusRes.ok){ const j = await statusRes.json(); throw new Error((j.error && j.error.message) || "Couldn't update the status in the sheet"); }
+  if(!email) return; // nothing to notify
 
-  const to = (payload.to && payload.to.length) ? payload.to.join(",") : CONFIG.adminEmail;
-  const cc = (payload.cc||[]).join(",");
-  const plainBody = `New request from ${payload.name} (${payload.email})\n\n`+
-    `University: ${payload.university}\nProgram: ${payload.program}\nSection: ${payload.section}\n`+
-    `Type: ${payload.type}\nPriority: ${payload.priority}\nRelated link: ${payload.link}\n\n${payload.descriptionText}`;
-  const mimeLines = [
-    `To: ${to}`, cc ? `Cc: ${cc}` : null, `Subject: ${payload.subject}`,
-    `Content-Type: text/html; charset=UTF-8`, "",
-    `<div style="font-family:sans-serif;white-space:pre-wrap">${esc(plainBody)}</div>${payload.descriptionHtml ? ("<hr>"+payload.descriptionHtml) : ""}`
-  ].filter(Boolean).join("\r\n");
-  const raw = btoa(unescape(encodeURIComponent(mimeLines))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  const replySubject = /^re:/i.test(subject||"") ? subject : `Re: ${subject||"Your request"}`;
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13.5px;color:#222;max-width:520px">
+    <p>Your request status has been updated to:</p>
+    <p style="font-size:17px;font-weight:800;color:#0029A6;margin:6px 0 16px">${esc(status)}</p>
+    <p style="font-size:11.5px;color:#9aa1ab">Jaro Web Pages Dashboard</p>
+  </div>`;
+  const mimeLines = [ `To: ${email}`, `Subject: ${encodeMimeHeader_(replySubject)}` ];
+  if(messageId){ mimeLines.push(`In-Reply-To: ${messageId}`, `References: ${messageId}`); }
+  mimeLines.push(`Content-Type: text/html; charset=UTF-8`, "", html);
+  const body = { raw: b64UrlEncodeUtf8_(mimeLines.join("\r\n")) };
+  if(threadId) body.threadId = threadId;
   const mailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
     method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
-    body: JSON.stringify({ raw })
+    body: JSON.stringify(body)
   });
-  if(!mailRes.ok){ const j = await mailRes.json(); throw new Error((j.error && j.error.message) || "Saved to the sheet, but the email failed to send"); }
+  if(!mailRes.ok){ const j = await mailRes.json(); throw new Error((j.error && j.error.message) || "Status saved, but the reply email failed to send"); }
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
@@ -3037,6 +3119,40 @@ async function renderRequirementsGateOrTable(sec){
   input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
   input.focus();
 }
+const REQUEST_STATUS_OPTIONS = ["Not Started","In Progress","At Risk","Delayed","Completed","Terminated"];
+const REQUEST_STATUS_COLORS = {
+  "Not Started":{bg:"var(--ink-35)",fg:"#fff"}, "In Progress":{bg:"var(--blue)",fg:"#fff"},
+  "At Risk":{bg:"#8a6800",fg:"#fff"}, "Delayed":{bg:"var(--red)",fg:"#fff"},
+  "Completed":{bg:"#1b9c58",fg:"#fff"}, "Terminated":{bg:"var(--black)",fg:"#fff"}
+};
+function requestStatusSelectHtml_(row){
+  const current = REQUEST_STATUS_OPTIONS.includes(row["Status"]) ? row["Status"] : "Not Started";
+  const c = REQUEST_STATUS_COLORS[current] || REQUEST_STATUS_COLORS["Not Started"];
+  return `<select class="req-status-select" style="background:${c.bg};color:${c.fg};border:none;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer"
+      data-row="${row._sheetRow}" data-threadid="${esc(row["Gmail Thread ID"]||"")}" data-msgid="${esc(row["Gmail Message ID"]||"")}"
+      data-email="${esc(row["Email"]||"")}" data-subject="${esc(row["Subject"]||"")}">
+    ${REQUEST_STATUS_OPTIONS.map(s=>`<option value="${s}" ${s===current?"selected":""}>${s}</option>`).join("")}
+  </select>`;
+}
+/* ---- Reads the Requirements Log via the same Google sign-in used to write it — keeps the sheet
+   private (no "anyone with link" sharing needed) while still showing live data in the dashboard. ---- */
+async function fetchRequirementsLogRows_(){
+  const cfg = CONFIG.sheets.requirementsLog;
+  const token = await ensureGoogleAuth_();
+  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1:R")}`,
+    { headers:{ Authorization:`Bearer ${token}` } });
+  const json = await res.json();
+  if(!res.ok) throw new Error((json.error && json.error.message) || "Couldn't load the Requirements Log");
+  const values = json.values || [];
+  if(values.length < 2) return [];
+  const headers = values[0];
+  return values.slice(1).map((r,i)=>{
+    const obj = {}; headers.forEach((h,idx)=> obj[h] = r[idx] || "");
+    obj._sheetRow = i + 2; // header is row 1
+    return obj;
+  });
+}
 async function renderRequirementsTable(sec){
   const el = document.getElementById("content");
   el.innerHTML = sectionShell(sec, false);
@@ -3045,14 +3161,20 @@ async function renderRequirementsTable(sec){
   if(!cfg || !cfg.sheetId){
     listWrap.innerHTML = emptyStateHTML(
       "Requirements Log isn't linked yet",
-      "Deploy the Apps Script (see SETUP_GUIDE.md), then paste the Requirements Log sheet's ID + GID into CONFIG.sheets.requirementsLog to see every request raised here, with live status."
+      "Paste the Requirements Log sheet's ID + GID into CONFIG.sheets.requirementsLog to see every request raised here, with live status."
     );
     document.getElementById("resultCount").textContent = "";
     return;
   }
-  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
-  const {data, isLive} = await getData("requirementsLog", ["Timestamp","University","Program"]);
-  setLivePill(isLive);
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Sign in with Google if prompted, then loading…</div>`;
+  let data;
+  try{ data = await fetchRequirementsLogRows_(); }
+  catch(e){
+    listWrap.innerHTML = emptyStateHTML("Couldn't load the Requirements Log", e.message || "Try again in a moment.");
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  setLivePill(true);
   function draw(q){
     q=(q||"").toLowerCase();
     let items = data.filter(r => JSON.stringify(r).toLowerCase().includes(q));
@@ -3069,12 +3191,34 @@ async function renderRequirementsTable(sec){
               <td>${esc(row["Request Type"]||"—")}</td>
               <td>${esc(row["Priority"]||"—")}</td>
               <td class="cell-muted">${esc(row["Requested By"]||row["Email"]||"—")}</td>
-              <td>${statusPill(row["Status"])}</td>
+              <td>${requestStatusSelectHtml_(row)}</td>
             </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--ink-35)">No requests raised yet</td></tr>`}
           </tbody>
         </table>
       </div>`;
     document.getElementById("resultCount").textContent = `${items.length} requests`;
+    listWrap.querySelectorAll(".req-status-select").forEach(sel=>{
+      sel.addEventListener("change", async ()=>{
+        const newStatus = sel.value;
+        const prevColor = sel.style.background;
+        sel.disabled = true;
+        try{
+          await updateRequestStatus_({
+            sheetRow: +sel.dataset.row, status: newStatus,
+            threadId: sel.dataset.threadid, messageId: sel.dataset.msgid,
+            email: sel.dataset.email, subject: sel.dataset.subject
+          });
+          const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
+          sel.style.background = c.bg; sel.style.color = c.fg;
+          toast(sel.dataset.email ? `Status updated — ${sel.dataset.email} notified by email` : "Status updated");
+        }catch(err){
+          toast(err.message || "Couldn't update status", true);
+          sel.style.background = prevColor;
+        }finally{
+          sel.disabled = false;
+        }
+      });
+    });
   }
   draw("");
   document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
