@@ -572,6 +572,15 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <span>Requirements Log</span>
       </div>
+      <div class="nav-group-label">Insights</div>
+      <div class="navitem" data-nav="pageInsights">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/></svg>
+        <span>Page Insights</span>
+      </div>
+      <div class="navitem" data-nav="seoInsights">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>SEO Insights</span>
+      </div>
     </div>
     <div class="sidebar-foot">
       <button class="raise-btn" id="openRequestBtn">
@@ -778,7 +787,7 @@ const CONFIG = {
   // Paste the Web App URL you get after deploying the attached Code.gs (see SETUP_GUIDE.md, Step 2).
   // Until this is filled in, submitting a request falls back to opening a pre-filled email instead.
   requestForm: {
-    webAppUrl: "" // e.g. "https://script.google.com/macros/s/AKfycb.../exec"
+    webAppUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec" // Apps Script backend: handles request-form submissions + live Page/SEO Insights
   }
 };
 
@@ -830,7 +839,9 @@ const SECTIONS = {
   free: { key:"free", label:"Free Course Pages", desc:"Free courses grouped by category", icon:"free", type:"free-courses" },
   pillar: { key:"pillar", label:"Pillar Pages", desc:"Evergreen pillar & trending-topic pages", icon:"pillar", type:"flat-cards",
     titleField:"Page", linkField:"Webpage Link", tagField:"Column 4", tagFallback:"Pillar Page" },
-  requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" }
+  requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" },
+  pageInsights: { key:"pageInsights", label:"Page Insights", desc:"Traffic & engagement per page, live from Google Analytics (last 28 days)", icon:"bolt", type:"page-insights" },
+  seoInsights: { key:"seoInsights", label:"SEO Insights", desc:"Clicks, impressions & search ranking per page, live from Google Search Console (last 28 days)", icon:"search", type:"seo-insights" }
 };
 const NAV_ORDER = ["program","landing","unique","b2b","location","blog","university","free","pillar"];
 
@@ -2157,6 +2168,8 @@ async function navigate(route){
   else if(sec.type === "free-courses") await renderFreeCourses(sec);
   else if(sec.type === "unique") await renderUnique(sec);
   else if(sec.type === "requirements-table") await renderRequirementsGateOrTable(sec);
+  else if(sec.type === "page-insights") await renderPageInsights(sec);
+  else if(sec.type === "seo-insights") await renderSeoInsights(sec);
 }
 
 /* ================================================================================================
@@ -2508,6 +2521,111 @@ come through via this email fallback. Once CONFIG.requestForm.webAppUrl is set, 
 }
 
 /* ================================================================================================
+   LIVE INSIGHTS (Page Insights = GA4, SEO Insights = Search Console) — fetched on demand from the
+   same Apps Script backend that handles the request form, via doGet(?action=ga4 / ?action=gsc).
+   Nothing is cached client-side beyond the page session, so opening the section or hitting
+   "Refresh All" always pulls fresh numbers straight from Google.
+   ================================================================================================ */
+async function fetchInsightsApi_(action){
+  const url = CONFIG.requestForm.webAppUrl;
+  if(!url) throw new Error("Backend not configured yet");
+  const res = await fetch(`${url}?action=${action}`);
+  const json = await res.json();
+  if(!json.ok) throw new Error(json.error || "Unknown error from backend");
+  return json.rows || [];
+}
+async function renderPageInsights(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  if(!CONFIG.requestForm.webAppUrl){
+    listWrap.innerHTML = emptyStateHTML(
+      "Page Insights isn't connected yet",
+      "Deploy the Apps Script backend and paste its Web App URL into CONFIG.requestForm.webAppUrl to see live GA4 traffic per page."
+    );
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading from Google Analytics…</div>`;
+  let rows;
+  try{ rows = await fetchInsightsApi_("ga4"); }
+  catch(e){
+    listWrap.innerHTML = emptyStateHTML("Couldn't load Page Insights", e.message || "Check the Apps Script execution log for details.");
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  setLivePill(true);
+  rows = rows.slice().sort((a,b)=> (b.pageviews||0) - (a.pageviews||0));
+  function draw(q){
+    q=(q||"").toLowerCase();
+    const items = rows.filter(r => (r.pagePath||"").toLowerCase().includes(q));
+    listWrap.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Page</th><th>Pageviews (28d)</th><th>Active Users</th><th>Avg. Engagement Time</th><th>Engagement Rate</th></tr></thead>
+          <tbody>
+            ${items.map(r=>`<tr>
+              <td class="cell-muted">${esc(r.pagePath)}</td>
+              <td>${(r.pageviews||0).toLocaleString()}</td>
+              <td>${(r.activeUsers||0).toLocaleString()}</td>
+              <td>${(r.avgEngagementTime||0).toFixed(1)}s</td>
+              <td>${((r.engagementRate||0)*100).toFixed(1)}%</td>
+            </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No pages match this search</td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+    document.getElementById("resultCount").textContent = `${items.length} pages`;
+  }
+  draw("");
+  document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+}
+async function renderSeoInsights(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  if(!CONFIG.requestForm.webAppUrl){
+    listWrap.innerHTML = emptyStateHTML(
+      "SEO Insights isn't connected yet",
+      "Deploy the Apps Script backend and paste its Web App URL into CONFIG.requestForm.webAppUrl to see live Search Console data per page."
+    );
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading from Search Console…</div>`;
+  let rows;
+  try{ rows = await fetchInsightsApi_("gsc"); }
+  catch(e){
+    listWrap.innerHTML = emptyStateHTML("Couldn't load SEO Insights", e.message || "Check the Apps Script execution log for details.");
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  setLivePill(true);
+  rows = rows.slice().sort((a,b)=> (b.clicks||0) - (a.clicks||0));
+  function draw(q){
+    q=(q||"").toLowerCase();
+    const items = rows.filter(r => (r.page||"").toLowerCase().includes(q));
+    listWrap.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Page</th><th>Clicks (28d)</th><th>Impressions</th><th>CTR</th><th>Avg. Position</th></tr></thead>
+          <tbody>
+            ${items.map(r=>`<tr>
+              <td class="cell-muted">${esc(r.page)}</td>
+              <td>${(r.clicks||0).toLocaleString()}</td>
+              <td>${(r.impressions||0).toLocaleString()}</td>
+              <td>${((r.ctr||0)*100).toFixed(1)}%</td>
+              <td>${(r.position||0).toFixed(1)}</td>
+            </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No pages match this search</td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+    document.getElementById("resultCount").textContent = `${items.length} pages`;
+  }
+  draw("");
+  document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+}
+
+/* ================================================================================================
    REQUIREMENTS LOG (read-only view of the sheet the Apps Script writes to)
    ================================================================================================ */
 function statusPill(status){
@@ -2645,6 +2763,8 @@ function init(){
   });
   document.querySelector('.navitem[data-nav="home"]').addEventListener("click", ()=>navigate("home"));
   document.querySelector('.navitem[data-nav="requirements"]').addEventListener("click", ()=>navigate("requirements"));
+  document.querySelector('.navitem[data-nav="pageInsights"]').addEventListener("click", ()=>navigate("pageInsights"));
+  document.querySelector('.navitem[data-nav="seoInsights"]').addEventListener("click", ()=>navigate("seoInsights"));
   document.getElementById("openRequestBtn").addEventListener("click", ()=>openRequestModal());
   document.getElementById("closeRequestBtn").addEventListener("click", closeRequestModal);
   document.getElementById("cancelRequestBtn").addEventListener("click", closeRequestModal);
