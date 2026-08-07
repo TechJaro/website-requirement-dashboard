@@ -1397,10 +1397,6 @@ async function renderHome(){
           <h2 class="hero-title">${greeting}, team 👋</h2>
         </div>
         <div style="display:flex;align-items:center;gap:12px">
-          <span class="hero-total-card" id="heroTotalPill">
-            <span class="htc-ic">${ic("bolt")}</span>
-            <span class="htc-text"><b id="heroTotalCount">…</b><span class="htc-label">Total Pages</span></span>
-          </span>
           <span class="hero-live-pill" id="heroLivePill" style="display:none">
             <span class="hero-live-dot"></span>LIVE
           </span>
@@ -1414,10 +1410,13 @@ async function renderHome(){
 
     <div class="section-head">
       <div><h2>Website Stats</h2><div class="meta">Every category, refreshed straight from your Google Sheets</div></div>
-      <button class="btn" id="refreshHomeBtn">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
-        Refresh All
-      </button>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+        <button class="btn" id="refreshHomeBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+          Refresh All
+        </button>
+        <div style="font-size:13px;color:var(--ink-70)">Total Page Count: <b id="heroTotalCount" style="color:var(--blue)">…</b></div>
+      </div>
     </div>
     <div class="stat-grid" id="statGrid">${NAV_ORDER.map(k=>{
       return `
