@@ -819,7 +819,7 @@ const CONFIG = {
   // session (token lasts ~1hr). See the procedure notes for how to create the OAuth Client ID.
   oauth: {
     clientId: "169035673500-5rjm58tf5n27qlfaajbr553ie3th8q5s.apps.googleusercontent.com", // paste the OAuth 2.0 Client ID (Web application type) here
-    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly"
+    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/gmail.send"
   },
   ga4PropertyId: "281070911", // same GA4 Property ID you put in Code.gs's CONFIG.GA4_PROPERTY_ID
   gscSiteUrl: "https://www.jaroeducation.com/",    // same Search Console property URL you put in Code.gs's CONFIG.GSC_SITE_URL
@@ -1423,7 +1423,7 @@ async function renderHome(){
 
     <div class="section-head" style="align-items:center">
       <div><h2>Website Stats</h2><div class="meta">Every category, refreshed straight from your Google Sheets</div></div>
-      <div class="total-pages-badge" id="heroTotalPill">✅ Total Page Count: <span class="tpb-num" id="heroTotalCount">…</span></div>
+      <div class="total-pages-badge" id="heroTotalPill">📄 Total Page Count: <span class="tpb-num" id="heroTotalCount">…</span></div>
       <button class="btn" id="refreshHomeBtn">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
         Refresh All
@@ -2519,30 +2519,18 @@ async function submitRequest(e){
   // Threading rule: same requester + same subject (exact match) -> same email thread
   payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
 
-  const webAppUrl = CONFIG.requestForm.webAppUrl;
   const submitBtn = document.querySelector('#requestForm button[type="submit"]');
-  if(webAppUrl){
-    submitBtn.disabled = true;
-    try{
-      const res = await fetch(webAppUrl, {
-        method:"POST",
-        headers:{ "Content-Type":"text/plain;charset=utf-8" }, // avoids a CORS preflight on Apps Script
-        body: JSON.stringify(payload)
-      });
-      toast("Request submitted — an email is on its way!");
-      closeRequestModal();
-      resetRequestForm();
-    }catch(err){
-      toast("Couldn't submit automatically — opening email instead", true);
-      mailtoFallback(payload);
-    }finally{
-      submitBtn.disabled = false;
-    }
-  } else {
-    mailtoFallback(payload);
-    toast("Opening your email client to send this request…");
+  submitBtn.disabled = true;
+  try{
+    await submitRequestDirect_(payload);
+    toast("Request submitted — saved to the log and emailed!");
     closeRequestModal();
     resetRequestForm();
+  }catch(err){
+    toast(err.message ? `Couldn't submit automatically (${err.message}) — opening email instead` : "Couldn't submit automatically — opening email instead", true);
+    mailtoFallback(payload);
+  }finally{
+    submitBtn.disabled = false;
   }
 }
 function resetRequestForm(){
@@ -2568,7 +2556,7 @@ Description:
 ${payload.descriptionText}
 
 (Note: this dashboard isn't yet connected to the automatic mailer — screenshots pasted above won't
-come through via this email fallback. Once CONFIG.requestForm.webAppUrl is set, they will.)`;
+come through via this email fallback — they will once the automatic submission above succeeds.)`;
   const url = `mailto:${(payload.to||[CONFIG.adminEmail]).join(",")}?cc=${encodeURIComponent((payload.cc||[]).join(","))}&subject=${encodeURIComponent(payload.subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = url;
 }
@@ -2642,6 +2630,59 @@ async function fetchGscLive_(){
   const json = await res.json();
   if(!res.ok) throw new Error((json.error && json.error.message) || "Search Console request failed");
   return (json.rows||[]).map(r=>({ page:r.keys[0], clicks:r.clicks, impressions:r.impressions, ctr:r.ctr, position:r.position }));
+}
+
+/* ---- Requirements Log: writes the row + sends the email directly from the browser (Sheets API +
+   Gmail API), using the same Google sign-in as Page/SEO Insights. No Apps Script, no spreadsheet
+   sharing restriction to work around. Requires CONFIG.sheets.requirementsLog to be set. ---- */
+async function resolveSheetTitleOAuth_(token, sheetId, gid){
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties`, { headers:{ Authorization:`Bearer ${token}` } });
+  const json = await res.json();
+  if(!res.ok) throw new Error((json.error && json.error.message) || "Couldn't read the Requirements Log spreadsheet");
+  const match = (json.sheets||[]).find(s => String(s.properties.sheetId) === String(gid||"0"));
+  if(!match) throw new Error(`Couldn't find a tab with gid ${gid} in that spreadsheet`);
+  return match.properties.title;
+}
+async function submitRequestDirect_(payload){
+  const cfg = CONFIG.sheets.requirementsLog;
+  if(!cfg || !cfg.sheetId) throw new Error("CONFIG.sheets.requirementsLog isn't set");
+  const token = await ensureGoogleAuth_();
+  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
+
+  const headerCheck = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1:P1")}`,
+    { headers:{ Authorization:`Bearer ${token}` } });
+  const headerJson = await headerCheck.json();
+  if(!headerJson.values || !headerJson.values.length){
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1")}?valueInputOption=RAW`, {
+      method:"PUT", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+      body: JSON.stringify({ values:[["Timestamp","University","Program","Request Type","Priority","Requested By","Email","Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key"]] })
+    });
+  }
+  const row = [ new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
+    payload.name||"", payload.email||"", payload.team||"", payload.section||"", payload.link||"", payload.subject||"",
+    payload.descriptionText||"", (payload.to||[]).join(", "), (payload.cc||[]).join(", "), "Open", payload.threadKey||"" ];
+  const appendRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A:A")}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+    method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ values:[row] })
+  });
+  if(!appendRes.ok){ const j = await appendRes.json(); throw new Error((j.error && j.error.message) || "Couldn't save the request to the sheet"); }
+
+  const to = (payload.to && payload.to.length) ? payload.to.join(",") : CONFIG.adminEmail;
+  const cc = (payload.cc||[]).join(",");
+  const plainBody = `New request from ${payload.name} (${payload.email})\n\n`+
+    `University: ${payload.university}\nProgram: ${payload.program}\nSection: ${payload.section}\n`+
+    `Type: ${payload.type}\nPriority: ${payload.priority}\nRelated link: ${payload.link}\n\n${payload.descriptionText}`;
+  const mimeLines = [
+    `To: ${to}`, cc ? `Cc: ${cc}` : null, `Subject: ${payload.subject}`,
+    `Content-Type: text/html; charset=UTF-8`, "",
+    `<div style="font-family:sans-serif;white-space:pre-wrap">${esc(plainBody)}</div>${payload.descriptionHtml ? ("<hr>"+payload.descriptionHtml) : ""}`
+  ].filter(Boolean).join("\r\n");
+  const raw = btoa(unescape(encodeURIComponent(mimeLines))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  const mailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
+    method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ raw })
+  });
+  if(!mailRes.ok){ const j = await mailRes.json(); throw new Error((j.error && j.error.message) || "Saved to the sheet, but the email failed to send"); }
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
