@@ -1704,7 +1704,7 @@ async function renderGroupedSection(sec){
               ${(()=>{
                 const lines = (row[sec.itemField]||"Untitled Program").toString().split(/\n+/).map(s=>s.trim()).filter(Boolean);
                 return lines.length > 1
-                  ? `<div class="prog-name"><div style="font-weight:700">${esc(lines[0])}</div><div style="font-weight:400;color:var(--ink-50);margin-top:2px">${esc(lines.slice(1).join(" "))}</div></div>`
+                  ? `<div class="prog-name"><div style="font-weight:700">${esc(lines[0])}</div><div style="font-weight:400;color:var(--ink-50);font-size:12px;margin-top:2px">${esc(lines.slice(1).join(" "))}</div></div>`
                   : `<div class="prog-name">${esc(lines[0]||"Untitled Program")}</div>`;
               })()}
               ${statusBadge(row[sec.statusField])}
