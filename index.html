@@ -1688,19 +1688,28 @@ async function renderGroupedSection(sec){
             const isDraft = sec.statusField && (row[sec.statusField]||"").toLowerCase().includes("draft");
             return `
             <div class="prog-row${isDraft?" is-draft":""}">
-              <div class="prog-name">${esc(row[sec.itemField]||"Untitled Program")}</div>
+              ${(()=>{
+                const lines = (row[sec.itemField]||"Untitled Program").toString().split(/\n+/).map(s=>s.trim()).filter(Boolean);
+                return lines.length > 1
+                  ? `<div class="prog-name"><div style="font-weight:700">${esc(lines[0])}</div><div style="font-weight:400;color:var(--ink-50);margin-top:2px">${esc(lines.slice(1).join(" "))}</div></div>`
+                  : `<div class="prog-name">${esc(lines[0]||"Untitled Program")}</div>`;
+              })()}
               ${statusBadge(row[sec.statusField])}
               ${row["Category / Domain"] ? `<span class="badge neutral">${esc(row["Category / Domain"])}</span>` : ""}
-              ${isValidLink(row["Application Closure Date"]) ? `<span class="badge" style="background:var(--yellow-tint);color:#8a6800">Closes: ${esc(row["Application Closure Date"])}</span>` : ""}
+              ${isValidLink(row["Application Closure Date"]) ? `<span class="badge" style="background:var(--yellow-tint);color:#8a6800">Admission Closure Date: ${esc(row["Application Closure Date"])}</span>` : ""}
               ${raiseBtn({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" })}
               <div class="linkrow">${buildLinkChips(row, sec.linkFields)}</div>
               ${(isValidLink(row["Meta Title"])||isValidLink(row["Meta Description"])) ? `
                 <div class="meta-block" style="width:100%">
-                  ${isValidLink(row["Meta Title"]) ? `<div class="meta-title">${esc(row["Meta Title"])}</div>` : ""}
-                  ${isValidLink(row["Meta Description"]) ? `<div class="meta-desc">${esc(row["Meta Description"])}</div>` : ""}
+                  ${isValidLink(row["Meta Title"]) ? `<div class="meta-title"><b>Meta Title:</b> ${esc(row["Meta Title"])}</div>` : ""}
+                  ${isValidLink(row["Meta Description"]) ? `<div class="meta-desc"><b>Meta Description:</b> ${esc(row["Meta Description"])}</div>` : ""}
                 </div>
               ` : ""}
-              ${isDraft ? draftNote({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" }) : ""}
+              ${isDraft && isValidLink(row["Preview Link"]) ? `
+                <div class="linkrow" style="margin-top:-2px">
+                  <a class="link-chip primary-chip" href="${esc(firstLink(row["Preview Link"]))}" target="_blank" rel="noopener">${ic("external")}Preview Page</a>
+                </div>
+              ` : ""}
             </div>`;}).join("")}
         </div></div>
       </div>`;
