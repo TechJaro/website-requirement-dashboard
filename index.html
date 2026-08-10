@@ -1064,6 +1064,19 @@ function draftNote(prefill){
 }
 function isValidLink(v){ if(!v) return false; const s=v.toString().trim(); if(!s || s==="-" || /page not created/i.test(s) || /^nill?$/i.test(s)) return false; return true; }
 function firstLink(v){ if(!isValidLink(v)) return ""; const s=v.toString().trim(); const m = s.match(/https?:\/\/[^\s\n]+/); return m ? m[0] : (s.startsWith("http")? s.split(/\s|\n/)[0] : ""); }
+/* Google Sheets API (UNFORMATTED_VALUE) returns dates as a raw serial number (days since
+   1899-12-30) rather than a readable date — this converts it back for display, leaving anything
+   that isn't a plausible date serial (e.g. "Closed", "Closing Soon") untouched. */
+function formatClosureDate_(v){
+  if(v===undefined || v===null || v==="") return "";
+  const s = v.toString().trim();
+  const num = /^\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+  if(!isNaN(num) && num > 20000 && num < 60000){
+    const d = new Date(Date.UTC(1899,11,30) + Math.round(num)*86400000);
+    return d.toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" });
+  }
+  return s;
+}
 function initials(name){ return (name||"?").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase() || "?"; }
 /* ================================================================================================
    UNIVERSITY / INSTITUTE LOGOS — replaces the initials avatar wherever we recognize the name.
@@ -1696,18 +1709,13 @@ async function renderGroupedSection(sec){
               })()}
               ${statusBadge(row[sec.statusField])}
               ${row["Category / Domain"] ? `<span class="badge neutral">${esc(row["Category / Domain"])}</span>` : ""}
-              ${isValidLink(row["Application Closure Date"]) ? `<span class="badge" style="background:var(--yellow-tint);color:#8a6800">Admission Closure Date: ${esc(row["Application Closure Date"])}</span>` : ""}
+              ${isValidLink(row["Application Closure Date"]) ? `<span class="badge" style="background:var(--yellow-tint);color:#8a6800">Admission Closure Date: ${esc(formatClosureDate_(row["Application Closure Date"]))}</span>` : ""}
               ${raiseBtn({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" })}
-              <div class="linkrow">${buildLinkChips(row, sec.linkFields)}</div>
+              <div class="linkrow">${buildLinkChips(row, isDraft ? [["Preview Link","Preview Page"], ...sec.linkFields.slice(1)] : sec.linkFields)}</div>
               ${(isValidLink(row["Meta Title"])||isValidLink(row["Meta Description"])) ? `
                 <div class="meta-block" style="width:100%">
-                  ${isValidLink(row["Meta Title"]) ? `<div class="meta-title"><b>Meta Title:</b> ${esc(row["Meta Title"])}</div>` : ""}
-                  ${isValidLink(row["Meta Description"]) ? `<div class="meta-desc"><b>Meta Description:</b> ${esc(row["Meta Description"])}</div>` : ""}
-                </div>
-              ` : ""}
-              ${isDraft && isValidLink(row["Preview Link"]) ? `
-                <div class="linkrow" style="margin-top:-2px">
-                  <a class="link-chip primary-chip" href="${esc(firstLink(row["Preview Link"]))}" target="_blank" rel="noopener">${ic("external")}Preview Page</a>
+                  ${isValidLink(row["Meta Title"]) ? `<div style="font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:2px"><b>Meta Title:</b> ${esc(row["Meta Title"])}</div>` : ""}
+                  ${isValidLink(row["Meta Description"]) ? `<div style="font-size:13.5px;font-weight:700;color:var(--ink)"><b>Meta Description:</b> ${esc(row["Meta Description"])}</div>` : ""}
                 </div>
               ` : ""}
             </div>`;}).join("")}
