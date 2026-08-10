@@ -825,7 +825,7 @@ const CONFIG = {
   gscSiteUrl: "https://www.jaroeducation.com/",    // same Search Console property URL you put in Code.gs's CONFIG.GSC_SITE_URL
 
   // ---- LIVE PAGE VITALS / ON-PAGE AUDIT: run on demand from a button, no sheet, no trigger ----
-  pagespeedApiKey: "281070911", // paste your PageSpeed-only restricted API key here (the one you created earlier)
+  pagespeedApiKey: "AIzaSyAeSWkzQof55kMc6tpPyWqM5WOzMZEk3jA", // paste your PageSpeed-only restricted API key here (the one you created earlier)
 
   requestForm: {
     webAppUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec" // Apps Script backend: handles request-form submissions only now
@@ -1691,8 +1691,15 @@ async function renderGroupedSection(sec){
               <div class="prog-name">${esc(row[sec.itemField]||"Untitled Program")}</div>
               ${statusBadge(row[sec.statusField])}
               ${row["Category / Domain"] ? `<span class="badge neutral">${esc(row["Category / Domain"])}</span>` : ""}
+              ${isValidLink(row["Application Closure Date"]) ? `<span class="badge" style="background:var(--yellow-tint);color:#8a6800">Closes: ${esc(row["Application Closure Date"])}</span>` : ""}
               ${raiseBtn({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" })}
               <div class="linkrow">${buildLinkChips(row, sec.linkFields)}</div>
+              ${(isValidLink(row["Meta Title"])||isValidLink(row["Meta Description"])) ? `
+                <div class="meta-block" style="width:100%">
+                  ${isValidLink(row["Meta Title"]) ? `<div class="meta-title">${esc(row["Meta Title"])}</div>` : ""}
+                  ${isValidLink(row["Meta Description"]) ? `<div class="meta-desc">${esc(row["Meta Description"])}</div>` : ""}
+                </div>
+              ` : ""}
               ${isDraft ? draftNote({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" }) : ""}
             </div>`;}).join("")}
         </div></div>
