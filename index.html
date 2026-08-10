@@ -372,7 +372,7 @@ input,select,textarea{font-family:inherit}
 .badge.closed{background:var(--red-tint);color:var(--red)}
 .badge.soon{background:var(--yellow-tint);color:#8a6800}
 .badge.neutral{background:var(--blue-tint-10);color:var(--blue)}
-.badge.draft{background:var(--red-tint);color:var(--red)}
+.badge.draft{background:var(--red-tint);color:var(--black)}
 .linkrow{display:flex;flex-wrap:wrap;gap:6px;width:100%}
 .link-chip{
   display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
@@ -1714,8 +1714,8 @@ async function renderGroupedSection(sec){
               <div class="linkrow">${buildLinkChips(row, isDraft ? [["Preview Link","Preview Page"], ...sec.linkFields.slice(1)] : sec.linkFields)}</div>
               ${(isValidLink(row["Meta Title"])||isValidLink(row["Meta Description"])) ? `
                 <div class="meta-block" style="width:100%">
-                  ${isValidLink(row["Meta Title"]) ? `<div style="font-size:13.5px;font-weight:700;color:var(--ink);margin-bottom:2px"><b>Meta Title:</b> ${esc(row["Meta Title"])}</div>` : ""}
-                  ${isValidLink(row["Meta Description"]) ? `<div style="font-size:13.5px;font-weight:700;color:var(--ink)"><b>Meta Description:</b> ${esc(row["Meta Description"])}</div>` : ""}
+                  ${isValidLink(row["Meta Title"]) ? `<div style="font-size:12px;margin-bottom:3px"><b style="color:var(--ink);font-weight:700">Meta Title:</b> <span style="font-weight:400;color:var(--ink-50)">${esc(row["Meta Title"])}</span></div>` : ""}
+                  ${isValidLink(row["Meta Description"]) ? `<div style="font-size:12px"><b style="color:var(--ink);font-weight:700">Meta Description:</b> <span style="font-weight:400;color:var(--ink-50)">${esc(row["Meta Description"])}</span></div>` : ""}
                 </div>
               ` : ""}
             </div>`;}).join("")}
