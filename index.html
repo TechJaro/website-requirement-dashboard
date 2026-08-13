@@ -612,25 +612,51 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .news-item .ni-link{font-size:12px;font-weight:700;color:var(--blue);display:inline-flex;align-items:center;gap:4px;margin-top:6px}
 .news-item .ni-link svg{width:12px;height:12px}
 @media(max-width:640px){.hero-award-card{min-width:200px}}
-/* "Our Associations" strip - a static row of partner-university logos at the bottom of Home,
-   mirroring the section on jaroeducation.com's own homepage. Deliberately NOT a slider (the
-   earlier University/Partnership sliders were removed at request) and on a plain white card,
-   not the dark hero-banner background. */
-.assoc-section{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
-  padding:30px 24px;text-align:center;margin-bottom:26px;box-shadow:var(--shadow-sm)}
-.assoc-section h3{font-size:21px;font-weight:700;color:var(--ink);margin-bottom:26px}
-.assoc-section h3 span{color:var(--blue)}
-.assoc-row{display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap}
-.assoc-chip{display:flex;align-items:center;justify-content:center;height:66px;min-width:110px;
-  padding:8px 16px;border-radius:10px;border:1px solid var(--line-soft);background:#fff}
-.assoc-chip img{max-height:50px;max-width:150px;object-fit:contain}
-.assoc-chip-word{flex-direction:column;justify-content:center;align-items:flex-start;min-width:100px}
-.assoc-uonline{display:flex;flex-direction:column;align-items:flex-start;line-height:1}
-.au-word{display:flex;align-items:baseline;gap:2px}
-.au-word .au-u{font-size:24px;font-weight:800;color:var(--red)}
-.au-word .au-online{font-size:16px;font-weight:800;color:var(--ink)}
-.au-tag{font-size:9.5px;color:var(--ink-50);margin-top:2px;letter-spacing:.2px}
-@media(max-width:640px){.assoc-row{gap:14px}.assoc-chip{height:56px;padding:6px 12px}.assoc-chip img{max-height:38px}}
+/* "Our Associations" strip (v2) — full-bleed auto-scrolling marquee at the very bottom of Home,
+   matching the real carousel on jaroeducation.com's homepage: no card/box background, just the
+   heading and a continuously sliding row of logos sitting directly on the page. */
+.assoc-section-v2{margin-top:6px;padding:22px 0 4px;text-align:center}
+.assoc-section-v2 h3{font-size:20px;font-weight:700;color:var(--ink);margin-bottom:18px}
+.assoc-section-v2 h3 span{color:var(--blue)}
+.assoc-strip{position:relative;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
+.assoc-track{display:flex;align-items:center;gap:36px;width:max-content;animation:assocScroll 42s linear infinite}
+.assoc-strip:hover .assoc-track{animation-play-state:paused}
+@keyframes assocScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.assoc-logo{flex-shrink:0;display:flex;align-items:center;justify-content:center;height:46px}
+.assoc-logo img{max-height:42px;max-width:130px;object-fit:contain;filter:grayscale(15%);opacity:.9;transition:filter .2s,opacity .2s}
+.assoc-logo:hover img{filter:none;opacity:1}
+/* "Trending Courses" carousel — sits below Website Stats on Home, light-green backdrop per request,
+   arrow-driven horizontal scroll (course text needs to be readable, so no auto-marquee here). */
+.trending-section{background:#EAF7EE;border-radius:var(--radius);padding:26px 8px 30px;margin-bottom:26px}
+.trending-head{text-align:center;padding:0 20px;margin-bottom:20px}
+.trending-head h3{font-size:22px;font-weight:700;color:var(--ink)}
+.trending-head h3 span{color:var(--blue)}
+.trending-head p{font-size:13px;color:var(--ink-50);margin-top:8px;max-width:640px;margin-left:auto;margin-right:auto}
+.tc-carousel{display:flex;align-items:center;gap:8px;padding:0 8px}
+.tc-arrow{flex-shrink:0;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;
+  color:var(--blue);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm)}
+.tc-arrow:hover{background:var(--blue);color:#fff}
+.tc-arrow svg{width:16px;height:16px}
+.tc-track{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x proximity;padding:4px;scrollbar-width:none}
+.tc-track::-webkit-scrollbar{display:none}
+.tc-empty{padding:30px;color:var(--ink-50);font-size:13px;width:100%;text-align:center}
+.tc-card{flex-shrink:0;width:270px;scroll-snap-align:start;background:#fff;border-radius:14px;overflow:hidden;
+  box-shadow:var(--shadow-sm);border:1px solid var(--line-soft)}
+.tc-card-top{position:relative;height:92px;display:flex;align-items:flex-start;padding:10px}
+.tc-card-top .card-logo-corner{position:absolute;top:10px;left:10px;right:auto}
+.tc-badge{position:absolute;top:10px;right:10px;font-size:10.5px;font-weight:800;padding:4px 9px;border-radius:20px;color:#fff}
+.tc-badge-open{background:#1b9c58}
+.tc-badge-soon{background:#c98a00}
+.tc-card-body{padding:14px 16px 16px}
+.tc-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.35;min-height:36px}
+.tc-uni{font-size:11.5px;color:var(--ink-50);margin-top:4px}
+.tc-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-70);margin-top:8px}
+.tc-meta svg{width:13px;height:13px;flex-shrink:0;color:var(--ink-35)}
+.tc-btn{display:block;text-align:center;margin-top:12px;background:var(--blue);color:#fff;font-size:12.5px;
+  font-weight:700;padding:9px 0;border-radius:9px;text-decoration:none}
+.tc-btn:hover{background:var(--blue-dark)}
+.tc-btn-disabled{background:var(--ink-35);cursor:default}
+@media(max-width:640px){.tc-card{width:230px}.assoc-track{gap:24px}}
 /* ==== Round 2: clearer click affordance, landing insights drill-down,
    university/partner logo sliders, floating News launcher, richer News cards ==== */
 .status-legend-item[data-type],
@@ -1798,6 +1824,22 @@ async function renderHome(){
       </button>
     </div>`;}).join("")}</div>
 
+    <div class="trending-section">
+      <div class="trending-head">
+        <h3>Trending <span>Courses</span></h3>
+        <p>Live, in-demand programs from your Program Pages tracker — open for admission or closing soon.</p>
+      </div>
+      <div class="tc-carousel">
+        <button type="button" class="tc-arrow tc-arrow-left" id="tcArrowLeft" aria-label="Scroll left">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
+        <div class="tc-track" id="trendingCoursesTrack"><div class="tc-empty">Loading trending courses…</div></div>
+        <button type="button" class="tc-arrow tc-arrow-right" id="tcArrowRight" aria-label="Scroll right">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+
     <div class="section-head"><div><h2>Live Insights</h2><div class="meta">Traffic, search performance, page vitals & audit — password protected</div></div></div>
     <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:26px">
       <div class="stat-card" data-go="pageInsights" style="--glass:var(--blue-tint-10);--fg:var(--blue)">
@@ -1836,26 +1878,16 @@ async function renderHome(){
       </div>
     </div>
 
-    <div class="assoc-section">
+    <div class="assoc-section-v2">
       <h3>Our <span>Associations</span></h3>
-      <div class="assoc-row">
-        <div class="assoc-chip assoc-chip-word">
-          <div class="assoc-uonline">
-            <div class="au-word"><span class="au-u">U</span><span class="au-online">Online</span></div>
-            <div class="au-tag">Learn. Empower.</div>
-          </div>
-        </div>
-        <div class="assoc-chip"><img src="${UNIVERSITY_LOGO_DATA.amity}" alt="Amity University Online" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
-        <div class="assoc-chip"><img src="${UNIVERSITY2_LOGO_DATA.siu_symbiosis}" alt="Symbiosis School for Online and Digital Learning" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
-        <div class="assoc-chip"><img src="${UNIVERSITY2_LOGO_DATA.imt_ghaziabad}" alt="IMT" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
-        <div class="assoc-chip"><img src="${UNIVERSITY_LOGO_DATA.dpu}" alt="D Y Patil - DPU" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
-        <div class="assoc-chip"><img src="${UNIVERSITY2_LOGO_DATA.liba}" alt="LIBA" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
-        <div class="assoc-chip"><img src="${UNIVERSITY2_LOGO_DATA.muj}" alt="Manipal University Jaipur - Online Manipal" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+      <div class="assoc-strip">
+        <div class="assoc-track" id="assocTrack2">${renderAssocLogos()}</div>
       </div>
     </div>
   `;
   el.querySelectorAll("[data-go]").forEach(c=>c.addEventListener("click", ()=>navigate(c.dataset.go)));
   document.getElementById("refreshHomeBtn").addEventListener("click", forceRefreshCurrentSection);
+  wireTrendingCoursesArrows();
   const heroSearchEl = document.getElementById("heroSearch");
   if(heroSearchEl) heroSearchEl.addEventListener("keydown", (e)=>{
     if(e.key === "Enter"){
@@ -1892,7 +1924,7 @@ async function renderHome(){
         const pill = document.getElementById("heroLivePill");
         if(pill) pill.style.display = "inline-flex";
       }
-      if(key==="program") renderQuickInsights(data);
+      if(key==="program"){ renderQuickInsights(data); renderTrendingCourses(data); }
     });
   }
   loadLandingInsights();
@@ -1909,6 +1941,71 @@ function statusKeyFor(row){
   if(s.includes("closing")) return "soon";
   if(s.includes("closed")) return "closed";
   return "other";
+}
+/* "Our Associations" strip (bottom of Home) — the exact university/partner sequence from
+   jaroeducation.com's own "Our Associations" carousel (verified against the live site), rendered
+   via the same findUniversityLogo() alias-matching already used everywhere else in the dashboard,
+   so no logo is duplicated or hand-typed here. A handful of the site's logos (IIT Jodhpur, Harvard,
+   IDSS, Rotman, Deakin, iFEEL) aren't in our logo library yet, so they're skipped rather than shown
+   blank — send those image files over and they can be added the same way PNB Gilts was. */
+const ASSOC_NAMES = [
+  "IIM Ahmedabad","IIM Kozhikode","IIM Mumbai","IIM Indore","IIM Trichy","IIM Nagpur","IIM Visakhapatnam",
+  "IIT Madras Pravartak","IIT Delhi","IIT Bombay","IIT Kanpur","IIT Roorkee","IIT Guwahati","IIT Palakkad",
+  "IISc","MAHE","Amrita","XLRI","Chandigarh University","Amity University",
+  "Symbiosis School for Online and Digital Learning","IMT Ghaziabad","D Y Patil","LIBA",
+  "Manipal University Jaipur","Bharati Vidyapeeth","Parul University","Sikkim Manipal University",
+  "Dr MGR University","Dayananda Sagar University","Wharton","KPMG","NHSRE",
+];
+function renderAssocLogos(){
+  const logos = ASSOC_NAMES.map(n => ({ name:n, logo:findUniversityLogo(n) })).filter(x => x.logo);
+  const twice = logos.concat(logos);
+  return twice.map(x => `<div class="assoc-logo"><img src="${x.logo}" alt="${esc(x.name)}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`).join("");
+}
+/* "Trending Courses" carousel (below Website Stats on Home) — mirrors jaroeducation.com's own
+   Trending Courses section, but pulls live from the same Program Pages data already fetched for
+   Quick Insights above (no second fetch). Shows programs that are currently Open or Closing Soon. */
+const TC_GRADIENTS = [
+  "linear-gradient(135deg,#0029A6,#3b5bdb)", "linear-gradient(135deg,#1b9c58,#0aa5a0)",
+  "linear-gradient(135deg,#F63D44,#ff7a66)", "linear-gradient(135deg,#7c5cff,#0029A6)",
+  "linear-gradient(135deg,#8a6800,#FFCF24)",
+];
+function renderTrendingCourses(rawData){
+  const track = document.getElementById("trendingCoursesTrack");
+  if(!track) return; // user has already navigated away from Home before this resolved
+  const rows = (rawData||[]).filter(r => (r["Program Name"]||"").toString().trim());
+  const trending = rows.filter(r => { const s = statusKeyFor(r); return s === "open" || s === "soon"; }).slice(0, 14);
+  if(!trending.length){ track.innerHTML = `<div class="tc-empty">No open programs to show right now.</div>`; return; }
+  track.innerHTML = trending.map((r,i)=>{
+    const status = statusKeyFor(r);
+    const badgeLabel = status === "soon" ? "Closing Soon" : "Admission Open";
+    const link = firstLink(r["Webpage Link"]) || firstLink(r["Landing Page Link"]);
+    return `<div class="tc-card">
+      <div class="tc-card-top" style="background:${TC_GRADIENTS[i % TC_GRADIENTS.length]}">
+        ${logoChipFor(r["University/Institute"])}
+        <span class="tc-badge tc-badge-${status}">${badgeLabel}</span>
+      </div>
+      <div class="tc-card-body">
+        <div class="tc-title">${esc(r["Program Name"])}</div>
+        <div class="tc-uni">${esc(r["University/Institute"]||"")}</div>
+        <div class="tc-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>${esc(r["Application Closure Date"]||"—")}</div>
+        <div class="tc-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>${esc(r["Category / Domain"]||"General")}</div>
+        ${link ? `<a class="tc-btn" href="${esc(link)}" target="_blank" rel="noopener">View Course</a>` : `<span class="tc-btn tc-btn-disabled">View Details</span>`}
+      </div>
+    </div>`;
+  }).join("");
+}
+function wireTrendingCoursesArrows(){
+  const track = document.getElementById("trendingCoursesTrack");
+  const left = document.getElementById("tcArrowLeft");
+  const right = document.getElementById("tcArrowRight");
+  if(!track || !left || !right) return;
+  const scrollByCard = (dir) => {
+    const card = track.querySelector(".tc-card");
+    const step = card ? card.getBoundingClientRect().width + 16 : 300;
+    track.scrollBy({ left: dir * step, behavior: "smooth" });
+  };
+  left.addEventListener("click", ()=> scrollByCard(-1));
+  right.addEventListener("click", ()=> scrollByCard(1));
 }
 function renderQuickInsights(rawData){
   // Legend/note rows that sit above or inside the real data (the Program Pages sheet has banner
