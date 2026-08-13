@@ -590,43 +590,25 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .hero-awards-label{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--yellow);margin-bottom:12px}
 .hero-awards-label svg{width:14px;height:14px;animation:heroAwardSpin 3.2s ease-in-out infinite}
 @keyframes heroAwardSpin{0%,100%{transform:rotate(0deg)}25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
-.hero-awards-strip{position:relative;overflow:hidden;padding:6px 0 14px;
-  -webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);
-  mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
-.hero-awards-track{display:flex;align-items:flex-start;gap:18px;width:max-content;animation:heroAwardsScroll 38s linear infinite}
-.hero-awards-strip:hover .hero-awards-track{animation-play-state:paused}
-@keyframes heroAwardsScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.hero-awards-strip{position:relative}
+.hero-awards-track{display:flex;flex-wrap:wrap;gap:12px}
 .hero-award-card{
-  flex-shrink:0;position:relative;overflow:hidden;
-  display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px;
-  width:172px;padding:22px 14px 16px;
-  background:linear-gradient(165deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.05) 100%);
-  border:1px solid rgba(255,207,36,.32);border-radius:18px;
-  box-shadow:0 12px 26px -12px rgba(0,0,0,.5);
-  transition:transform .3s ease,box-shadow .3s ease,border-color .3s ease;
+  flex-shrink:0;display:flex;align-items:center;gap:11px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);
+  border-radius:13px;padding:10px 18px 10px 10px;min-width:225px;
+  box-shadow:0 6px 16px -8px rgba(0,0,0,.4);
+  transition:box-shadow .25s,background .25s,transform .25s,border-color .25s;
 }
-.hero-award-card::before{
-  content:"";position:absolute;top:0;left:-65%;width:35%;height:100%;
-  background:linear-gradient(115deg,transparent,rgba(255,255,255,.4),transparent);
-  transform:skewX(-18deg);transition:left .7s ease;pointer-events:none;
-}
-.hero-award-card:hover::before{left:135%}
 .hero-award-card:hover{
-  transform:translateY(-6px);border-color:rgba(255,207,36,.85);
-  box-shadow:0 20px 38px -12px rgba(255,207,36,.4),0 12px 26px -12px rgba(0,0,0,.5);
+  background:rgba(255,255,255,.18);border-color:rgba(255,207,36,.6);
+  box-shadow:0 10px 24px -8px rgba(255,207,36,.4);transform:translateY(-3px);
 }
-.hero-award-card .hac-medal{
-  width:60px;height:60px;border-radius:50%;background:#fff;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;padding:8px;
-  box-shadow:0 0 0 3px rgba(255,207,36,.6),0 8px 16px -6px rgba(0,0,0,.55);
+.hero-award-card img{
+  width:38px;height:38px;border-radius:9px;object-fit:contain;background:#fff;
+  flex-shrink:0;padding:4px;box-shadow:0 0 0 1px rgba(255,207,36,.4);
 }
-.hero-award-card .hac-medal img{width:100%;height:100%;object-fit:contain}
-.hero-award-card .hac-year{
-  position:absolute;top:10px;right:10px;background:var(--yellow);color:var(--black);
-  font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:100px;letter-spacing:.02em;
-}
-.hero-award-card .hac-title{font-size:12px;font-weight:800;color:#fff;line-height:1.3;min-height:31px}
-.hero-award-card .hac-sub{font-size:10px;color:rgba(255,255,255,.62);line-height:1.35}
+.hero-award-card .hac-title{font-size:12.5px;font-weight:800;color:#fff;line-height:1.3}
+.hero-award-card .hac-sub{font-size:10.5px;color:rgba(255,255,255,.65);margin-top:2px}
 .news-item{padding:14px 2px;border-bottom:1px solid var(--line)}
 .news-item:last-child{border-bottom:none}
 .news-item .ni-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.4}
@@ -634,7 +616,7 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .news-item .ni-desc{font-size:12.5px;color:var(--ink-70);line-height:1.5}
 .news-item .ni-link{font-size:12px;font-weight:700;color:var(--blue);display:inline-flex;align-items:center;gap:4px;margin-top:6px}
 .news-item .ni-link svg{width:12px;height:12px}
-@media(max-width:640px){.hero-award-card{width:150px;padding:18px 10px 14px}}
+@media(max-width:640px){.hero-award-card{min-width:0;width:100%}}
 /* ==== Round 2: clearer click affordance, landing insights drill-down,
    university/partner logo sliders, floating News launcher, richer News cards ==== */
 .status-legend-item[data-type],
@@ -1633,7 +1615,7 @@ const NEWS_ITEMS = [
     desc:"Among the recently listed companies, Choksey expressed optimism about Jaro Institute of Technology Management & Research Ltd.",
     link:"https://www.businesstoday.in/markets/stocks/story/deven-choksey-expects-18-20-equity-returns-spots-potential-in-recently-listed-jaro-education-499329-2025-10-23" },
   { title:"Jaro Education and Jio Join Hands to Bring Free, Expert-Led Learning to Every Indian Home", source:"Press Trust of India", date:"Oct 17, 2025",
-    desc:"",
+    desc:"India is moving fast toward the vision of Viksit Bharat, a nation where every individual has the power to learn, grow, and contribute to the country's progress.",
     link:"https://www.ptinews.com/editor-detail/Jaro-Education-and-Jio-Join-Hands-to-Bring-Free-Expert-Led-Learning-to-Every-Indian-Home/3014526" },
   { title:"Jaro Education opens new centres in Kolkata, Jaipur, and 2 other cities", source:"Press Trust of India", date:"Oct 14, 2025",
     desc:"Edtech company Jaro Education to open new counselling centres in Kolkata, Nagpur, Jaipur, and Indore as it expands reach across Tier-II cities.",
@@ -1688,12 +1670,13 @@ async function renderHome(){
         </div>
         <div class="hero-awards-strip">
           <div class="hero-awards-track">
-            ${AWARDS_ITEMS.concat(AWARDS_ITEMS).map(a=>`
+            ${AWARDS_ITEMS.map(a=>`
               <div class="hero-award-card">
-                ${a.year ? `<span class="hac-year">${esc(a.year)}</span>` : ""}
-                <div class="hac-medal"><img src="${esc(a.logo)}" alt="${esc(a.title)}" loading="lazy" onerror="this.parentElement.style.visibility='hidden'"></div>
-                <div class="hac-title">${esc(a.title)}</div>
-                <div class="hac-sub">${esc(a.issuer)}</div>
+                <img src="${esc(a.logo)}" alt="${esc(a.title)}" loading="lazy" onerror="this.style.display='none'">
+                <div>
+                  <div class="hac-title">${esc(a.title)}</div>
+                  <div class="hac-sub">${esc(a.issuer)}${a.year ? " · " + esc(a.year) : ""}</div>
+                </div>
               </div>`).join("")}
           </div>
         </div>
