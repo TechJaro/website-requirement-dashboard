@@ -612,6 +612,86 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .news-item .ni-link{font-size:12px;font-weight:700;color:var(--blue);display:inline-flex;align-items:center;gap:4px;margin-top:6px}
 .news-item .ni-link svg{width:12px;height:12px}
 @media(max-width:640px){.hero-award-card{min-width:200px}}
+/* ==== Round 2: clearer click affordance, landing insights drill-down,
+   university/partner logo sliders, floating News launcher, richer News cards ==== */
+.status-legend-item[data-type],
+.status-legend-item[data-status],
+.status-legend-item[data-source],
+.status-legend-item[data-linkcat]{
+  border:1px solid var(--line);border-radius:100px;padding:5px 10px 5px 6px;
+  background:var(--canvas);transition:background .15s,border-color .15s,transform .15s;
+}
+.status-legend-item[data-type]:hover,
+.status-legend-item[data-status]:hover,
+.status-legend-item[data-source]:hover,
+.status-legend-item[data-linkcat]:hover{
+  background:var(--blue-tint-10);border-color:var(--blue);transform:translateY(-1px);
+}
+.status-legend-item[data-type]::after,
+.status-legend-item[data-status]::after,
+.status-legend-item[data-source]::after,
+.status-legend-item[data-linkcat]::after{
+  content:"›";margin-left:2px;font-weight:800;color:var(--ink-35);
+}
+.insight-panel .click-hint{font-size:11px;color:var(--ink-35);font-weight:600;margin:-10px 0 12px}
+.status-bar > div[data-type],
+.status-bar > div[data-status],
+.status-bar > div[data-source],
+.status-bar > div[data-linkcat]{outline:2px solid transparent;outline-offset:1px}
+.status-bar > div[data-type]:hover,
+.status-bar > div[data-status]:hover,
+.status-bar > div[data-source]:hover,
+.status-bar > div[data-linkcat]:hover{outline-color:var(--blue)}
+.insight-list-item{padding:10px 2px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.insight-list-item:last-child{border-bottom:none}
+.insight-list-item .ili-title{font-weight:700;font-size:13px}
+.insight-list-item .ili-sub{font-size:12px;color:var(--ink-50)}
+
+.hero-logos-row{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:18px}
+@media(max-width:760px){.hero-logos-row{grid-template-columns:1fr}}
+.hero-logo-chip{
+  flex-shrink:0;width:66px;height:66px;border-radius:14px;background:#fff;
+  display:flex;align-items:center;justify-content:center;padding:9px;
+  box-shadow:0 8px 18px -8px rgba(0,0,0,.35);transition:transform .2s,box-shadow .2s;
+}
+.hero-logo-chip:hover{transform:translateY(-3px) scale(1.05);box-shadow:0 14px 26px -8px rgba(255,207,36,.5)}
+.hero-logo-chip img{width:100%;height:100%;object-fit:contain}
+
+.news-fab{
+  position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:70;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:linear-gradient(160deg,var(--blue) 0%,var(--blue-dark) 100%);color:#fff;
+  border:none;border-radius:16px 0 0 16px;padding:16px 10px 18px;cursor:pointer;
+  box-shadow:-8px 10px 26px -8px rgba(0,30,90,.5);
+  transition:padding .2s,box-shadow .2s;
+}
+.news-fab:hover{padding-right:16px;box-shadow:-10px 14px 32px -6px rgba(0,30,90,.65)}
+.news-fab svg{width:20px;height:20px}
+.news-fab span{font-size:10px;font-weight:800;letter-spacing:.06em;writing-mode:vertical-rl;text-orientation:mixed;margin-top:2px}
+.news-fab .nf-badge{
+  position:absolute;top:6px;right:10px;min-width:18px;height:18px;border-radius:999px;
+  background:var(--red);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  padding:0 4px;box-shadow:0 0 0 2px var(--blue-dark);animation:heroNewsPing 2.2s ease-in-out infinite;
+}
+@media(max-width:640px){.news-fab{border-radius:14px 0 0 14px;padding:12px 8px 14px}}
+
+.news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
+.news-card{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#fff;
+  box-shadow:var(--shadow-sm);display:flex;flex-direction:column;transition:transform .2s,box-shadow .2s}
+.news-card:hover{transform:translateY(-4px);box-shadow:0 18px 34px -12px rgba(0,0,0,.22)}
+.news-card-top{height:6px}
+.news-card-body{padding:14px 15px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.news-card-source{display:flex;align-items:center;gap:8px}
+.news-card-source img{width:20px;height:20px;border-radius:6px;background:var(--canvas);object-fit:contain;flex-shrink:0}
+.news-card-source .ncs-name{font-size:11px;font-weight:800;color:var(--ink-70)}
+.news-card-source .ncs-date{font-size:10.5px;color:var(--ink-35);margin-left:auto;white-space:nowrap}
+.news-card-title{font-size:13.5px;font-weight:800;color:var(--ink);line-height:1.35}
+.news-card-desc{font-size:12px;color:var(--ink-60);line-height:1.5;flex:1}
+.news-card-link{margin-top:6px;font-size:12px;font-weight:800;color:#fff;background:var(--blue);
+  padding:8px 12px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  text-decoration:none;transition:background .15s}
+.news-card-link:hover{background:var(--blue-dark)}
+.news-card-link svg{width:12px;height:12px}
 </style>
 </head>
 <body>
@@ -1577,11 +1657,6 @@ async function renderHome(){
           <span class="hero-live-pill" id="heroLivePill" style="display:none">
             <span class="hero-live-dot"></span>LIVE
           </span>
-          <button type="button" class="hero-news-btn" id="heroNewsBtn" title="Jaro in the News">
-            ${ic("blog")}
-            News
-            <span class="hero-news-badge">${NEWS_ITEMS.length}</span>
-          </button>
           <div class="hero-search-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <input type="text" id="heroSearch" placeholder="Search universities, programs, links…">
@@ -1605,8 +1680,27 @@ async function renderHome(){
               </div>`).join("")}
           </div>
         </div>
+        <div class="hero-logos-row">
+          <div>
+            <div class="hero-awards-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 9 10-6 10 6-10 6-10-6Z"/><path d="M6 11.5V17c0 1.1 2.7 3 6 3s6-1.9 6-3v-5.5"/><path d="M22 9v7"/></svg>
+              Our Associations
+            </div>
+            <div class="hero-awards-strip">
+              <div class="hero-awards-track" id="assocTrack"><div class="hero-award-card" style="min-width:0">Loading…</div></div>
+            </div>
+          </div>
+          <div>
+            <div class="hero-awards-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg>
+              In Partnership with the Trusted Companies
+            </div>
+            <div class="hero-awards-strip">
+              <div class="hero-awards-track" id="partnerTrack" style="animation-direction:reverse"><div class="hero-award-card" style="min-width:0">Loading…</div></div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
     </div>
 
     <div class="section-head" style="align-items:center">
@@ -1651,25 +1745,28 @@ async function renderHome(){
     <div class="insights-grid">
       <div class="insight-panel">
         <h4>Programs by Type</h4>
+        <div class="click-hint">Click any slice to see the list ›</div>
         <div id="typeBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
       </div>
       <div class="insight-panel">
         <h4>Program Status Breakdown</h4>
+        <div class="click-hint">Click any slice to see the list ›</div>
         <div id="statusBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
       </div>
       <div class="insight-panel">
         <h4>Landing Pages by Source</h4>
+        <div class="click-hint">Click any slice to see the list ›</div>
         <div id="landingSourceBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
       </div>
       <div class="insight-panel">
         <h4>Landing Page Link Completeness</h4>
+        <div class="click-hint">Click any slice to see the list ›</div>
         <div id="landingLinkBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
       </div>
     </div>
   `;
   el.querySelectorAll("[data-go]").forEach(c=>c.addEventListener("click", ()=>navigate(c.dataset.go)));
   document.getElementById("refreshHomeBtn").addEventListener("click", forceRefreshCurrentSection);
-  document.getElementById("heroNewsBtn").addEventListener("click", openNewsModal);
   const heroSearchEl = document.getElementById("heroSearch");
   if(heroSearchEl) heroSearchEl.addEventListener("keydown", (e)=>{
     if(e.key === "Enter"){
@@ -1707,6 +1804,8 @@ async function renderHome(){
         if(pill) pill.style.display = "inline-flex";
       }
       if(key==="program") renderQuickInsights(data);
+      if(key==="program") renderLogoStrip("assocTrack", data.map(r=>r["University/Institute"]));
+      if(key==="b2b") renderLogoStrip("partnerTrack", data.map(r=>r["Remarks"]));
     });
   }
   loadLandingInsights();
@@ -1778,11 +1877,44 @@ function renderQuickInsights(rawData){
     });
   }
 }
-/* Generic click-to-drill-down popup used by the Quick Insights breakdowns above — lists the actual
-   Program Name / University for whichever slice (type or status) was clicked, so a number in the
-   chart can always be checked against the real rows behind it. Built once and reused; injected at
-   runtime rather than in the static markup since it's only ever needed after Quick Insights loads. */
-function openInsightListModal(title, rows){
+/* Populates one of the hero banner's logo sliders (Our Associations / Trusted Companies). Only
+   entries we actually recognize a real logo for are shown — per your request this row is logos
+   only, so a name we can't match (falls back to initials everywhere else in the app) is silently
+   skipped here rather than showing a text-only chip. Dedupes by normalized name; the list is
+   doubled so the CSS marquee (translateX(-50%)) loops seamlessly. */
+function renderLogoStrip(trackId, names){
+  const track = document.getElementById(trackId);
+  if(!track) return;
+  const seen = new Set();
+  const logos = [];
+  (names||[]).forEach(n=>{
+    const norm = normUniName(n);
+    if(!norm || seen.has(norm)) return;
+    const logo = findUniversityLogo(n);
+    if(!logo) return;
+    seen.add(norm);
+    logos.push({ name: displayNameFor(n), logo });
+  });
+  if(!logos.length){
+    track.parentElement.parentElement.style.display = "none";
+    return;
+  }
+  track.innerHTML = logos.concat(logos).map(l=>
+    `<div class="hero-logo-chip" title="${esc(l.name)}"><img src="${l.logo}" alt="${esc(l.name)}" loading="lazy"></div>`
+  ).join("");
+}
+/* Generic click-to-drill-down popup used by the Quick Insights breakdowns (Program AND Landing
+   Page) above — lists the actual rows behind whichever slice was clicked, so a number in the chart
+   can always be checked against the real data. Built once and reused; injected at runtime rather
+   than in the static markup since it's only ever needed after Quick Insights loads.
+   mapRow(row) -> {title, sub, link} lets each caller decide which fields to show; defaults to the
+   Program Pages shape so the existing calls above don't need to change. */
+function openInsightListModal(title, rows, mapRow){
+  mapRow = mapRow || (r => ({
+    title: r["Program Name"] || "Untitled Program",
+    sub: r["University/Institute"] || "—",
+    link: firstLink(r["Webpage Link"]),
+  }));
   let overlay = document.getElementById("insightListOverlay");
   if(!overlay){
     document.body.insertAdjacentHTML("beforeend", `
@@ -1807,28 +1939,42 @@ function openInsightListModal(title, rows){
     document.getElementById("insightListClose").addEventListener("click", ()=> overlay.classList.remove("show"));
   }
   document.getElementById("insightListTitle").textContent = title;
-  document.getElementById("insightListSub").textContent = `${rows.length} program${rows.length===1?"":"s"}`;
+  document.getElementById("insightListSub").textContent = `${rows.length} item${rows.length===1?"":"s"}`;
   const body = document.getElementById("insightListBody");
   body.innerHTML = rows.length ? rows.map(r=>{
-    const uni = esc(r["University/Institute"]||"—");
-    const prog = esc(r["Program Name"]||"Untitled Program");
-    const link = firstLink(r["Webpage Link"]);
-    return `<div style="padding:10px 2px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px">
-      <div><div style="font-weight:700;font-size:13px">${prog}</div><div style="font-size:12px;color:var(--ink-50)">${uni}</div></div>
+    const m = mapRow(r) || {};
+    const titleTxt = esc(m.title || "Untitled");
+    const subTxt = esc(m.sub || "—");
+    const link = m.link || "";
+    return `<div class="insight-list-item">
+      <div><div class="ili-title">${titleTxt}</div><div class="ili-sub">${subTxt}</div></div>
       ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener" class="btn" style="flex-shrink:0">${ic("external")}</a>` : ""}
     </div>`;
-  }).join("") : emptyStateHTML("Nothing here", "No programs match this slice.");
+  }).join("") : emptyStateHTML("Nothing here", "Nothing matches this slice.");
   overlay.classList.add("show");
 }
 /* "Jaro in the News" popup — triggered from the hero banner's News button. Reuses the same
    .modal-overlay/.modal shell as the other popups on this dashboard so it looks native, built and
    inserted at runtime the first time it's opened. */
+/* News cards don't have real article photos available to us (that would mean scraping each of the
+   24 linked articles individually) — instead each card gets the publication's own favicon via
+   Google's public favicon service, in a colored badge, plus a gradient top bar so the grid reads
+   as a proper news feed rather than a plain list. */
+const NEWS_GRADIENTS = [
+  "linear-gradient(90deg,#003694,#ffcf24)", "linear-gradient(90deg,#c8102e,#003694)",
+  "linear-gradient(90deg,#1b9c58,#003694)", "linear-gradient(90deg,#ffcf24,#c8102e)",
+  "linear-gradient(90deg,#7c5cff,#003694)", "linear-gradient(90deg,#003694,#0aa5a0)",
+];
+function faviconFor(link){
+  try{ return `https://www.google.com/s2/favicons?sz=64&domain=${new URL(link).hostname.replace(/^www\./,"")}`; }
+  catch(e){ return ""; }
+}
 function openNewsModal(){
   let overlay = document.getElementById("newsOverlay");
   if(!overlay){
     document.body.insertAdjacentHTML("beforeend", `
       <div class="modal-overlay" id="newsOverlay">
-        <div class="modal" style="max-width:600px">
+        <div class="modal" style="max-width:920px">
           <div class="modal-watermark"></div>
           <div class="modal-head">
             <div class="ic">${ic("blog")}</div>
@@ -1840,19 +1986,26 @@ function openNewsModal(){
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
           </div>
-          <div class="modal-body" id="newsBody" style="max-height:64vh;overflow:auto"></div>
+          <div class="modal-body" id="newsBody" style="max-height:70vh;overflow:auto"></div>
         </div>
       </div>`);
     overlay = document.getElementById("newsOverlay");
     overlay.addEventListener("click", (e)=>{ if(e.target.id === "newsOverlay") overlay.classList.remove("show"); });
     document.getElementById("newsClose").addEventListener("click", ()=> overlay.classList.remove("show"));
-    document.getElementById("newsBody").innerHTML = NEWS_ITEMS.map(n=>`
-      <div class="news-item">
-        <div class="ni-title">${esc(n.title)}</div>
-        <div class="ni-meta"><span>${esc(n.source)}</span><span>·</span><span>${esc(n.date)}</span></div>
-        ${n.desc ? `<div class="ni-desc">${esc(n.desc)}</div>` : ""}
-        <a class="ni-link" href="${esc(n.link)}" target="_blank" rel="noopener">Read full story ${ic("external")}</a>
-      </div>`).join("");
+    document.getElementById("newsBody").innerHTML = `<div class="news-grid">${NEWS_ITEMS.map((n,i)=>`
+      <div class="news-card">
+        <div class="news-card-top" style="background:${NEWS_GRADIENTS[i % NEWS_GRADIENTS.length]}"></div>
+        <div class="news-card-body">
+          <div class="news-card-source">
+            <img src="${faviconFor(n.link)}" alt="" onerror="this.style.visibility='hidden'">
+            <span class="ncs-name">${esc(n.source)}</span>
+            <span class="ncs-date">${esc(n.date)}</span>
+          </div>
+          <div class="news-card-title">${esc(n.title)}</div>
+          ${n.desc ? `<div class="news-card-desc">${esc(n.desc)}</div>` : ""}
+          <a class="news-card-link" href="${esc(n.link)}" target="_blank" rel="noopener">Read full story ${ic("external")}</a>
+        </div>
+      </div>`).join("")}</div>`;
   }
   overlay.classList.add("show");
 }
@@ -1867,43 +2020,62 @@ async function loadLandingInsights(){
     renderLandingInsights(domain.data, channel.data);
   }catch(e){ console.warn("Landing insights failed to load", e); }
 }
+/* Shared by the counting pass below and the click handlers, same reasoning as statusKeyFor(). */
+function landingLinkKeyFor(row){
+  const hasCms = isValidLink(row["Website Link  ( CMS )"]);
+  const hasSub = isValidLink(row["Subdomain Link"]);
+  if(hasCms && hasSub) return "both";
+  if(hasCms) return "cmsOnly";
+  if(hasSub) return "subOnly";
+  return "neither";
+}
+const LANDING_ROW_MAP = r => ({
+  title: r["University/Institute"] || "Untitled",
+  sub: "Landing Page",
+  link: firstLink(r["Landing Page Link"]) || firstLink(r["Subdomain Link"]) || firstLink(r["Website Link  ( CMS )"]),
+});
 function renderLandingInsights(domainData, channelData){
   const sourceEl = document.getElementById("landingSourceBreakdown");
   if(sourceEl){
     const total = (domainData.length + channelData.length) || 1;
     const parts = [
-      { label:"Domain Tracker", count:domainData.length, color:"var(--blue)" },
-      { label:"Channel (PR)",   count:channelData.length, color:"#8a6800" },
+      { key:"domain",  label:"Domain Tracker", count:domainData.length,  color:"var(--blue)", rows:domainData },
+      { key:"channel", label:"Channel (PR)",   count:channelData.length, color:"#8a6800",      rows:channelData },
     ].filter(p=>p.count>0);
     sourceEl.innerHTML = `
       <div class="status-bar">${parts.map(p=>
-        `<div style="width:${(p.count/total)*100}%;background:${p.color}" title="${esc(p.label)}: ${p.count}"></div>`
+        `<div data-source="${p.key}" style="width:${(p.count/total)*100}%;background:${p.color};cursor:pointer" title="${esc(p.label)}: ${p.count} — click to view"></div>`
       ).join("")}</div>
       <div class="status-legend">${parts.map(p=>`
-        <div class="status-legend-item"><span class="status-dot" style="background:${p.color}"></span>${esc(p.label)} <b>${p.count}</b></div>
+        <div class="status-legend-item" data-source="${p.key}" style="cursor:pointer"><span class="status-dot" style="background:${p.color}"></span>${esc(p.label)} <b>${p.count}</b></div>
       `).join("")}</div>`;
+    sourceEl.querySelectorAll("[data-source]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const p = parts.find(x=>x.key === el.dataset.source);
+        if(p) openInsightListModal(`Landing Pages — ${p.label}`, p.rows, LANDING_ROW_MAP);
+      });
+    });
   }
   const linkEl = document.getElementById("landingLinkBreakdown");
   if(linkEl){
     const counts = { both:0, cmsOnly:0, subOnly:0, neither:0 };
-    domainData.forEach(r=>{
-      const hasCms = isValidLink(r["Website Link  ( CMS )"]);
-      const hasSub = isValidLink(r["Subdomain Link"]);
-      if(hasCms && hasSub) counts.both++;
-      else if(hasCms) counts.cmsOnly++;
-      else if(hasSub) counts.subOnly++;
-      else counts.neither++;
-    });
+    domainData.forEach(r=> counts[landingLinkKeyFor(r)]++);
     const total = domainData.length || 1;
     const labels = { both:"Both Links", cmsOnly:"Landing Page Only", subOnly:"Subdomain Only", neither:"Missing Both" };
     const colors = { both:"#1b9c58", cmsOnly:"var(--blue)", subOnly:"#8a6800", neither:"var(--red)" };
     linkEl.innerHTML = `
       <div class="status-bar">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>
-        `<div style="width:${(counts[k]/total)*100}%;background:${colors[k]}" title="${labels[k]}: ${counts[k]}"></div>`
+        `<div data-linkcat="${k}" style="width:${(counts[k]/total)*100}%;background:${colors[k]};cursor:pointer" title="${labels[k]}: ${counts[k]} — click to view"></div>`
       ).join("")}</div>
       <div class="status-legend">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>`
-        <div class="status-legend-item"><span class="status-dot" style="background:${colors[k]}"></span>${labels[k]} <b>${counts[k]}</b></div>
+        <div class="status-legend-item" data-linkcat="${k}" style="cursor:pointer"><span class="status-dot" style="background:${colors[k]}"></span>${labels[k]} <b>${counts[k]}</b></div>
       `).join("")}</div>`;
+    linkEl.querySelectorAll("[data-linkcat]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const key = el.dataset.linkcat;
+        openInsightListModal(`Landing Pages — ${labels[key]}`, domainData.filter(r => landingLinkKeyFor(r) === key), LANDING_ROW_MAP);
+      });
+    });
   }
 }
 function sheetKeyFor(navKey){
@@ -3555,9 +3727,22 @@ function forceRefreshCurrentSection(){
   navigate(currentRoute);
   toast("Refreshing from Google Sheets…");
 }
+/* Floating "News" launcher — lives outside the Home page markup (fixed position, right-middle of
+   the viewport, chat-widget style) so it's reachable from anywhere in the dashboard, not just Home. */
+function mountNewsFab(){
+  if(document.getElementById("newsFab")) return;
+  document.body.insertAdjacentHTML("beforeend", `
+    <button type="button" class="news-fab" id="newsFab" title="Jaro in the News">
+      ${ic("blog")}
+      <span>NEWS</span>
+      <span class="nf-badge">${NEWS_ITEMS.length}</span>
+    </button>`);
+  document.getElementById("newsFab").addEventListener("click", openNewsModal);
+}
 function init(){
   renderNav();
   populateSectionDropdown();
+  mountNewsFab();
   document.getElementById("refreshDataBtn").addEventListener("click", forceRefreshCurrentSection);
   // Gentle background auto-refresh: checks once a minute, but each section's own 5-minute TTL
   // (see getData) decides whether that actually triggers a real re-fetch. Skipped while someone
