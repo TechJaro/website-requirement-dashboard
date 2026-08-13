@@ -612,51 +612,54 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .news-item .ni-link{font-size:12px;font-weight:700;color:var(--blue);display:inline-flex;align-items:center;gap:4px;margin-top:6px}
 .news-item .ni-link svg{width:12px;height:12px}
 @media(max-width:640px){.hero-award-card{min-width:200px}}
-/* "Our Associations" strip (v2) — full-bleed auto-scrolling marquee at the very bottom of Home,
+/* "Our Collaborations" strip (v3) — full-bleed auto-scrolling marquee at the very bottom of Home,
    matching the real carousel on jaroeducation.com's homepage: no card/box background, just the
-   heading and a continuously sliding row of logos sitting directly on the page. */
-.assoc-section-v2{margin-top:6px;padding:22px 0 4px;text-align:center}
-.assoc-section-v2 h3{font-size:20px;font-weight:700;color:var(--ink);margin-bottom:18px}
+   heading and a continuously sliding row of logos sitting directly on the page. Pushed further
+   down from the section above it and enlarged (bigger heading, bigger logos) per request. */
+.assoc-section-v2{margin-top:56px;padding:38px 0 14px;text-align:center}
+.assoc-section-v2 h3{font-size:27px;font-weight:700;color:var(--ink);margin-bottom:28px}
 .assoc-section-v2 h3 span{color:var(--blue)}
 .assoc-strip{position:relative;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
-.assoc-track{display:flex;align-items:center;gap:36px;width:max-content;animation:assocScroll 42s linear infinite}
+.assoc-track{display:flex;align-items:center;gap:48px;width:max-content;animation:assocScroll 42s linear infinite}
 .assoc-strip:hover .assoc-track{animation-play-state:paused}
 @keyframes assocScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-.assoc-logo{flex-shrink:0;display:flex;align-items:center;justify-content:center;height:46px}
-.assoc-logo img{max-height:42px;max-width:130px;object-fit:contain;filter:grayscale(15%);opacity:.9;transition:filter .2s,opacity .2s}
+.assoc-logo{flex-shrink:0;display:flex;align-items:center;justify-content:center;height:64px}
+.assoc-logo img{max-height:58px;max-width:170px;object-fit:contain;filter:grayscale(15%);opacity:.9;transition:filter .2s,opacity .2s}
 .assoc-logo:hover img{filter:none;opacity:1}
-/* "Trending Courses" carousel — sits below Website Stats on Home, light-green backdrop per request,
+/* "What's Trending" carousel — sits below Website Stats on Home, black backdrop per request, cards
+   styled like the dashboard's own pastel Website Stats cards (no colored gradient banner), with
    arrow-driven horizontal scroll (course text needs to be readable, so no auto-marquee here). */
-.trending-section{background:#EAF7EE;border-radius:var(--radius);padding:26px 8px 30px;margin-bottom:26px}
+.trending-section{background:#0A0A0C;border-radius:var(--radius);padding:26px 8px 30px;margin-bottom:26px}
 .trending-head{text-align:center;padding:0 20px;margin-bottom:20px}
-.trending-head h3{font-size:22px;font-weight:700;color:var(--ink)}
-.trending-head h3 span{color:var(--blue)}
-.trending-head p{font-size:13px;color:var(--ink-50);margin-top:8px;max-width:640px;margin-left:auto;margin-right:auto}
+.trending-head h3{font-size:22px;font-weight:700;color:#fff}
+.trending-head h3 span{color:var(--yellow)}
+.trending-head p{font-size:13px;color:rgba(255,255,255,.55);margin-top:8px;max-width:640px;margin-left:auto;margin-right:auto}
 .tc-carousel{display:flex;align-items:center;gap:8px;padding:0 8px}
-.tc-arrow{flex-shrink:0;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;
-  color:var(--blue);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow-sm)}
-.tc-arrow:hover{background:var(--blue);color:#fff}
+.tc-arrow{flex-shrink:0;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);
+  color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.tc-arrow:hover{background:var(--yellow);color:var(--ink);border-color:var(--yellow)}
 .tc-arrow svg{width:16px;height:16px}
 .tc-track{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x proximity;padding:4px;scrollbar-width:none}
 .tc-track::-webkit-scrollbar{display:none}
-.tc-empty{padding:30px;color:var(--ink-50);font-size:13px;width:100%;text-align:center}
-.tc-card{flex-shrink:0;width:270px;scroll-snap-align:start;background:#fff;border-radius:14px;overflow:hidden;
-  box-shadow:var(--shadow-sm);border:1px solid var(--line-soft)}
-.tc-card-top{position:relative;height:92px;display:flex;align-items:flex-start;padding:10px}
-.tc-card-top .card-logo-corner{position:absolute;top:10px;left:10px;right:auto}
-.tc-badge{position:absolute;top:10px;right:10px;font-size:10.5px;font-weight:800;padding:4px 9px;border-radius:20px;color:#fff}
+.tc-empty{padding:30px;color:rgba(255,255,255,.55);font-size:13px;width:100%;text-align:center}
+.tc-card{flex-shrink:0;width:270px;scroll-snap-align:start;border-radius:16px;overflow:hidden;padding:16px;
+  background:linear-gradient(165deg,var(--glass) 0%,rgba(255,255,255,.9) 100%);border:1px solid rgba(255,255,255,.5)}
+.tc-card-top{display:flex;align-items:center;justify-content:space-between}
+.tc-card-top .ic-badge{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tc-card-top .ic-badge svg{width:18px;height:18px}
+.tc-card-top .ic-badge img{width:24px;height:24px;object-fit:contain}
+.tc-badge{font-size:10.5px;font-weight:800;padding:4px 9px;border-radius:20px;color:#fff;flex-shrink:0}
 .tc-badge-open{background:#1b9c58}
 .tc-badge-soon{background:#c98a00}
-.tc-card-body{padding:14px 16px 16px}
+.tc-card-body{padding-top:14px}
 .tc-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.35;min-height:36px}
 .tc-uni{font-size:11.5px;color:var(--ink-50);margin-top:4px}
 .tc-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-70);margin-top:8px}
 .tc-meta svg{width:13px;height:13px;flex-shrink:0;color:var(--ink-35)}
-.tc-btn{display:block;text-align:center;margin-top:12px;background:var(--blue);color:#fff;font-size:12.5px;
+.tc-btn{display:block;text-align:center;margin-top:12px;color:#fff;font-size:12.5px;
   font-weight:700;padding:9px 0;border-radius:9px;text-decoration:none}
-.tc-btn:hover{background:var(--blue-dark)}
 .tc-btn-disabled{background:var(--ink-35);cursor:default}
-@media(max-width:640px){.tc-card{width:230px}.assoc-track{gap:24px}}
+@media(max-width:640px){.tc-card{width:230px}.assoc-track{gap:30px}}
 /* ==== Round 2: clearer click affordance, landing insights drill-down,
    university/partner logo sliders, floating News launcher, richer News cards ==== */
 .status-legend-item[data-type],
@@ -1826,7 +1829,7 @@ async function renderHome(){
 
     <div class="trending-section">
       <div class="trending-head">
-        <h3>Trending <span>Courses</span></h3>
+        <h3>What's <span>Trending</span></h3>
         <p>Live, in-demand programs from your Program Pages tracker — open for admission or closing soon.</p>
       </div>
       <div class="tc-carousel">
@@ -1879,7 +1882,7 @@ async function renderHome(){
     </div>
 
     <div class="assoc-section-v2">
-      <h3>Our <span>Associations</span></h3>
+      <h3>Our <span>Collaborations</span></h3>
       <div class="assoc-strip">
         <div class="assoc-track" id="assocTrack2">${renderAssocLogos()}</div>
       </div>
@@ -1961,13 +1964,14 @@ function renderAssocLogos(){
   const twice = logos.concat(logos);
   return twice.map(x => `<div class="assoc-logo"><img src="${x.logo}" alt="${esc(x.name)}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`).join("");
 }
-/* "Trending Courses" carousel (below Website Stats on Home) — mirrors jaroeducation.com's own
-   Trending Courses section, but pulls live from the same Program Pages data already fetched for
-   Quick Insights above (no second fetch). Shows programs that are currently Open or Closing Soon. */
-const TC_GRADIENTS = [
-  "linear-gradient(135deg,#0029A6,#3b5bdb)", "linear-gradient(135deg,#1b9c58,#0aa5a0)",
-  "linear-gradient(135deg,#F63D44,#ff7a66)", "linear-gradient(135deg,#7c5cff,#0029A6)",
-  "linear-gradient(135deg,#8a6800,#FFCF24)",
+/* "What's Trending" carousel (below Website Stats on Home) — pulls live from the same Program
+   Pages data already fetched for Quick Insights above (no second fetch). Shows programs that are
+   currently Open or Closing Soon, styled like the dashboard's own Website Stats cards (pastel tint
+   + icon badge) rather than a solid color banner, per request. */
+const TC_TINTS = [
+  {bg:"var(--blue-tint-10)", fg:"var(--blue)"},
+  {bg:"var(--yellow-tint)", fg:"#8a6800"},
+  {bg:"var(--red-tint)", fg:"var(--red)"},
 ];
 function renderTrendingCourses(rawData){
   const track = document.getElementById("trendingCoursesTrack");
@@ -1979,9 +1983,11 @@ function renderTrendingCourses(rawData){
     const status = statusKeyFor(r);
     const badgeLabel = status === "soon" ? "Closing Soon" : "Admission Open";
     const link = firstLink(r["Webpage Link"]) || firstLink(r["Landing Page Link"]);
-    return `<div class="tc-card">
-      <div class="tc-card-top" style="background:${TC_GRADIENTS[i % TC_GRADIENTS.length]}">
-        ${logoChipFor(r["University/Institute"])}
+    const tint = TC_TINTS[i % TC_TINTS.length];
+    const logo = findUniversityLogo(r["University/Institute"]);
+    return `<div class="tc-card" style="--glass:${tint.bg};--fg:${tint.fg}">
+      <div class="tc-card-top">
+        <div class="ic-badge" style="background:rgba(255,255,255,.7);color:${tint.fg}">${logo ? `<img src="${logo}" alt="">` : ic("university")}</div>
         <span class="tc-badge tc-badge-${status}">${badgeLabel}</span>
       </div>
       <div class="tc-card-body">
@@ -1989,7 +1995,7 @@ function renderTrendingCourses(rawData){
         <div class="tc-uni">${esc(r["University/Institute"]||"")}</div>
         <div class="tc-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>${esc(r["Application Closure Date"]||"—")}</div>
         <div class="tc-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>${esc(r["Category / Domain"]||"General")}</div>
-        ${link ? `<a class="tc-btn" href="${esc(link)}" target="_blank" rel="noopener">View Course</a>` : `<span class="tc-btn tc-btn-disabled">View Details</span>`}
+        ${link ? `<a class="tc-btn" style="background:${tint.fg}" href="${esc(link)}" target="_blank" rel="noopener">View Course</a>` : `<span class="tc-btn tc-btn-disabled">View Details</span>`}
       </div>
     </div>`;
   }).join("");
