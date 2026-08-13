@@ -612,6 +612,25 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .news-item .ni-link{font-size:12px;font-weight:700;color:var(--blue);display:inline-flex;align-items:center;gap:4px;margin-top:6px}
 .news-item .ni-link svg{width:12px;height:12px}
 @media(max-width:640px){.hero-award-card{min-width:200px}}
+/* "Our Associations" strip - a static row of partner-university logos at the bottom of Home,
+   mirroring the section on jaroeducation.com's own homepage. Deliberately NOT a slider (the
+   earlier University/Partnership sliders were removed at request) and on a plain white card,
+   not the dark hero-banner background. */
+.assoc-section{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+  padding:30px 24px;text-align:center;margin-bottom:26px;box-shadow:var(--shadow-sm)}
+.assoc-section h3{font-size:21px;font-weight:700;color:var(--ink);margin-bottom:26px}
+.assoc-section h3 span{color:var(--blue)}
+.assoc-row{display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap}
+.assoc-chip{display:flex;align-items:center;justify-content:center;height:66px;min-width:110px;
+  padding:8px 16px;border-radius:10px;border:1px solid var(--line-soft);background:#fff}
+.assoc-chip img{max-height:50px;max-width:150px;object-fit:contain}
+.assoc-chip-word{flex-direction:column;justify-content:center;align-items:flex-start;min-width:100px}
+.assoc-uonline{display:flex;flex-direction:column;align-items:flex-start;line-height:1}
+.au-word{display:flex;align-items:baseline;gap:2px}
+.au-word .au-u{font-size:24px;font-weight:800;color:var(--red)}
+.au-word .au-online{font-size:16px;font-weight:800;color:var(--ink)}
+.au-tag{font-size:9.5px;color:var(--ink-50);margin-top:2px;letter-spacing:.2px}
+@media(max-width:640px){.assoc-row{gap:14px}.assoc-chip{height:56px;padding:6px 12px}.assoc-chip img{max-height:38px}}
 /* ==== Round 2: clearer click affordance, landing insights drill-down,
    university/partner logo sliders, floating News launcher, richer News cards ==== */
 .status-legend-item[data-type],
@@ -1814,6 +1833,24 @@ async function renderHome(){
         <h4>Landing Page Link Completeness</h4>
         <div class="click-hint">Click any slice to see the list ›</div>
         <div id="landingLinkBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+      </div>
+    </div>
+
+    <div class="assoc-section">
+      <h3>Our <span>Associations</span></h3>
+      <div class="assoc-row">
+        <div class="assoc-chip assoc-chip-word">
+          <div class="assoc-uonline">
+            <div class="au-word"><span class="au-u">U</span><span class="au-online">Online</span></div>
+            <div class="au-tag">Learn. Empower.</div>
+          </div>
+        </div>
+        <div class="assoc-chip"><img src="${UNIVERSITY_LOGO_DATA.amity}" alt="Amity University Online" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+        <div class="assoc-chip"><img src="${UNIVERSITY2_LOGO_DATA.siu_symbiosis}" alt="Symbiosis School for Online and Digital Learning" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+        <div class="assoc-chip"><img src="${UNIVERSITY2_LOGO_DATA.imt_ghaziabad}" alt="IMT" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+        <div class="assoc-chip"><img src="${UNIVERSITY_LOGO_DATA.dpu}" alt="D Y Patil - DPU" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+        <div class="assoc-chip"><img src="${UNIVERSITY2_LOGO_DATA.liba}" alt="LIBA" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
+        <div class="assoc-chip"><img src="${UNIVERSITY2_LOGO_DATA.muj}" alt="Manipal University Jaipur - Online Manipal" loading="lazy" onerror="this.parentElement.style.display='none'"></div>
       </div>
     </div>
   `;
