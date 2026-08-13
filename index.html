@@ -616,51 +616,6 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
    matching the real carousel on jaroeducation.com's homepage: no card/box background, just the
    heading and a continuously sliding row of logos sitting directly on the page. Pushed further
    down from the section above it and enlarged (bigger heading, bigger logos) per request. */
-/* "In Collaboration With" — floating launcher (same pattern as the News FAB), stacked directly
-   above it in the same bottom-right corner so both live together. Hovering the icon slides a
-   full-width panel straight UP to half the viewport height — a calm, neutral grey backdrop (not
-   the hero-banner blue, so it reads as its own distinct space) holding a static 3-per-row grid of
-   every logo at a larger size, name capitalized underneath. No slider/marquee: everything is
-   visible at once, with a light internal scroll only if the list runs past half the screen. */
-.collab-fab{
-  position:fixed;bottom:90px;right:24px;z-index:70;width:54px;height:54px;border-radius:50%;
-  background:linear-gradient(135deg,var(--blue) 0%,var(--blue-dark) 100%);color:#fff;
-  border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;
-  box-shadow:0 14px 30px -8px rgba(0,30,90,.55),0 0 0 5px rgba(255,255,255,.85);
-  transition:transform .25s ease,box-shadow .25s ease;
-}
-.collab-fab:hover{transform:scale(1.08);box-shadow:0 18px 38px -6px rgba(0,30,90,.65),0 0 0 5px rgba(255,255,255,.85)}
-.collab-fab svg{width:24px;height:24px}
-@media(max-width:640px){.collab-fab{right:14px;bottom:78px;width:48px;height:48px}}
-.collab-drawer{
-  position:fixed;left:0;right:0;bottom:0;height:0;overflow:hidden;z-index:65;
-  background:linear-gradient(180deg,#F6F7FA 0%,#E7E9EF 100%);
-  box-shadow:0 -18px 40px -16px rgba(10,10,20,.28);
-  border-top:1px solid rgba(10,10,12,.06);
-  transition:height .45s cubic-bezier(.2,.8,.2,1);
-}
-.collab-drawer.open{height:50vh}
-.collab-drawer-inner{height:100%;display:flex;flex-direction:column;
-  padding:28px 36px 22px;opacity:0;transition:opacity .3s ease .1s}
-.collab-drawer.open .collab-drawer-inner{opacity:1}
-.collab-head{flex-shrink:0;margin-bottom:20px;position:relative;padding-bottom:12px}
-.collab-head::after{content:"";position:absolute;left:0;bottom:0;width:48px;height:4px;border-radius:3px;
-  background:linear-gradient(90deg,var(--blue),var(--yellow))}
-.collab-head h3{color:var(--ink);font-size:23px;font-weight:800}
-.collab-head h3 span{color:var(--blue)}
-.collab-head p{color:var(--ink-50);font-size:12.5px;margin-top:6px}
-.collab-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(3,1fr);
-  gap:30px 22px;align-content:start;padding-right:8px}
-.collab-grid::-webkit-scrollbar{width:6px}
-.collab-grid::-webkit-scrollbar-thumb{background:rgba(10,10,12,.15);border-radius:6px}
-.collab-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;
-  padding:12px 6px;border-radius:14px;transition:transform .2s,background .2s}
-.collab-item:hover{background:rgba(10,10,12,.045);transform:translateY(-2px)}
-.collab-item img{height:66px;max-width:88%;object-fit:contain}
-.collab-item span{font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
-  color:var(--ink-70);text-align:center;line-height:1.35}
-@media(max-width:900px){.collab-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:640px){.collab-drawer.open{height:62vh}.collab-grid{grid-template-columns:repeat(2,1fr);gap:22px 14px}.collab-item img{height:52px}}
 /* "What's Trending" strip — sits below Website Stats on Home, same gradient backdrop as the hero
    banner (per request, instead of a flat color), heading pinned to the left. A curated, name-only
    list (no CTA) auto-scrolling as a continuous marquee — see TRENDING_COURSES/renderTrendingCourses
@@ -1959,27 +1914,6 @@ function statusKeyFor(row){
   if(s.includes("closing")) return "soon";
   if(s.includes("closed")) return "closed";
   return "other";
-}
-/* "Our Associations" strip (bottom of Home) — the exact university/partner sequence from
-   jaroeducation.com's own "Our Associations" carousel (verified against the live site), rendered
-   via the same findUniversityLogo() alias-matching already used everywhere else in the dashboard,
-   so no logo is duplicated or hand-typed here. A handful of the site's logos (IIT Jodhpur, Harvard,
-   IDSS, Rotman, Deakin, iFEEL) aren't in our logo library yet, so they're skipped rather than shown
-   blank — send those image files over and they can be added the same way PNB Gilts was. */
-const ASSOC_NAMES = [
-  "IIM Ahmedabad","IIM Kozhikode","IIM Mumbai","IIM Indore","IIM Trichy","IIM Nagpur","IIM Visakhapatnam",
-  "IIT Madras Pravartak","IIT Delhi","IIT Bombay","IIT Kanpur","IIT Roorkee","IIT Guwahati","IIT Palakkad",
-  "IISc","MAHE","Amrita","XLRI","Chandigarh University","Amity University",
-  "Symbiosis School for Online and Digital Learning","IMT Ghaziabad","D Y Patil","LIBA",
-  "Manipal University Jaipur","Bharati Vidyapeeth","Parul University","Sikkim Manipal University",
-  "Dr MGR University","Dayananda Sagar University","Wharton","KPMG","NHSRE",
-];
-function renderAssocLogos(){
-  const logos = ASSOC_NAMES.map(n => ({ name:n, logo:findUniversityLogo(n) })).filter(x => x.logo);
-  return logos.map(x => `<div class="collab-item">
-    <img src="${x.logo}" alt="${esc(x.name)}" loading="lazy" onerror="this.parentElement.style.display='none'">
-    <span>${esc(x.name)}</span>
-  </div>`).join("");
 }
 /* "What's Trending" strip (below Website Stats on Home) — a curated, fixed list of 13 currently-
    live programs on jaroeducation.com (checked against the site directly; the earlier version of
@@ -3917,42 +3851,10 @@ function mountNewsFab(){
     </button>`);
   document.getElementById("newsFab").addEventListener("click", openNewsModal);
 }
-/* Floating "In Collaboration With" launcher — lives outside page markup (like the News FAB) so
-   it's reachable from anywhere in the dashboard, not just Home. Hovering the icon slides a full-
-   width panel up from the bottom of the screen to half the viewport height — a static 3-per-row
-   logo wall (name capitalized underneath each), not a slider, so every partner is visible at once
-   without waiting for a scroll animation. A short close delay bridges the gap between the icon and
-   the panel so it doesn't snap shut while the cursor is moving between them. */
-function mountCollabFab(){
-  if(document.getElementById("collabFab")) return;
-  document.body.insertAdjacentHTML("beforeend", `
-    <button type="button" class="collab-fab" id="collabFab" title="In Collaboration With — hover to see our university & partner logos">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.5 2.7 3 6 3s6-1.5 6-3v-5"/><path d="M22 10v6"/></svg>
-    </button>
-    <div class="collab-drawer" id="collabDrawer">
-      <div class="collab-drawer-inner">
-        <div class="collab-head">
-          <h3>In <span>Collaboration</span> With</h3>
-          <p>The universities and industry partners behind our programs</p>
-        </div>
-        <div class="collab-grid">${renderAssocLogos()}</div>
-      </div>
-    </div>`);
-  const fab = document.getElementById("collabFab");
-  const drawer = document.getElementById("collabDrawer");
-  let closeTimer = null;
-  const open = () => { clearTimeout(closeTimer); drawer.classList.add("open"); };
-  const scheduleClose = () => { clearTimeout(closeTimer); closeTimer = setTimeout(()=> drawer.classList.remove("open"), 260); };
-  fab.addEventListener("mouseenter", open);
-  fab.addEventListener("mouseleave", scheduleClose);
-  drawer.addEventListener("mouseenter", open);
-  drawer.addEventListener("mouseleave", scheduleClose);
-}
 function init(){
   renderNav();
   populateSectionDropdown();
   mountNewsFab();
-  mountCollabFab();
   loadHomeExtras();
   document.getElementById("refreshDataBtn").addEventListener("click", forceRefreshCurrentSection);
   // Gentle background auto-refresh: checks once a minute, but each section's own 5-minute TTL
