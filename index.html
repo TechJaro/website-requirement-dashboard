@@ -912,6 +912,11 @@ const CONFIG = {
     uniquePages:          { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "378473248" },
     // NOTE: "LSQ wise Product&University Name" and "Zipteams - Detailed PV programs" tabs are
     // intentionally NOT wired in — you asked to leave those two out of this dashboard.
+    // News / Awards tabs (banner sections) — headers can be Title/Source/Date/Description/Link
+    // and Award Title/Issuing Body/Event/Year/Description/Logo URL respectively, but the loader
+    // below (pick()) tries several common header spellings, so exact wording isn't fragile.
+    newsItems:            { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "1921003461" },
+    awardsItems:          { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "480734245" },
 
     // ===== From: Landing Pages Tracker =====
     // Per your latest instruction: Landing Pages now reads from "Domain Tracker" (plain) + the
@@ -1531,7 +1536,7 @@ const STAT_COLORS = {
    homepage's own Awards/News sections change. Award images are linked straight from Jaro's own S3/
    backend media (the same hosts Program Page brochures use), not re-uploaded here.
    ================================================================================================ */
-const AWARDS_ITEMS = [
+let AWARDS_ITEMS = [
   { title:"ET Best Organisations for Women 2026", issuer:"ET (Economic Times)", year:"2026",
     desc:"Empowered by Our Women, We Set New Heights Together.",
     logo:"https://jaro-website.s3.ap-south-1.amazonaws.com/wp-content/uploads/2026/05/lrank.png" },
@@ -1557,7 +1562,7 @@ const AWARDS_ITEMS = [
     desc:"Highlighting our leadership and influence in the evolving EdTech ecosystem.",
     logo:"https://backend.jaroeducation.com/wp-content/uploads/2025/04/WHC-Awards-2024-1.jpg" },
 ];
-const NEWS_ITEMS = [
+let NEWS_ITEMS = [
   { title:"Jaro Education launches nationwide campaign focused on learner growth, upskilling", source:"Financial Express", date:"Jul 13, 2026",
     desc:"The ed-tech company said women make up 49% of its workforce, with several leadership roles held by women. It has recorded a 342% growth in profit after tax (PAT) over the past three years.",
     link:"https://www.financialexpress.com/jobs-career/education/jaro-education-launches-nationwide-campaign-focused-on-learner-growth-upskilling/4290048/" },
@@ -1631,6 +1636,78 @@ const NEWS_ITEMS = [
     desc:"Honoured with the title of 'EdTech Leader of the Year — Empowering India's Professionals' at the ET Now Business Conclave & Awards 2025 (West Edition).",
     link:"https://www.indianbroadcastingworld.com/jaro-education-edtech-year-et-now/" },
 ];
+// Raw sheet-row-shaped fallback data for the News/Awards live-sheet loader (loadHomeExtras, below) —
+// used automatically by getData() when the "Web Pages<>JARO" sheet's News/Awards tabs can't be
+// reached, exactly like every other section's DEMO[...] fallback. Kept in sync with the arrays above.
+DEMO.awardsItems = AWARDS_ITEMS.map(a => ({
+  "Award Title": a.title, "Issuing Body/Event": a.issuer, "Year": a.year, "Description": a.desc, "Logo URL": a.logo
+}));
+DEMO.newsItems = NEWS_ITEMS.map(n => ({
+  "Title": n.title, "Source": n.source, "Date": n.date, "Description": n.desc, "Link": n.link
+}));
+/* Tolerantly pulls a field out of a live sheet row by trying several plausible header spellings
+   (in priority order) — so the News/Awards tabs work regardless of the exact header text the user
+   typed into the "Web Pages<>JARO" sheet. */
+function pick(row, candidates){
+  for(const c of candidates){
+    const lc = c.toLowerCase();
+    for(const k in row){
+      if(k.toLowerCase().includes(lc) && row[k] && row[k].toString().trim()) return row[k].toString().trim();
+    }
+  }
+  return "";
+}
+function normalizeNewsRow(r){
+  return {
+    title: pick(r, ["title","headline"]),
+    source: pick(r, ["source","publication"]),
+    date: pick(r, ["date"]),
+    desc: pick(r, ["description","desc","summary"]),
+    link: pick(r, ["link","url"]),
+  };
+}
+function normalizeAwardRow(r){
+  return {
+    title: pick(r, ["award title","title"]),
+    issuer: pick(r, ["issuing body","issuer","event"]),
+    year: pick(r, ["year"]),
+    desc: pick(r, ["description","desc"]),
+    logo: pick(r, ["logo url","logo","image"]),
+  };
+}
+/* Loads News & Awards live from the "Web Pages<>JARO" sheet (see CONFIG.sheets.newsItems /
+   awardsItems), normalizes rows into the shape the banner/modal already render, and — since this
+   runs async after first paint — patches the on-screen News FAB badge and, if the Home page is
+   already open, the Awards marquee track directly, so nothing looks stale once the fetch resolves. */
+async function loadHomeExtras(){
+  try{
+    const [newsRes, awardsRes] = await Promise.all([
+      getData("newsItems", ["Title","Source","Date"]),
+      getData("awardsItems", ["Award Title","Issuing Body","Year"]),
+    ]);
+    if(newsRes && newsRes.data && newsRes.data.length){
+      const normalized = newsRes.data.map(normalizeNewsRow).filter(n=>n.title);
+      if(normalized.length) NEWS_ITEMS = normalized;
+    }
+    if(awardsRes && awardsRes.data && awardsRes.data.length){
+      const normalized = awardsRes.data.map(normalizeAwardRow).filter(a=>a.title);
+      if(normalized.length) AWARDS_ITEMS = normalized;
+    }
+    const badge = document.getElementById("newsFabBadge");
+    if(badge) badge.textContent = NEWS_ITEMS.length;
+    const track = document.getElementById("awardsTrack");
+    if(track){
+      track.innerHTML = AWARDS_ITEMS.concat(AWARDS_ITEMS).map(a=>`
+        <div class="hero-award-card">
+          <img src="${esc(a.logo)}" alt="${esc(a.title)}" loading="lazy" onerror="this.style.display='none'">
+          <div>
+            <div class="hac-title">${esc(a.title)}</div>
+            <div class="hac-sub">${esc(a.issuer)}${a.year ? " · " + esc(a.year) : ""}</div>
+          </div>
+        </div>`).join("");
+    }
+  }catch(e){ console.warn("loadHomeExtras failed", e); }
+}
 
 async function renderHome(){
   const el = document.getElementById("content");
@@ -1664,7 +1741,7 @@ async function renderHome(){
           Awards &amp; Recognition
         </div>
         <div class="hero-awards-strip">
-          <div class="hero-awards-track">
+          <div class="hero-awards-track" id="awardsTrack">
             ${AWARDS_ITEMS.concat(AWARDS_ITEMS).map(a=>`
               <div class="hero-award-card">
                 <img src="${esc(a.logo)}" alt="${esc(a.title)}" loading="lazy" onerror="this.style.display='none'">
@@ -1927,7 +2004,7 @@ function openNewsModal(){
             <div class="ic">${ic("blog")}</div>
             <div>
               <h3>Jaro Education — In the News</h3>
-              <p>${NEWS_ITEMS.length} recent mentions, most recent first</p>
+              <p id="newsModalCount">${NEWS_ITEMS.length} recent mentions, most recent first</p>
             </div>
             <button class="modal-close" id="newsClose">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
@@ -1939,7 +2016,11 @@ function openNewsModal(){
     overlay = document.getElementById("newsOverlay");
     overlay.addEventListener("click", (e)=>{ if(e.target.id === "newsOverlay") overlay.classList.remove("show"); });
     document.getElementById("newsClose").addEventListener("click", ()=> overlay.classList.remove("show"));
-    document.getElementById("newsBody").innerHTML = `<div class="news-grid">${NEWS_ITEMS.map((n,i)=>`
+  }
+  // Rebuilt on every open (not just the first) so it always reflects the latest NEWS_ITEMS —
+  // which can change after first paint once loadHomeExtras() finishes its live-sheet fetch.
+  document.getElementById("newsModalCount").textContent = `${NEWS_ITEMS.length} recent mentions, most recent first`;
+  document.getElementById("newsBody").innerHTML = `<div class="news-grid">${NEWS_ITEMS.map((n,i)=>`
       <div class="news-card">
         <div class="news-card-top" style="background:${NEWS_GRADIENTS[i % NEWS_GRADIENTS.length]}"></div>
         <div class="news-card-body">
@@ -1953,7 +2034,6 @@ function openNewsModal(){
           <a class="news-card-link" href="${esc(n.link)}" target="_blank" rel="noopener">Read full story ${ic("external")}</a>
         </div>
       </div>`).join("")}</div>`;
-  }
   overlay.classList.add("show");
 }
 /* Fetches both Landing Pages tabs (Domain Tracker + Channel/PR) once, independent of the per-card
@@ -3682,7 +3762,7 @@ function mountNewsFab(){
     <button type="button" class="news-fab" id="newsFab" title="Jaro in the News — click for the latest">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a2 2 0 0 0 2 2h1l3 5V4L6 9H5a2 2 0 0 0-2 2Z"/><path d="M14.5 8.5a4 4 0 0 1 0 7"/><path d="M17.5 5.5a8 8 0 0 1 0 13"/></svg>
       <span class="nf-label">News</span>
-      <span class="nf-badge">${NEWS_ITEMS.length}</span>
+      <span class="nf-badge" id="newsFabBadge">${NEWS_ITEMS.length}</span>
     </button>`);
   document.getElementById("newsFab").addEventListener("click", openNewsModal);
 }
@@ -3690,6 +3770,7 @@ function init(){
   renderNav();
   populateSectionDropdown();
   mountNewsFab();
+  loadHomeExtras();
   document.getElementById("refreshDataBtn").addEventListener("click", forceRefreshCurrentSection);
   // Gentle background auto-refresh: checks once a minute, but each section's own 5-minute TTL
   // (see getData) decides whether that actually triggers a real re-fetch. Skipped while someone
