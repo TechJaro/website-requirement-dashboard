@@ -571,6 +571,47 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
   .stat-grid{grid-template-columns:1fr 1fr}
 }
 .menu-btn{display:none;border:1px solid var(--line);background:#fff;border-radius:9px;width:38px;height:38px;align-items:center;justify-content:center;flex-shrink:0}
+/* ==== Hero banner enhancements: Awards marquee + News popup trigger ==== */
+.hero-news-btn{
+  position:relative;display:inline-flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
+  color:#fff;border-radius:11px;padding:10px 16px;cursor:pointer;white-space:nowrap;
+  font-size:12.5px;font-weight:700;backdrop-filter:blur(4px);transition:background .15s,transform .15s;
+}
+.hero-news-btn:hover{background:rgba(255,255,255,.2);transform:translateY(-1px)}
+.hero-news-btn svg{width:16px;height:16px}
+.hero-news-badge{
+  position:absolute;top:-7px;right:-7px;min-width:18px;height:18px;border-radius:999px;
+  background:var(--red);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  padding:0 4px;box-shadow:0 0 0 2px var(--blue-dark);animation:heroNewsPing 2.2s ease-in-out infinite;
+}
+@keyframes heroNewsPing{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
+.hero-awards-wrap{position:relative;z-index:1;margin-top:22px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14)}
+.hero-awards-label{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--yellow);margin-bottom:12px}
+.hero-awards-label svg{width:14px;height:14px;animation:heroAwardSpin 3.2s ease-in-out infinite}
+@keyframes heroAwardSpin{0%,100%{transform:rotate(0deg)}25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
+.hero-awards-strip{position:relative;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.hero-awards-track{display:flex;gap:14px;width:max-content;animation:heroAwardsScroll 34s linear infinite}
+.hero-awards-strip:hover .hero-awards-track{animation-play-state:paused}
+@keyframes heroAwardsScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.hero-award-card{
+  flex-shrink:0;display:flex;align-items:center;gap:10px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+  border-radius:13px;padding:9px 16px 9px 9px;min-width:230px;
+  box-shadow:0 0 0 0 rgba(255,207,36,0);transition:box-shadow .25s,background .25s,transform .25s;
+}
+.hero-award-card:hover{background:rgba(255,255,255,.18);box-shadow:0 0 22px -2px rgba(255,207,36,.55);transform:translateY(-2px)}
+.hero-award-card img{width:34px;height:34px;border-radius:8px;object-fit:contain;background:#fff;flex-shrink:0;padding:3px}
+.hero-award-card .hac-title{font-size:12px;font-weight:800;color:#fff;line-height:1.25}
+.hero-award-card .hac-sub{font-size:10.5px;color:rgba(255,255,255,.65);margin-top:2px}
+.news-item{padding:14px 2px;border-bottom:1px solid var(--line)}
+.news-item:last-child{border-bottom:none}
+.news-item .ni-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.4}
+.news-item .ni-meta{font-size:11.5px;color:var(--ink-50);margin:3px 0 6px;display:flex;gap:8px;flex-wrap:wrap}
+.news-item .ni-desc{font-size:12.5px;color:var(--ink-70);line-height:1.5}
+.news-item .ni-link{font-size:12px;font-weight:700;color:var(--blue);display:inline-flex;align-items:center;gap:4px;margin-top:6px}
+.news-item .ni-link svg{width:12px;height:12px}
+@media(max-width:640px){.hero-award-card{min-width:200px}}
 </style>
 </head>
 <body>
@@ -1408,6 +1449,114 @@ const STAT_COLORS = {
 };
 
 
+/* ================================================================================================
+   HOMEPAGE AWARDS & NEWS — snapshot pulled from the live jaroeducation.com homepage on 2026-08-13.
+   These aren't backed by a Google Sheet (there's no tracker for them yet), so unlike every other
+   section they won't auto-refresh — re-pull from the site and update these two arrays when the
+   homepage's own Awards/News sections change. Award images are linked straight from Jaro's own S3/
+   backend media (the same hosts Program Page brochures use), not re-uploaded here.
+   ================================================================================================ */
+const AWARDS_ITEMS = [
+  { title:"ET Best Organisations for Women 2026", issuer:"ET (Economic Times)", year:"2026",
+    desc:"Empowered by Our Women, We Set New Heights Together.",
+    logo:"https://jaro-website.s3.ap-south-1.amazonaws.com/wp-content/uploads/2026/05/lrank.png" },
+  { title:"EdTech Leader of the Year — Empowering India's Professionals", issuer:"ET Now Business Conclave & Awards 2025 (West Edition)", year:"2025",
+    desc:"",
+    logo:"https://jaro-website.s3.ap-south-1.amazonaws.com/wp-content/uploads/2025/10/ET-awards-4-1.jpg" },
+  { title:"Outstanding Contribution in Online Education", issuer:"MODI Awards", year:"2024",
+    desc:"Acknowledging our role in redefining the digital learning landscape.",
+    logo:"https://backend.jaroeducation.com/wp-content/uploads/2025/04/Modi-Award-2024.jpg" },
+  { title:"National Best Employer Accolade", issuer:"World HRD Congress", year:"2024",
+    desc:"A testament to our dynamic work culture and commitment to talent development.",
+    logo:"https://backend.jaroeducation.com/wp-content/uploads/2025/04/WHC-Awards-2024-1.jpg" },
+  { title:"Best Digital Learning Innovation Award", issuer:"ABP Education Awards", year:"",
+    desc:"Honoring our continuous innovation in digital pedagogy and learner engagement.",
+    logo:"https://backend.jaroeducation.com/wp-content/uploads/2025/04/NSHM_ABP_Award_post.png" },
+  { title:"India's Most Trusted Online Higher Education Company", issuer:"Outlook Business Icon Awards", year:"2023",
+    desc:"A reflection of the trust we've built with learners and industry leaders alike.",
+    logo:"https://backend.jaroeducation.com/wp-content/uploads/2025/04/Outlook-Business-2023.jpg" },
+  { title:"Leading EdTech Company of the Year", issuer:"The Business Awards, The Times Group", year:"2024",
+    desc:"Recognizing our unwavering pursuit of excellence and growth.",
+    logo:"https://backend.jaroeducation.com/wp-content/uploads/2025/04/TOI-2024.jpg" },
+  { title:"EdTech Leadership Awards", issuer:"World HRD Congress", year:"2024",
+    desc:"Highlighting our leadership and influence in the evolving EdTech ecosystem.",
+    logo:"https://backend.jaroeducation.com/wp-content/uploads/2025/04/WHC-Awards-2024-1.jpg" },
+];
+const NEWS_ITEMS = [
+  { title:"Jaro Education launches nationwide campaign focused on learner growth, upskilling", source:"Financial Express", date:"Jul 13, 2026",
+    desc:"The ed-tech company said women make up 49% of its workforce, with several leadership roles held by women. It has recorded a 342% growth in profit after tax (PAT) over the past three years.",
+    link:"https://www.financialexpress.com/jobs-career/education/jaro-education-launches-nationwide-campaign-focused-on-learner-growth-upskilling/4290048/" },
+  { title:"Jaro Education marks 17 years with #GrowWithJaro campaign, celebrates 3.5 lakh learners", source:"MediaNews4U", date:"Jul 11, 2026",
+    desc:"Jaro Education launched a pan-India campaign marking 17 years of operations.",
+    link:"https://www.medianews4u.com/jaro-education-marks-17-years-with-growwithjaro-campaign-celebrates-3-5-lakh-learners/" },
+  { title:"Jaro Education launches #GrowWithJaro campaign on Jaro Day", source:"Adgully", date:"Jul 10, 2026",
+    desc:"A pan-India 360° campaign built around real stories of professional growth, marking 17 years of transforming careers.",
+    link:"https://www.adgully.com/post/17922/jaro-education-launches-growith-jaro-campaign-on-jaro-day" },
+  { title:"Looking to Upskill While You Work? These 5 Online MBA Programs Stand Out", source:"Dailyhunt", date:"Jul 1, 2026",
+    desc:"Article highlighting practical management education programs offering convenience and industry relevance.",
+    link:"https://m.dailyhunt.in/news/india/english/news+patrolling-epaper-newspatr/looking+to+upskill+while+you+work+these+5+online+mba+programs+stand+out-newsid-n718029030" },
+  { title:"In the AI Era, hiring alone won't solve talent gaps — continuous upskilling will", source:"ET Edge Insights", date:"Jul 1, 2026",
+    desc:"Discussion on India's workforce growth and the importance of continuous professional development.",
+    link:"https://etedge-insights.com/industry/hr/in-the-ai-era-hiring-alone-wont-solve-talent-gaps-continuous-upskilling-will/" },
+  { title:"IIM Nagpur opens applications for blended MBA program for working professionals", source:"Hindustan Times", date:"Jun 29, 2026",
+    desc:"Applications for the second cohort of IIM Nagpur's Blended MBA Programme have been opened for working professionals with flexible learning.",
+    link:"https://www.hindustantimes.com/education/admissions/iim-nagpur-opens-applications-for-blended-mba-program-for-working-professionals-101782721728214-amp.html" },
+  { title:"IIT Delhi Invites Applications for Healthcare Industry 5.0 Programme", source:"Edugraph", date:"Jun 23, 2026",
+    desc:"IIT Delhi's CEP has opened admissions for the third batch of its Executive Programme in Healthcare for Industry 5.0.",
+    link:"https://www.telegraphindia.com/amp/edugraph/news/iit-delhi-cep-opens-applications-for-six-month-healthcare-industry-executive-programme/cid/2166846" },
+  { title:"10 Indian Edtech Founders Leading AI-Backed Learning Transformation", source:"Analytics India Magazine", date:"May 19, 2026",
+    desc:"India's edtech sector has evolved from the pandemic-era funding boom to now shaping the future of AI-powered learning and upskilling.",
+    link:"https://analyticsindiamag.com/lists/10-indian-edtech-founders-leading-ai-backed-learning-transformation" },
+  { title:"Healthcare Management Skills In Focus", source:"BW Education", date:"Apr 29, 2026",
+    desc:"India's evolving healthcare sector is increasing demand for skilled professionals with strong management and leadership capabilities.",
+    link:"https://www.bweducation.com/article/healthcare-management-skills-in-focus-604564" },
+  { title:"India fee-sensitive market sets a tough test for global varsities", source:"Business Standard", date:"Apr 29, 2026",
+    desc:"Analysis of foreign university campuses in India and market focus on return on investment.",
+    link:"https://www.business-standard.com/education/news/foreign-universities-india-market-fee-sensitivity-enrolments-126042901102_1.html" },
+  { title:"Beyond Metro Hubs: The Rise of Online Education in Tier-2 India", source:"Edugraph", date:"Apr 27, 2026",
+    desc:"For decades, India's education and career opportunities have been largely concentrated in metropolitan cities.",
+    link:"https://www.telegraphindia.com/edugraph/career/beyond-metro-hubs-the-rise-of-online-education-in-tier-2-india/cid/2157992" },
+  { title:"Not 100% ready? Why Gen Z is taking career risks while Millennials hold back", source:"India Today", date:"Apr 25, 2026",
+    desc:"Analysis of generational differences in professional risk-taking and job stability preferences.",
+    link:"https://www.indiatoday.in/jobs/story/not-100-ready-why-gen-z-is-taking-career-risks-while-millennials-hold-back-educ-2901376-2026-04-25" },
+  { title:"CSR: Jaro Education Commits Rs 51 Lakh for Healthcare in Patna", source:"India CSR", date:"Mar 30, 2026",
+    desc:"Jaro Education has contributed ₹51 lakh toward supporting an affordable healthcare initiative in Patna.",
+    link:"https://indiacsr.in/csr-jaro-education-commits-rs-51-lakh-healthcare-in-patna/" },
+  { title:"Leading with Vision: Women leaders powering change across industries", source:"The Hans India", date:"Mar 6, 2026",
+    desc:"From boardrooms to startups, women leaders across industries are redefining success with vision, resilience, and purpose.",
+    link:"https://www.thehansindia.com/featured/women/leading-with-vision-women-leaders-powering-change-across-industries-1054316" },
+  { title:"Create value, valuation will follow: How Dr Sanjay Salunkhe built Jaro Education", source:"YourStory", date:"Feb 11, 2026",
+    desc:"From day-one profitability to enabling over 3.5 lakh learners, Jaro Education's model highlights sustainable edtech growth without venture capital.",
+    link:"https://yourstory.com/2026/02/value-valuation-follow-dr-sanjay-salunkhe-built-jaro-education" },
+  { title:"Jaro Institute turns profitable in December quarter on higher revenue growth", source:"ET Education", date:"Feb 1, 2026",
+    desc:"The Institute reported a profit after tax of Rs 7.03 crore for the October–December quarter against a loss of Rs 3.88 crore a year earlier.",
+    link:"https://education.economictimes.indiatimes.com/amp/news/industry/jaro-institute-turns-profitable-in-december-quarter-on-higher-revenue-growth/127843193" },
+  { title:"Deven Choksey expects 18–20% equity returns; spots potential in recently listed Jaro Education", source:"Business Today", date:"Oct 23, 2025",
+    desc:"Among the recently listed companies, Choksey expressed optimism about Jaro Institute of Technology Management & Research Ltd.",
+    link:"https://www.businesstoday.in/markets/stocks/story/deven-choksey-expects-18-20-equity-returns-spots-potential-in-recently-listed-jaro-education-499329-2025-10-23" },
+  { title:"Jaro Education and Jio Join Hands to Bring Free, Expert-Led Learning to Every Indian Home", source:"Press Trust of India", date:"Oct 17, 2025",
+    desc:"",
+    link:"https://www.ptinews.com/editor-detail/Jaro-Education-and-Jio-Join-Hands-to-Bring-Free-Expert-Led-Learning-to-Every-Indian-Home/3014526" },
+  { title:"Jaro Education opens new centres in Kolkata, Jaipur, and 2 other cities", source:"Press Trust of India", date:"Oct 14, 2025",
+    desc:"Edtech company Jaro Education to open new counselling centres in Kolkata, Nagpur, Jaipur, and Indore as it expands reach across Tier-II cities.",
+    link:"https://www.ptinews.com/story/business/jaro-education-opens-new-centres-in-kolkata-jaipur-2-other-cities/3006412" },
+  { title:"Breaking Barriers, Building Leaders: The Ranjita Raman Story", source:"The Hans India", date:"Oct 11, 2025",
+    desc:"Ranjita has been at the heart of Jaro's evolution — her strategic foresight has turned challenges into stepping stones for growth.",
+    link:"https://www.thehansindia.com/amp/karnataka/breaking-barriers-building-leaders-the-ranjita-raman-story-1013839" },
+  { title:"Jaro Institute shares list flat at IPO price of Rs 890 on NSE, BSE", source:"The Economic Times", date:"Sep 30, 2025",
+    desc:"Jaro Institute, better known as Jaro Education, made a muted market debut, listing flat at its IPO price on both BSE and NSE.",
+    link:"https://economictimes.indiatimes.com/markets/ipos/fpos/jaro-institute-shares-list-flat-at-ipo-price-of-rs-890-on-nse-bse/articleshow/124225484.cms" },
+  { title:"Jaro Education IPO oversubscribed 23x: India's online learning leader makes market debut", source:"YourStory", date:"Sep 26, 2025",
+    desc:"With robust growth, premier institutional partnerships, and a 15-year profitable track record, Jaro Education raised fresh capital to scale up online higher education.",
+    link:"https://yourstory.com/2025/09/jaro-education-ipo-oversubscribed-23x" },
+  { title:"Jaro Education raises Rs 135 crore via anchor book of Rs 450 crore IPO", source:"Moneycontrol", date:"Sep 22, 2025",
+    desc:"Mumbai-based Jaro Institute of Technology, the online higher education and upskilling platform, raised Rs 135 crore via anchor book.",
+    link:"https://www.moneycontrol.com/news/business/ipo/jaro-education-raises-rs-135-crore-via-anchor-book-of-rs-450-crore-ipo-13567614.html" },
+  { title:"Jaro Education wins 'EdTech Leader of the Year'", source:"Indian Broadcasting World", date:"Aug 21, 2025",
+    desc:"Honoured with the title of 'EdTech Leader of the Year — Empowering India's Professionals' at the ET Now Business Conclave & Awards 2025 (West Edition).",
+    link:"https://www.indianbroadcastingworld.com/jaro-education-edtech-year-et-now/" },
+];
+
 async function renderHome(){
   const el = document.getElementById("content");
   const now = new Date();
@@ -1424,16 +1573,40 @@ async function renderHome(){
           <div class="hero-eyebrow">${dateStr}</div>
           <h2 class="hero-title">${greeting}, team 👋</h2>
         </div>
-        <div style="display:flex;align-items:center;gap:12px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <span class="hero-live-pill" id="heroLivePill" style="display:none">
             <span class="hero-live-dot"></span>LIVE
           </span>
+          <button type="button" class="hero-news-btn" id="heroNewsBtn" title="Jaro in the News">
+            ${ic("blog")}
+            News
+            <span class="hero-news-badge">${NEWS_ITEMS.length}</span>
+          </button>
           <div class="hero-search-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <input type="text" id="heroSearch" placeholder="Search universities, programs, links…">
           </div>
         </div>
       </div>
+      <div class="hero-awards-wrap">
+        <div class="hero-awards-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4a1 1 0 0 0-1 1c0 2.5 1.5 4 3.5 4.3M17 6h3a1 1 0 0 1 1 1c0 2.5-1.5 4-3.5 4.3"/></svg>
+          Awards &amp; Recognition
+        </div>
+        <div class="hero-awards-strip">
+          <div class="hero-awards-track">
+            ${AWARDS_ITEMS.concat(AWARDS_ITEMS).map(a=>`
+              <div class="hero-award-card">
+                <img src="${esc(a.logo)}" alt="${esc(a.title)}" loading="lazy" onerror="this.style.display='none'">
+                <div>
+                  <div class="hac-title">${esc(a.title)}</div>
+                  <div class="hac-sub">${esc(a.issuer)}${a.year ? " · " + esc(a.year) : ""}</div>
+                </div>
+              </div>`).join("")}
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
 
     <div class="section-head" style="align-items:center">
@@ -1496,6 +1669,7 @@ async function renderHome(){
   `;
   el.querySelectorAll("[data-go]").forEach(c=>c.addEventListener("click", ()=>navigate(c.dataset.go)));
   document.getElementById("refreshHomeBtn").addEventListener("click", forceRefreshCurrentSection);
+  document.getElementById("heroNewsBtn").addEventListener("click", openNewsModal);
   const heroSearchEl = document.getElementById("heroSearch");
   if(heroSearchEl) heroSearchEl.addEventListener("keydown", (e)=>{
     if(e.key === "Enter"){
@@ -1644,6 +1818,42 @@ function openInsightListModal(title, rows){
       ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener" class="btn" style="flex-shrink:0">${ic("external")}</a>` : ""}
     </div>`;
   }).join("") : emptyStateHTML("Nothing here", "No programs match this slice.");
+  overlay.classList.add("show");
+}
+/* "Jaro in the News" popup — triggered from the hero banner's News button. Reuses the same
+   .modal-overlay/.modal shell as the other popups on this dashboard so it looks native, built and
+   inserted at runtime the first time it's opened. */
+function openNewsModal(){
+  let overlay = document.getElementById("newsOverlay");
+  if(!overlay){
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal-overlay" id="newsOverlay">
+        <div class="modal" style="max-width:600px">
+          <div class="modal-watermark"></div>
+          <div class="modal-head">
+            <div class="ic">${ic("blog")}</div>
+            <div>
+              <h3>Jaro Education — In the News</h3>
+              <p>${NEWS_ITEMS.length} recent mentions, most recent first</p>
+            </div>
+            <button class="modal-close" id="newsClose">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" id="newsBody" style="max-height:64vh;overflow:auto"></div>
+        </div>
+      </div>`);
+    overlay = document.getElementById("newsOverlay");
+    overlay.addEventListener("click", (e)=>{ if(e.target.id === "newsOverlay") overlay.classList.remove("show"); });
+    document.getElementById("newsClose").addEventListener("click", ()=> overlay.classList.remove("show"));
+    document.getElementById("newsBody").innerHTML = NEWS_ITEMS.map(n=>`
+      <div class="news-item">
+        <div class="ni-title">${esc(n.title)}</div>
+        <div class="ni-meta"><span>${esc(n.source)}</span><span>·</span><span>${esc(n.date)}</span></div>
+        ${n.desc ? `<div class="ni-desc">${esc(n.desc)}</div>` : ""}
+        <a class="ni-link" href="${esc(n.link)}" target="_blank" rel="noopener">Read full story ${ic("external")}</a>
+      </div>`).join("");
+  }
   overlay.classList.add("show");
 }
 /* Fetches both Landing Pages tabs (Domain Tracker + Channel/PR) once, independent of the per-card
