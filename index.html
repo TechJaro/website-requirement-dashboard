@@ -1693,7 +1693,10 @@ function normalizeNewsRow(r){
   return {
     title: pick(r, ["title","headline"]),
     source: pick(r, ["source","publication"]),
-    date: pick(r, ["date"]),
+    // Same raw-serial-number issue as Application Closure Date (see formatClosureDate_ above) —
+    // when the sheet is read via the Google Sheets API, a real Date cell comes back as a plain
+    // number of days since 1899-12-30 instead of "Jul 13, 2026". Run it through the same fixup.
+    date: formatClosureDate_(pick(r, ["date"])),
     desc: pick(r, ["description","desc","summary"]),
     link: pick(r, ["link","url"]),
   };
