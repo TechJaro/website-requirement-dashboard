@@ -616,8 +616,8 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
    matching the real carousel on jaroeducation.com's homepage: no card/box background, just the
    heading and a continuously sliding row of logos sitting directly on the page. Pushed further
    down from the section above it and enlarged (bigger heading, bigger logos) per request. */
-.assoc-section-v2{margin-top:56px;padding:38px 0 14px;text-align:center}
-.assoc-section-v2 h3{font-size:27px;font-weight:700;color:var(--ink);margin-bottom:28px}
+.assoc-section-v2{margin-top:56px;padding:38px 0 14px}
+.assoc-section-v2 h3{font-size:27px;font-weight:700;color:var(--ink);margin-bottom:28px;text-align:left}
 .assoc-section-v2 h3 span{color:var(--blue)}
 .assoc-strip{position:relative;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent);mask-image:linear-gradient(90deg,transparent,#000 5%,#000 95%,transparent)}
 .assoc-track{display:flex;align-items:center;gap:48px;width:max-content;animation:assocScroll 42s linear infinite}
@@ -626,40 +626,34 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .assoc-logo{flex-shrink:0;display:flex;align-items:center;justify-content:center;height:64px}
 .assoc-logo img{max-height:58px;max-width:170px;object-fit:contain;filter:grayscale(15%);opacity:.9;transition:filter .2s,opacity .2s}
 .assoc-logo:hover img{filter:none;opacity:1}
-/* "What's Trending" carousel — sits below Website Stats on Home, black backdrop per request, cards
-   styled like the dashboard's own pastel Website Stats cards (no colored gradient banner), with
-   arrow-driven horizontal scroll (course text needs to be readable, so no auto-marquee here). */
-.trending-section{background:#0A0A0C;border-radius:var(--radius);padding:26px 8px 30px;margin-bottom:26px}
-.trending-head{text-align:center;padding:0 20px;margin-bottom:20px}
-.trending-head h3{font-size:22px;font-weight:700;color:#fff}
+/* "What's Trending" strip — sits below Website Stats on Home, same gradient backdrop as the hero
+   banner (per request, instead of a flat color), heading pinned to the left. A curated, name-only
+   list (no CTA) auto-scrolling as a continuous marquee — see TRENDING_COURSES/renderTrendingCourses
+   below for the actual program list. Cards are deliberately small/compact, no meta rows or button. */
+.trending-section{
+  background:linear-gradient(120deg,var(--black) 0%,var(--blue-dark) 55%,var(--blue) 100%);
+  border-radius:var(--radius);padding:26px 0 30px;margin-bottom:26px;overflow:hidden;
+}
+.trending-head{padding:0 24px;margin-bottom:18px}
+.trending-head h3{font-size:22px;font-weight:700;color:#fff;text-align:left}
 .trending-head h3 span{color:var(--yellow)}
-.trending-head p{font-size:13px;color:rgba(255,255,255,.55);margin-top:8px;max-width:640px;margin-left:auto;margin-right:auto}
-.tc-carousel{display:flex;align-items:center;gap:8px;padding:0 8px}
-.tc-arrow{flex-shrink:0;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.08);
-  color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
-.tc-arrow:hover{background:var(--yellow);color:var(--ink);border-color:var(--yellow)}
-.tc-arrow svg{width:16px;height:16px}
-.tc-track{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x proximity;padding:4px;scrollbar-width:none}
-.tc-track::-webkit-scrollbar{display:none}
-.tc-empty{padding:30px;color:rgba(255,255,255,.55);font-size:13px;width:100%;text-align:center}
-.tc-card{flex-shrink:0;width:270px;scroll-snap-align:start;border-radius:16px;overflow:hidden;padding:16px;
-  background:linear-gradient(165deg,var(--glass) 0%,rgba(255,255,255,.9) 100%);border:1px solid rgba(255,255,255,.5)}
-.tc-card-top{display:flex;align-items:center;justify-content:space-between}
-.tc-card-top .ic-badge{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.tc-card-top .ic-badge svg{width:18px;height:18px}
-.tc-card-top .ic-badge img{width:24px;height:24px;object-fit:contain}
-.tc-badge{font-size:10.5px;font-weight:800;padding:4px 9px;border-radius:20px;color:#fff;flex-shrink:0}
-.tc-badge-open{background:#1b9c58}
-.tc-badge-soon{background:#c98a00}
-.tc-card-body{padding-top:14px}
-.tc-title{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.35;min-height:36px}
-.tc-uni{font-size:11.5px;color:var(--ink-50);margin-top:4px}
-.tc-meta{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-70);margin-top:8px}
-.tc-meta svg{width:13px;height:13px;flex-shrink:0;color:var(--ink-35)}
-.tc-btn{display:block;text-align:center;margin-top:12px;color:#fff;font-size:12.5px;
-  font-weight:700;padding:9px 0;border-radius:9px;text-decoration:none}
-.tc-btn-disabled{background:var(--ink-35);cursor:default}
-@media(max-width:640px){.tc-card{width:230px}.assoc-track{gap:30px}}
+.tc-strip{position:relative;overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent);mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+.tc-track{display:flex;gap:14px;width:max-content;animation:tcScroll 36s linear infinite;padding:2px 24px}
+.tc-strip:hover .tc-track{animation-play-state:paused}
+@keyframes tcScroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.tc-empty{padding:30px;color:rgba(255,255,255,.55);font-size:13px}
+.tc-card{flex-shrink:0;width:210px;display:flex;align-items:center;gap:10px;border-radius:12px;padding:10px 12px;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);transition:background .2s}
+.tc-card:hover{background:rgba(255,255,255,.18)}
+.tc-card .ic-badge{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;background:#fff}
+.tc-card .ic-badge svg{width:16px;height:16px;color:var(--blue)}
+.tc-card .ic-badge img{width:22px;height:22px;object-fit:contain}
+.tc-card-body{min-width:0}
+.tc-title{font-size:11.5px;font-weight:700;color:#fff;line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tc-uni{font-size:10px;color:rgba(255,255,255,.6);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:640px){.tc-card{width:180px}.assoc-track{gap:30px}}
 /* ==== Round 2: clearer click affordance, landing insights drill-down,
    university/partner logo sliders, floating News launcher, richer News cards ==== */
 .status-legend-item[data-type],
@@ -1830,16 +1824,9 @@ async function renderHome(){
     <div class="trending-section">
       <div class="trending-head">
         <h3>What's <span>Trending</span></h3>
-        <p>Live, in-demand programs from your Program Pages tracker — open for admission or closing soon.</p>
       </div>
-      <div class="tc-carousel">
-        <button type="button" class="tc-arrow tc-arrow-left" id="tcArrowLeft" aria-label="Scroll left">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 6l-6 6 6 6"/></svg>
-        </button>
-        <div class="tc-track" id="trendingCoursesTrack"><div class="tc-empty">Loading trending courses…</div></div>
-        <button type="button" class="tc-arrow tc-arrow-right" id="tcArrowRight" aria-label="Scroll right">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>
-        </button>
+      <div class="tc-strip">
+        <div class="tc-track" id="trendingCoursesTrack"></div>
       </div>
     </div>
 
@@ -1882,7 +1869,7 @@ async function renderHome(){
     </div>
 
     <div class="assoc-section-v2">
-      <h3>Our <span>Collaborations</span></h3>
+      <h3>In <span>Collaboration</span> With</h3>
       <div class="assoc-strip">
         <div class="assoc-track" id="assocTrack2">${renderAssocLogos()}</div>
       </div>
@@ -1890,7 +1877,7 @@ async function renderHome(){
   `;
   el.querySelectorAll("[data-go]").forEach(c=>c.addEventListener("click", ()=>navigate(c.dataset.go)));
   document.getElementById("refreshHomeBtn").addEventListener("click", forceRefreshCurrentSection);
-  wireTrendingCoursesArrows();
+  renderTrendingCourses();
   const heroSearchEl = document.getElementById("heroSearch");
   if(heroSearchEl) heroSearchEl.addEventListener("keydown", (e)=>{
     if(e.key === "Enter"){
@@ -1927,7 +1914,7 @@ async function renderHome(){
         const pill = document.getElementById("heroLivePill");
         if(pill) pill.style.display = "inline-flex";
       }
-      if(key==="program"){ renderQuickInsights(data); renderTrendingCourses(data); }
+      if(key==="program") renderQuickInsights(data);
     });
   }
   loadLandingInsights();
@@ -1964,54 +1951,48 @@ function renderAssocLogos(){
   const twice = logos.concat(logos);
   return twice.map(x => `<div class="assoc-logo"><img src="${x.logo}" alt="${esc(x.name)}" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`).join("");
 }
-/* "What's Trending" carousel (below Website Stats on Home) — pulls live from the same Program
-   Pages data already fetched for Quick Insights above (no second fetch). Shows programs that are
-   currently Open or Closing Soon, styled like the dashboard's own Website Stats cards (pastel tint
-   + icon badge) rather than a solid color banner, per request. */
-const TC_TINTS = [
-  {bg:"var(--blue-tint-10)", fg:"var(--blue)"},
-  {bg:"var(--yellow-tint)", fg:"#8a6800"},
-  {bg:"var(--red-tint)", fg:"var(--red)"},
+/* "What's Trending" strip (below Website Stats on Home) — a curated, fixed list of 13 currently-
+   live programs on jaroeducation.com (checked against the site directly; the earlier version of
+   this section, auto-pulled from Program Pages "Open"/"Closing Soon" rows, didn't match what's
+   actually live). Just a title + offering institute, no CTA — this is a name-recognition strip,
+   not a click-through. Order is reshuffled on every load so it doesn't always read the same way.
+   "org" is the full institute text (used for logo matching); "orgShort" is what's shown on the
+   small card. */
+const TRENDING_COURSES = [
+  { title:"Executive Programme in Business Finance", org:"IIM Ahmedabad", orgShort:"IIM Ahmedabad" },
+  { title:"Executive Programme in Brand Management", org:"Programme offered by Continuing Education Programme (CEP), IIT Delhi", orgShort:"CEP, IIT Delhi" },
+  { title:"Professional Certificate Programme in Investment Banking, Risk & Capital Markets", org:"IIM Kozhikode", orgShort:"IIM Kozhikode" },
+  { title:"Professional Certificate Programme in AI-Powered Digital Marketing for Performance & Growth", org:"IIM Kozhikode", orgShort:"IIM Kozhikode" },
+  { title:"Blended MBA for Working Professionals", org:"IIM Nagpur", orgShort:"IIM Nagpur" },
+  { title:"Post Graduate Certificate Programme in Strategic Human Resource Management with AI & Analytics", org:"IIM Tiruchirappalli", orgShort:"IIM Tiruchirappalli" },
+  { title:"Professional Certificate Programme in Sustainability Leadership and Practice", org:"Indian Institute of Technology Bombay", orgShort:"IIT Bombay" },
+  { title:"Chief Technology Officer Programme", org:"IIT Bombay", orgShort:"IIT Bombay" },
+  { title:"Advanced Programme in Electric Vehicle (EV) Technology", org:"Programme offered by Continuing Education Programme (CEP), IIT Delhi", orgShort:"CEP, IIT Delhi" },
+  { title:"Executive Programme in Autonomous Robotics & AI", org:"Programme offered by Continuing Education Programme (CEP), IIT Delhi", orgShort:"CEP, IIT Delhi" },
+  { title:"Post Graduate Certificate Programme in Applied Data Science & AI", org:"IIT Roorkee", orgShort:"IIT Roorkee" },
+  { title:"Chief Technology & AI Officer Post Graduate (PG) Certificate Program", org:"Program by CEC, IIT Roorkee", orgShort:"CEC, IIT Roorkee" },
+  { title:"Online MBA", org:"Symbiosis School for Online and Digital Learning (SSODL)", orgShort:"SSODL" },
 ];
-function renderTrendingCourses(rawData){
+function shuffledCopy(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; }
+  return a;
+}
+function renderTrendingCourses(){
   const track = document.getElementById("trendingCoursesTrack");
   if(!track) return; // user has already navigated away from Home before this resolved
-  const rows = (rawData||[]).filter(r => (r["Program Name"]||"").toString().trim());
-  const trending = rows.filter(r => { const s = statusKeyFor(r); return s === "open" || s === "soon"; }).slice(0, 14);
-  if(!trending.length){ track.innerHTML = `<div class="tc-empty">No open programs to show right now.</div>`; return; }
-  track.innerHTML = trending.map((r,i)=>{
-    const status = statusKeyFor(r);
-    const badgeLabel = status === "soon" ? "Closing Soon" : "Admission Open";
-    const link = firstLink(r["Webpage Link"]) || firstLink(r["Landing Page Link"]);
-    const tint = TC_TINTS[i % TC_TINTS.length];
-    const logo = findUniversityLogo(r["University/Institute"]);
-    return `<div class="tc-card" style="--glass:${tint.bg};--fg:${tint.fg}">
-      <div class="tc-card-top">
-        <div class="ic-badge" style="background:rgba(255,255,255,.7);color:${tint.fg}">${logo ? `<img src="${logo}" alt="">` : ic("university")}</div>
-        <span class="tc-badge tc-badge-${status}">${badgeLabel}</span>
-      </div>
+  const list = shuffledCopy(TRENDING_COURSES);
+  const twice = list.concat(list); // duplicated so the auto-scroll marquee loops seamlessly
+  track.innerHTML = twice.map(c=>{
+    const logo = findUniversityLogo(c.org);
+    return `<div class="tc-card">
+      <div class="ic-badge">${logo ? `<img src="${logo}" alt="">` : ic("university")}</div>
       <div class="tc-card-body">
-        <div class="tc-title">${esc(r["Program Name"])}</div>
-        <div class="tc-uni">${esc(r["University/Institute"]||"")}</div>
-        <div class="tc-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></svg>${esc(r["Application Closure Date"]||"—")}</div>
-        <div class="tc-meta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>${esc(r["Category / Domain"]||"General")}</div>
-        ${link ? `<a class="tc-btn" style="background:${tint.fg}" href="${esc(link)}" target="_blank" rel="noopener">View Course</a>` : `<span class="tc-btn tc-btn-disabled">View Details</span>`}
+        <div class="tc-title">${esc(c.title)}</div>
+        <div class="tc-uni">${esc(c.orgShort)}</div>
       </div>
     </div>`;
   }).join("");
-}
-function wireTrendingCoursesArrows(){
-  const track = document.getElementById("trendingCoursesTrack");
-  const left = document.getElementById("tcArrowLeft");
-  const right = document.getElementById("tcArrowRight");
-  if(!track || !left || !right) return;
-  const scrollByCard = (dir) => {
-    const card = track.querySelector(".tc-card");
-    const step = card ? card.getBoundingClientRect().width + 16 : 300;
-    track.scrollBy({ left: dir * step, behavior: "smooth" });
-  };
-  left.addEventListener("click", ()=> scrollByCard(-1));
-  right.addEventListener("click", ()=> scrollByCard(1));
 }
 function renderQuickInsights(rawData){
   // Legend/note rows that sit above or inside the real data (the Program Pages sheet has banner
