@@ -647,33 +647,30 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .insight-list-item .ili-title{font-weight:700;font-size:13px}
 .insight-list-item .ili-sub{font-size:12px;color:var(--ink-50)}
 
-.hero-logos-row{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:18px}
-@media(max-width:760px){.hero-logos-row{grid-template-columns:1fr}}
-.hero-logo-chip{
-  flex-shrink:0;width:66px;height:66px;border-radius:14px;background:#fff;
-  display:flex;align-items:center;justify-content:center;padding:9px;
-  box-shadow:0 8px 18px -8px rgba(0,0,0,.35);transition:transform .2s,box-shadow .2s;
-}
-.hero-logo-chip:hover{transform:translateY(-3px) scale(1.05);box-shadow:0 14px 26px -8px rgba(255,207,36,.5)}
-.hero-logo-chip img{width:100%;height:100%;object-fit:contain}
-
 .news-fab{
-  position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:70;
-  display:flex;flex-direction:column;align-items:center;gap:6px;
-  background:linear-gradient(160deg,var(--blue) 0%,var(--blue-dark) 100%);color:#fff;
-  border:none;border-radius:16px 0 0 16px;padding:16px 10px 18px;cursor:pointer;
-  box-shadow:-8px 10px 26px -8px rgba(0,30,90,.5);
-  transition:padding .2s,box-shadow .2s;
+  position:fixed;top:50%;right:20px;transform:translateY(-50%);z-index:70;
+  display:flex;align-items:center;
+  background:linear-gradient(135deg,var(--blue) 0%,var(--blue-dark) 100%);color:#fff;
+  border:none;border-radius:999px;cursor:pointer;padding:15px;
+  box-shadow:0 14px 30px -8px rgba(0,30,90,.55),0 0 0 5px rgba(255,255,255,.85);
+  transition:padding .25s ease,box-shadow .25s ease;
+  animation:newsFabFloat 3.2s ease-in-out infinite;
 }
-.news-fab:hover{padding-right:16px;box-shadow:-10px 14px 32px -6px rgba(0,30,90,.65)}
-.news-fab svg{width:20px;height:20px}
-.news-fab span{font-size:10px;font-weight:800;letter-spacing:.06em;writing-mode:vertical-rl;text-orientation:mixed;margin-top:2px}
+.news-fab:hover{padding:15px 24px 15px 15px;box-shadow:0 18px 38px -6px rgba(0,30,90,.65),0 0 0 5px rgba(255,255,255,.85);animation-play-state:paused}
+.news-fab svg{width:22px;height:22px;flex-shrink:0}
+.news-fab .nf-label{
+  max-width:0;overflow:hidden;white-space:nowrap;
+  font-size:13px;font-weight:800;letter-spacing:.02em;opacity:0;margin-left:0;
+  transition:max-width .25s ease,opacity .2s ease,margin-left .25s ease;
+}
+.news-fab:hover .nf-label{max-width:60px;opacity:1;margin-left:9px}
 .news-fab .nf-badge{
-  position:absolute;top:6px;right:10px;min-width:18px;height:18px;border-radius:999px;
-  background:var(--red);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;
-  padding:0 4px;box-shadow:0 0 0 2px var(--blue-dark);animation:heroNewsPing 2.2s ease-in-out infinite;
+  position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;border-radius:999px;
+  background:var(--red);color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;
+  padding:0 4px;box-shadow:0 0 0 2px #fff;animation:heroNewsPing 2.2s ease-in-out infinite;
 }
-@media(max-width:640px){.news-fab{border-radius:14px 0 0 14px;padding:12px 8px 14px}}
+@keyframes newsFabFloat{0%,100%{transform:translateY(-50%)}50%{transform:translateY(calc(-50% - 7px))}}
+@media(max-width:640px){.news-fab{right:12px;padding:13px}}
 
 .news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px}
 .news-card{border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#fff;
@@ -1680,26 +1677,6 @@ async function renderHome(){
               </div>`).join("")}
           </div>
         </div>
-        <div class="hero-logos-row">
-          <div>
-            <div class="hero-awards-label">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m2 9 10-6 10 6-10 6-10-6Z"/><path d="M6 11.5V17c0 1.1 2.7 3 6 3s6-1.9 6-3v-5.5"/><path d="M22 9v7"/></svg>
-              Our Associations
-            </div>
-            <div class="hero-awards-strip">
-              <div class="hero-awards-track" id="assocTrack"><div class="hero-award-card" style="min-width:0">Loading…</div></div>
-            </div>
-          </div>
-          <div>
-            <div class="hero-awards-label">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg>
-              In Partnership with the Trusted Companies
-            </div>
-            <div class="hero-awards-strip">
-              <div class="hero-awards-track" id="partnerTrack" style="animation-direction:reverse"><div class="hero-award-card" style="min-width:0">Loading…</div></div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -1804,8 +1781,6 @@ async function renderHome(){
         if(pill) pill.style.display = "inline-flex";
       }
       if(key==="program") renderQuickInsights(data);
-      if(key==="program") renderLogoStrip("assocTrack", data.map(r=>r["University/Institute"]));
-      if(key==="b2b") renderLogoStrip("partnerTrack", data.map(r=>r["Remarks"]));
     });
   }
   loadLandingInsights();
@@ -1876,32 +1851,6 @@ function renderQuickInsights(rawData){
       });
     });
   }
-}
-/* Populates one of the hero banner's logo sliders (Our Associations / Trusted Companies). Only
-   entries we actually recognize a real logo for are shown — per your request this row is logos
-   only, so a name we can't match (falls back to initials everywhere else in the app) is silently
-   skipped here rather than showing a text-only chip. Dedupes by normalized name; the list is
-   doubled so the CSS marquee (translateX(-50%)) loops seamlessly. */
-function renderLogoStrip(trackId, names){
-  const track = document.getElementById(trackId);
-  if(!track) return;
-  const seen = new Set();
-  const logos = [];
-  (names||[]).forEach(n=>{
-    const norm = normUniName(n);
-    if(!norm || seen.has(norm)) return;
-    const logo = findUniversityLogo(n);
-    if(!logo) return;
-    seen.add(norm);
-    logos.push({ name: displayNameFor(n), logo });
-  });
-  if(!logos.length){
-    track.parentElement.parentElement.style.display = "none";
-    return;
-  }
-  track.innerHTML = logos.concat(logos).map(l=>
-    `<div class="hero-logo-chip" title="${esc(l.name)}"><img src="${l.logo}" alt="${esc(l.name)}" loading="lazy"></div>`
-  ).join("");
 }
 /* Generic click-to-drill-down popup used by the Quick Insights breakdowns (Program AND Landing
    Page) above — lists the actual rows behind whichever slice was clicked, so a number in the chart
@@ -3732,9 +3681,9 @@ function forceRefreshCurrentSection(){
 function mountNewsFab(){
   if(document.getElementById("newsFab")) return;
   document.body.insertAdjacentHTML("beforeend", `
-    <button type="button" class="news-fab" id="newsFab" title="Jaro in the News">
-      ${ic("blog")}
-      <span>NEWS</span>
+    <button type="button" class="news-fab" id="newsFab" title="Jaro in the News — click for the latest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a2 2 0 0 0 2 2h1l3 5V4L6 9H5a2 2 0 0 0-2 2Z"/><path d="M14.5 8.5a4 4 0 0 1 0 7"/><path d="M17.5 5.5a8 8 0 0 1 0 13"/></svg>
+      <span class="nf-label">News</span>
       <span class="nf-badge">${NEWS_ITEMS.length}</span>
     </button>`);
   document.getElementById("newsFab").addEventListener("click", openNewsModal);
