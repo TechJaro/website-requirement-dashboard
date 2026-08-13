@@ -4,9 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Jaro Education · Web Pages Command Center</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Raleway:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 /* ============================================================
    DESIGN TOKENS — Brand: Black / White / Blue #0029A6 / Yellow #FFCF24 / Red #F63D44
@@ -242,6 +244,30 @@ input,select,textarea{font-family:inherit}
 .hero-search-wrap input{border:none;outline:none;font-size:13px;width:100%;background:transparent;color:#fff}
 .hero-search-wrap input::placeholder{color:rgba(255,255,255,.55)}
 @media(max-width:640px){.hero-inner{flex-direction:column;align-items:stretch}.hero-search-wrap{min-width:0}}
+.hero-live-pill{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  color:#3ddc84;background:rgba(61,220,132,.16);border:1px solid rgba(61,220,132,.4);
+  padding:9px 16px;border-radius:100px;white-space:nowrap;
+  font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+}
+.hero-live-dot{width:7px;height:7px;border-radius:50%;background:#3ddc84;box-shadow:0 0 8px #3ddc84;animation:heroLivePulse 1.4s ease-in-out infinite}
+@keyframes heroLivePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(1.35)}}
+.hero-total-card{
+  display:flex;align-items:center;gap:13px;
+  background:linear-gradient(135deg, rgba(255,207,36,.22), rgba(255,255,255,.06));
+  border:1px solid rgba(255,207,36,.4);
+  border-radius:16px;padding:9px 20px 9px 12px;white-space:nowrap;
+  box-shadow:0 10px 24px -10px rgba(0,0,0,.45);
+}
+.hero-total-card .htc-ic{
+  width:40px;height:40px;border-radius:12px;background:var(--yellow);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 6px 14px -4px rgba(255,207,36,.6);
+}
+.hero-total-card .htc-ic svg{width:19px;height:19px;color:var(--black)}
+.hero-total-card .htc-text{display:flex;flex-direction:column;line-height:1;gap:2px}
+.hero-total-card b{color:#fff;font-size:25px;font-weight:800;font-family:'Raleway',sans-serif;letter-spacing:-.01em}
+.hero-total-card .htc-label{font-size:10px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:rgba(255,255,255,.6)}
 
 /* ---------- HOME: QUICK INSIGHTS ---------- */
 .insights-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -291,6 +317,19 @@ input,select,textarea{font-family:inherit}
 .btn.ghost-red{color:var(--red);border-color:var(--red-tint);background:var(--red-tint)}
 .btn.ghost-red:hover{background:var(--red);color:#fff}
 
+.total-pages-badge{
+  display:inline-flex;align-items:center;gap:9px;
+  background:#fff;border:1px solid var(--line);border-radius:9px;
+  padding:8px 16px;box-shadow:var(--shadow-sm);
+  font-size:14px;font-weight:600;color:var(--ink);white-space:nowrap;
+}
+.total-pages-badge .tpb-num{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:var(--yellow);color:var(--black);
+  font-size:20px;font-weight:800;font-family:'Raleway',sans-serif;letter-spacing:-.01em;
+  padding:2px 11px;border-radius:6px;margin-left:2px;
+}
+
 /* ---------- FILTER BAR ---------- */
 .filterbar{
   display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0 20px;
@@ -333,7 +372,7 @@ input,select,textarea{font-family:inherit}
 .badge.closed{background:var(--red-tint);color:var(--red)}
 .badge.soon{background:var(--yellow-tint);color:#8a6800}
 .badge.neutral{background:var(--blue-tint-10);color:var(--blue)}
-.badge.draft{background:var(--red-tint);color:var(--red)}
+.badge.draft{background:var(--red-tint);color:var(--black)}
 .linkrow{display:flex;flex-wrap:wrap;gap:6px;width:100%}
 .link-chip{
   display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
@@ -559,6 +598,15 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <span>Requirements Log</span>
       </div>
+      <div class="nav-group-label">Insights</div>
+      <div class="navitem" data-nav="pageInsights">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/></svg>
+        <span>Page Insights</span>
+      </div>
+      <div class="navitem" data-nav="seoInsights">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>SEO Insights</span>
+      </div>
     </div>
     <div class="sidebar-foot">
       <button class="raise-btn" id="openRequestBtn">
@@ -725,6 +773,13 @@ const CONFIG = {
   // ---- ADMIN EMAIL: shown in the UI + used as a last-resort mailto fallback ----
   adminEmail: "lalit.rade@jaro.in",
 
+  // ---- GOOGLE API KEY: makes the dashboard ignore any active Filter on your sheets ----
+  // Without this, live data is read via a method that respects filters/hidden rows (so a Filter
+  // left on by anyone editing the sheet can silently make rows disappear from the dashboard).
+  // With a key here, every row is always fetched regardless of filters. See SETUP_GUIDE.md for
+  // the 5-minute steps to get one — paste it in place of the placeholder below.
+  googleApiKey: "AIzaSyDXFlYi-O5yuHZfzOAw5bHpBPUIYZOwGUk",
+
   // ---- GOOGLE SHEET SOURCES ----
   // sheetId is already filled in from the links you shared. You only need to paste each
   // tab's GID (Sheet > click the tab > look at the URL after "#gid="). Sheet ID stays the
@@ -751,14 +806,29 @@ const CONFIG = {
     landingPagesChannel:  { sheetId: "1nIZ_qZmugMslTFxS2QosDYNZzjNzoYKPNxxApQsBkiA", gid: "1870442308" },
 
     // ===== Requirements Log (created by the Apps Script in step 2 of the setup guide) =====
-    requirementsLog:      { sheetId: "", gid: "" }
+    requirementsLog:      { sheetId: "1JGsWhpTOalVOPoO0CwlAaCCgPMVv0ExSYTxrRErCVV0", gid: "0" }
   },
 
   // ---- REQUEST FORM SETUP (captures requests, writes them to the Requirements Log sheet, and emails you) ----
   // Paste the Web App URL you get after deploying the attached Code.gs (see SETUP_GUIDE.md, Step 2).
   // Until this is filled in, submitting a request falls back to opening a pre-filled email instead.
+  // ---- LIVE PAGE/SEO INSIGHTS: signs the visitor in with Google directly in the browser, so
+  // GA4/Search Console are called straight from here — no Apps Script deployment involved, so the
+  // "Anyone within jaro.in" web app restriction doesn't apply to these two. Whoever opens the
+  // dashboard signs in with their own Google account (needs GA4 + Search Console access) once per
+  // session (token lasts ~1hr). See the procedure notes for how to create the OAuth Client ID.
+  oauth: {
+    clientId: "169035673500-5rjm58tf5n27qlfaajbr553ie3th8q5s.apps.googleusercontent.com", // paste the OAuth 2.0 Client ID (Web application type) here
+    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email"
+  },
+  ga4PropertyId: "281070911", // same GA4 Property ID you put in Code.gs's CONFIG.GA4_PROPERTY_ID
+  gscSiteUrl: "https://www.jaroeducation.com/",    // same Search Console property URL you put in Code.gs's CONFIG.GSC_SITE_URL
+
+  // ---- LIVE PAGE VITALS / ON-PAGE AUDIT: run on demand from a button, no sheet, no trigger ----
+  pagespeedApiKey: "AIzaSyAeSWkzQof55kMc6tpPyWqM5WOzMZEk3jA", // paste your PageSpeed-only restricted API key here (the one you created earlier)
+
   requestForm: {
-    webAppUrl: "" // e.g. "https://script.google.com/macros/s/AKfycb.../exec"
+    webAppUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec" // Apps Script backend: handles request-form submissions only now
   }
 };
 
@@ -810,7 +880,9 @@ const SECTIONS = {
   free: { key:"free", label:"Free Course Pages", desc:"Free courses grouped by category", icon:"free", type:"free-courses" },
   pillar: { key:"pillar", label:"Pillar Pages", desc:"Evergreen pillar & trending-topic pages", icon:"pillar", type:"flat-cards",
     titleField:"Page", linkField:"Webpage Link", tagField:"Column 4", tagFallback:"Pillar Page" },
-  requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" }
+  requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" },
+  pageInsights: { key:"pageInsights", label:"Page Insights", desc:"Traffic & engagement per page, live from Google Analytics (last 28 days)", icon:"bolt", type:"page-insights" },
+  seoInsights: { key:"seoInsights", label:"SEO Insights", desc:"Clicks, impressions & search ranking per page, live from Google Search Console (last 28 days)", icon:"search", type:"seo-insights" }
 };
 const NAV_ORDER = ["program","landing","unique","b2b","location","blog","university","free","pillar"];
 
@@ -861,24 +933,20 @@ const FIELD_ALIASES = [
   { canonical:"Category / Domain",     test:h => h.includes("category") || h.includes("domain") },
   { canonical:"Webpage Link",          test:h => h.includes("webpage") && h.includes("link") },
 ];
-async function loadSheet(sectionKey, expectedHeaderHints){
-  const cfg = CONFIG.sheets[sectionKey];
-  if(!cfg || !cfg.sheetId){ return null; } // no live source configured -> caller falls back to demo
-  const url = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv&gid=${cfg.gid||"0"}`;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("Sheet fetch failed: " + res.status);
-  const csvText = await res.text();
-  const parsed = Papa.parse(csvText, { skipEmptyLines:false });
-  const rows = parsed.data;
+/* Turns a raw 2D array of cell values (from either fetch method below) into the array of row
+   objects the rest of the app expects — finds the header row, aliases drifted field names, and
+   forward-fills merged cells. Shared so both fetch strategies produce identical output. */
+function parseRowsToObjects(rows, expectedHeaderHints){
   let headerIdx = -1;
   for(let i=0;i<Math.min(rows.length,15);i++){
-    const rowVals = rows[i].map(v=>(v||"").toString().toLowerCase());
+    const rowVals = (rows[i]||[]).map(v=>(v||"").toString().toLowerCase());
     const matches = expectedHeaderHints.filter(h => rowVals.some(v=>v.includes(h.toLowerCase()))).length;
     if(matches >= Math.max(2, expectedHeaderHints.length-1)){ headerIdx = i; break; }
   }
   if(headerIdx === -1) headerIdx = 0;
-  const header = rows[headerIdx].map(h=>(h||"").toString().trim());
+  const header = (rows[headerIdx]||[]).map(h=>(h||"").toString().trim());
   const out = [];
+  let lastFill = {};
   for(let i=headerIdx+1;i<rows.length;i++){
     const r = rows[i];
     if(!r || r.every(v=>!v || !v.toString().trim())) continue;
@@ -894,9 +962,68 @@ async function loadSheet(sectionKey, expectedHeaderHints){
         if(h && test(h.toLowerCase()) && obj[h]) obj[canonical] = obj[h];
       });
     });
+    // Forward-fill for vertically-merged cells: Google Sheets only stores a merged cell's value
+    // in the top row of the merge, so continuation rows would otherwise come through blank here
+    // (this only ever fills in a value on a row that already has other real content — fully
+    // blank spacer rows were already skipped just above).
+    ["University/Institute","Category / Domain"].forEach(field=>{
+      if(obj[field]) lastFill[field] = obj[field];
+      else if(lastFill[field]) obj[field] = lastFill[field];
+    });
     out.push(obj);
   }
   return out;
+}
+
+/* ---- Fetch strategy A: gviz CSV export ----
+   Simple, needs no API key, but reads the *rendered view* of the sheet — meaning it silently
+   omits any rows currently hidden by an active Filter (not Filter View) or manually hidden rows.
+   Used automatically as a fallback when no Google API key is configured. */
+async function loadSheetViaGviz(cfg, expectedHeaderHints){
+  const url = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv&gid=${cfg.gid||"0"}`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Sheet fetch failed: " + res.status);
+  const csvText = await res.text();
+  const rows = Papa.parse(csvText, { skipEmptyLines:false }).data;
+  return parseRowsToObjects(rows, expectedHeaderHints);
+}
+
+/* ---- Fetch strategy B: Google Sheets API v4 ----
+   Reads the underlying data model directly, so it always returns every row regardless of any
+   active Filter, Filter View, or hidden rows/columns — exactly what "ignore filters, fetch
+   everything" needs. Requires CONFIG.googleApiKey to be set (see SETUP_GUIDE.md). */
+const SHEET_TITLE_CACHE = {};
+async function resolveSheetTitle(sheetId, gid){
+  if(!SHEET_TITLE_CACHE[sheetId]){
+    const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties&key=${CONFIG.googleApiKey}`;
+    const res = await fetch(metaUrl);
+    if(!res.ok) throw new Error("Sheet metadata fetch failed: " + res.status);
+    const json = await res.json();
+    const map = {};
+    (json.sheets||[]).forEach(s=>{ map[String(s.properties.sheetId)] = s.properties.title; });
+    SHEET_TITLE_CACHE[sheetId] = map;
+  }
+  return SHEET_TITLE_CACHE[sheetId][String(gid||"0")];
+}
+async function loadSheetViaApi(cfg, expectedHeaderHints){
+  const title = await resolveSheetTitle(cfg.sheetId, cfg.gid);
+  if(!title) throw new Error(`Could not find a tab with gid ${cfg.gid} in sheet ${cfg.sheetId}`);
+  const range = encodeURIComponent(`${title}!A1:ZZ`);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${range}?key=${CONFIG.googleApiKey}&valueRenderOption=UNFORMATTED_VALUE`;
+  const res = await fetch(url);
+  if(!res.ok) throw new Error("Sheet values fetch failed: " + res.status);
+  const json = await res.json();
+  return parseRowsToObjects(json.values || [], expectedHeaderHints);
+}
+
+function hasApiKey(){
+  return !!(CONFIG.googleApiKey && !CONFIG.googleApiKey.startsWith("PASTE"));
+}
+async function loadSheet(sectionKey, expectedHeaderHints){
+  const cfg = CONFIG.sheets[sectionKey];
+  if(!cfg || !cfg.sheetId){ return null; } // no live source configured -> caller falls back to demo
+  if(hasApiKey()) return loadSheetViaApi(cfg, expectedHeaderHints);
+  return loadSheetViaGviz(cfg, expectedHeaderHints);
 }
 
 /* Returns {data, isLive} for a section, using live sheet if configured else demo.
@@ -937,6 +1064,19 @@ function draftNote(prefill){
 }
 function isValidLink(v){ if(!v) return false; const s=v.toString().trim(); if(!s || s==="-" || /page not created/i.test(s) || /^nill?$/i.test(s)) return false; return true; }
 function firstLink(v){ if(!isValidLink(v)) return ""; const s=v.toString().trim(); const m = s.match(/https?:\/\/[^\s\n]+/); return m ? m[0] : (s.startsWith("http")? s.split(/\s|\n/)[0] : ""); }
+/* Google Sheets API (UNFORMATTED_VALUE) returns dates as a raw serial number (days since
+   1899-12-30) rather than a readable date — this converts it back for display, leaving anything
+   that isn't a plausible date serial (e.g. "Closed", "Closing Soon") untouched. */
+function formatClosureDate_(v){
+  if(v===undefined || v===null || v==="") return "";
+  const s = v.toString().trim();
+  const num = /^\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+  if(!isNaN(num) && num > 20000 && num < 60000){
+    const d = new Date(Date.UTC(1899,11,30) + Math.round(num)*86400000);
+    return d.toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" });
+  }
+  return s;
+}
 function initials(name){ return (name||"?").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase() || "?"; }
 /* ================================================================================================
    UNIVERSITY / INSTITUTE LOGOS — replaces the initials avatar wherever we recognize the name.
@@ -1282,15 +1422,21 @@ async function renderHome(){
           <div class="hero-eyebrow">${dateStr}</div>
           <h2 class="hero-title">${greeting}, team 👋</h2>
         </div>
-        <div class="hero-search-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-          <input type="text" id="heroSearch" placeholder="Search universities, programs, links…">
+        <div style="display:flex;align-items:center;gap:12px">
+          <span class="hero-live-pill" id="heroLivePill" style="display:none">
+            <span class="hero-live-dot"></span>LIVE
+          </span>
+          <div class="hero-search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="heroSearch" placeholder="Search universities, programs, links…">
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="section-head">
+    <div class="section-head" style="align-items:center">
       <div><h2>Website Stats</h2><div class="meta">Every category, refreshed straight from your Google Sheets</div></div>
+      <div class="total-pages-badge" id="heroTotalPill">📄 Total Page Count: <span class="tpb-num" id="heroTotalCount">…</span></div>
       <button class="btn" id="refreshHomeBtn">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
         Refresh All
@@ -1312,6 +1458,20 @@ async function renderHome(){
       </button>
     </div>`;}).join("")}</div>
 
+    <div class="section-head"><div><h2>Live Insights</h2><div class="meta">Traffic, search performance, page vitals & audit — password protected</div></div></div>
+    <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:26px">
+      <div class="stat-card" data-go="pageInsights" style="--glass:var(--blue-tint-10);--fg:var(--blue)">
+        <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--blue)">${ic("bolt")}</div></div>
+        <div><div class="val" style="font-size:19px">Page Insights</div><div class="lbl">GA4 traffic + Core Web Vitals, live</div></div>
+        <button type="button" class="stat-explore-btn" style="background:var(--blue)">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+      <div class="stat-card" data-go="seoInsights" style="--glass:var(--red-tint);--fg:var(--red)">
+        <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--red)">${ic("search")}</div></div>
+        <div><div class="val" style="font-size:19px">SEO Insights</div><div class="lbl">Search Console + On-Page Audit, live</div></div>
+        <button type="button" class="stat-explore-btn" style="background:var(--red)">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+    </div>
+
     <div class="section-head"><div><h2>Quick Insights</h2><div class="meta">A live snapshot of your program portfolio</div></div></div>
     <div class="insights-grid">
       <div class="insight-panel">
@@ -1321,6 +1481,14 @@ async function renderHome(){
       <div class="insight-panel">
         <h4>Program Status Breakdown</h4>
         <div id="statusBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+      </div>
+      <div class="insight-panel">
+        <h4>Landing Pages by Source</h4>
+        <div id="landingSourceBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+      </div>
+      <div class="insight-panel">
+        <h4>Landing Page Link Completeness</h4>
+        <div id="landingLinkBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
       </div>
     </div>
   `;
@@ -1341,15 +1509,31 @@ async function renderHome(){
     unique:["Names","URLs"], b2b:["B2B Pages Links"], location:["Location","Centre Type"],
     blog:["Category","Title","Webpage Link"], university:["University","Webpage Link"], free:["Title","Duration"], pillar:["Title","Webpage Link"]
   };
+  const sectionPageCounts = {};
   for(const key of NAV_ORDER){
     getData(sheetKeyFor(key), hintMap[key]).then(({data,isLive})=>{
-      const n = key==="landing" ? data.length : data.length;
+      // Some sections (B2B/University/Pillar) drop rows that have neither a title nor a valid
+      // link when actually rendering cards — mirror that exact filter here so the Home stat and
+      // sidebar badge always match what you see when you open the section, not the raw row count.
+      const sec = SECTIONS[key];
+      const n = (sec.type === "flat-cards")
+        ? data.filter(row => (row[sec.titleField]||"").trim() || isValidLink(row[sec.linkField])).length
+        : data.length;
       const target = document.getElementById(`stat-${key}`);
       if(target) target.textContent = n;
       updateNavCount(key, n);
+      // Running total across every category, shown as one figure in the hero banner.
+      sectionPageCounts[key] = n;
+      const totalEl = document.getElementById("heroTotalCount");
+      if(totalEl) totalEl.textContent = Object.values(sectionPageCounts).reduce((a,b)=>a+b,0);
+      if(isLive){
+        const pill = document.getElementById("heroLivePill");
+        if(pill) pill.style.display = "inline-flex";
+      }
       if(key==="program") renderQuickInsights(data);
     });
   }
+  loadLandingInsights();
 }
 const STATUS_COLORS = { open:"#1b9c58", soon:"#8a6800", closed:"var(--red)", draft:"var(--blue)", other:"var(--ink-35)" };
 const TYPE_COLORS = ["var(--blue)","var(--yellow)","var(--red)","#7c5cff","#1b9c58","#8a6800","#0aa5a0"];
@@ -1393,6 +1577,56 @@ function renderQuickInsights(data){
         <div class="status-legend-item">
           <span class="status-dot" style="background:${STATUS_COLORS[k]}"></span>${labels[k]} <b>${counts[k]}</b>
         </div>`).join("")}</div>`;
+  }
+}
+/* Fetches both Landing Pages tabs (Domain Tracker + Channel/PR) once, independent of the per-card
+   NAV_ORDER loop above, since "by source" needs both counts side by side. */
+async function loadLandingInsights(){
+  try{
+    const [domain, channel] = await Promise.all([
+      getData("landingPages", ["University/Institute","Landing Page Link"]),
+      getData("landingPagesChannel", ["University/Institute","Landing Page Link"])
+    ]);
+    renderLandingInsights(domain.data, channel.data);
+  }catch(e){ console.warn("Landing insights failed to load", e); }
+}
+function renderLandingInsights(domainData, channelData){
+  const sourceEl = document.getElementById("landingSourceBreakdown");
+  if(sourceEl){
+    const total = (domainData.length + channelData.length) || 1;
+    const parts = [
+      { label:"Domain Tracker", count:domainData.length, color:"var(--blue)" },
+      { label:"Channel (PR)",   count:channelData.length, color:"#8a6800" },
+    ].filter(p=>p.count>0);
+    sourceEl.innerHTML = `
+      <div class="status-bar">${parts.map(p=>
+        `<div style="width:${(p.count/total)*100}%;background:${p.color}" title="${esc(p.label)}: ${p.count}"></div>`
+      ).join("")}</div>
+      <div class="status-legend">${parts.map(p=>`
+        <div class="status-legend-item"><span class="status-dot" style="background:${p.color}"></span>${esc(p.label)} <b>${p.count}</b></div>
+      `).join("")}</div>`;
+  }
+  const linkEl = document.getElementById("landingLinkBreakdown");
+  if(linkEl){
+    const counts = { both:0, cmsOnly:0, subOnly:0, neither:0 };
+    domainData.forEach(r=>{
+      const hasCms = isValidLink(r["Website Link  ( CMS )"]);
+      const hasSub = isValidLink(r["Subdomain Link"]);
+      if(hasCms && hasSub) counts.both++;
+      else if(hasCms) counts.cmsOnly++;
+      else if(hasSub) counts.subOnly++;
+      else counts.neither++;
+    });
+    const total = domainData.length || 1;
+    const labels = { both:"Both Links", cmsOnly:"Landing Page Only", subOnly:"Subdomain Only", neither:"Missing Both" };
+    const colors = { both:"#1b9c58", cmsOnly:"var(--blue)", subOnly:"#8a6800", neither:"var(--red)" };
+    linkEl.innerHTML = `
+      <div class="status-bar">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>
+        `<div style="width:${(counts[k]/total)*100}%;background:${colors[k]}" title="${labels[k]}: ${counts[k]}"></div>`
+      ).join("")}</div>
+      <div class="status-legend">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>`
+        <div class="status-legend-item"><span class="status-dot" style="background:${colors[k]}"></span>${labels[k]} <b>${counts[k]}</b></div>
+      `).join("")}</div>`;
   }
 }
 function sheetKeyFor(navKey){
@@ -1467,12 +1701,23 @@ async function renderGroupedSection(sec){
             const isDraft = sec.statusField && (row[sec.statusField]||"").toLowerCase().includes("draft");
             return `
             <div class="prog-row${isDraft?" is-draft":""}">
-              <div class="prog-name">${esc(row[sec.itemField]||"Untitled Program")}</div>
+              ${(()=>{
+                const lines = (row[sec.itemField]||"Untitled Program").toString().split(/\n+/).map(s=>s.trim()).filter(Boolean);
+                return lines.length > 1
+                  ? `<div class="prog-name"><div style="font-weight:700">${esc(lines[0])}</div><div style="font-weight:400;color:var(--ink-50);font-size:12px;margin-top:2px">${esc(lines.slice(1).join(" "))}</div></div>`
+                  : `<div class="prog-name">${esc(lines[0]||"Untitled Program")}</div>`;
+              })()}
               ${statusBadge(row[sec.statusField])}
               ${row["Category / Domain"] ? `<span class="badge neutral">${esc(row["Category / Domain"])}</span>` : ""}
+              ${isValidLink(row["Application Closure Date"]) ? `<span class="badge" style="background:var(--yellow-tint);color:#8a6800">Admission Closure Date: ${esc(formatClosureDate_(row["Application Closure Date"]))}</span>` : ""}
               ${raiseBtn({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" })}
-              <div class="linkrow">${buildLinkChips(row, sec.linkFields)}</div>
-              ${isDraft ? draftNote({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" }) : ""}
+              <div class="linkrow">${buildLinkChips(row, isDraft ? [["Preview Link","Preview Page"], ...sec.linkFields.slice(1)] : sec.linkFields)}</div>
+              ${(isValidLink(row["Meta Title"])||isValidLink(row["Meta Description"])) ? `
+                <div class="meta-block" style="width:100%">
+                  ${isValidLink(row["Meta Title"]) ? `<div style="font-size:12px;margin-bottom:3px"><b style="color:var(--ink);font-weight:700">Meta Title:</b> <span style="font-weight:400;color:var(--ink-50)">${esc(row["Meta Title"])}</span></div>` : ""}
+                  ${isValidLink(row["Meta Description"]) ? `<div style="font-size:12px"><b style="color:var(--ink);font-weight:700">Meta Description:</b> <span style="font-weight:400;color:var(--ink-50)">${esc(row["Meta Description"])}</span></div>` : ""}
+                </div>
+              ` : ""}
             </div>`;}).join("")}
         </div></div>
       </div>`;
@@ -1999,7 +2244,9 @@ async function navigate(route){
   else if(sec.type === "blog-cards") await renderBlogCards(sec);
   else if(sec.type === "free-courses") await renderFreeCourses(sec);
   else if(sec.type === "unique") await renderUnique(sec);
-  else if(sec.type === "requirements-table") await renderRequirementsTable(sec);
+  else if(sec.type === "requirements-table") await renderRequirementsGateOrTable(sec);
+  else if(sec.type === "page-insights") await renderPageInsightsGateOrTable(sec);
+  else if(sec.type === "seo-insights") await renderSeoInsightsGateOrTable(sec);
 }
 
 /* ================================================================================================
@@ -2296,30 +2543,18 @@ async function submitRequest(e){
   // Threading rule: same requester + same subject (exact match) -> same email thread
   payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
 
-  const webAppUrl = CONFIG.requestForm.webAppUrl;
   const submitBtn = document.querySelector('#requestForm button[type="submit"]');
-  if(webAppUrl){
-    submitBtn.disabled = true;
-    try{
-      const res = await fetch(webAppUrl, {
-        method:"POST",
-        headers:{ "Content-Type":"text/plain;charset=utf-8" }, // avoids a CORS preflight on Apps Script
-        body: JSON.stringify(payload)
-      });
-      toast("Request submitted — an email is on its way!");
-      closeRequestModal();
-      resetRequestForm();
-    }catch(err){
-      toast("Couldn't submit automatically — opening email instead", true);
-      mailtoFallback(payload);
-    }finally{
-      submitBtn.disabled = false;
-    }
-  } else {
-    mailtoFallback(payload);
-    toast("Opening your email client to send this request…");
+  submitBtn.disabled = true;
+  try{
+    await submitRequestDirect_(payload);
+    toast("Request submitted — saved to the log and emailed!");
     closeRequestModal();
     resetRequestForm();
+  }catch(err){
+    toast(err.message ? `Couldn't submit automatically (${err.message}) — opening email instead` : "Couldn't submit automatically — opening email instead", true);
+    mailtoFallback(payload);
+  }finally{
+    submitBtn.disabled = false;
   }
 }
 function resetRequestForm(){
@@ -2345,9 +2580,522 @@ Description:
 ${payload.descriptionText}
 
 (Note: this dashboard isn't yet connected to the automatic mailer — screenshots pasted above won't
-come through via this email fallback. Once CONFIG.requestForm.webAppUrl is set, they will.)`;
+come through via this email fallback — they will once the automatic submission above succeeds.)`;
   const url = `mailto:${(payload.to||[CONFIG.adminEmail]).join(",")}?cc=${encodeURIComponent((payload.cc||[]).join(","))}&subject=${encodeURIComponent(payload.subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = url;
+}
+
+/* ================================================================================================
+   LIVE INSIGHTS (Page Insights = GA4, SEO Insights = Search Console) — fetched on demand from the
+   same Apps Script backend that handles the request form, via doGet(?action=ga4 / ?action=gsc).
+   Nothing is cached client-side beyond the page session, so opening the section or hitting
+   "Refresh All" always pulls fresh numbers straight from Google.
+   ================================================================================================ */
+let GOOGLE_ACCESS_TOKEN = null;
+let GOOGLE_TOKEN_CLIENT = null;
+function ensureGoogleAuth_(){
+  return new Promise((resolve, reject)=>{
+    if(GOOGLE_ACCESS_TOKEN){ resolve(GOOGLE_ACCESS_TOKEN); return; }
+    if(!window.google || !google.accounts || !google.accounts.oauth2){
+      reject(new Error("Google sign-in script hasn't loaded yet — refresh the page and try again."));
+      return;
+    }
+    if(!GOOGLE_TOKEN_CLIENT){
+      GOOGLE_TOKEN_CLIENT = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.oauth.clientId,
+        scope: CONFIG.oauth.scopes,
+        callback: (resp)=>{
+          if(resp.error){ reject(new Error(resp.error)); return; }
+          GOOGLE_ACCESS_TOKEN = resp.access_token;
+          const ttl = (resp.expires_in || 3500) * 1000;
+          setTimeout(()=>{ GOOGLE_ACCESS_TOKEN = null; }, ttl);
+          resolve(GOOGLE_ACCESS_TOKEN);
+        },
+        error_callback: (err)=> reject(new Error(err.type || "Google sign-in failed or was cancelled"))
+      });
+    }
+    GOOGLE_TOKEN_CLIENT.requestAccessToken();
+  });
+}
+async function fetchGa4Live_(){
+  if(!CONFIG.oauth.clientId) throw new Error("CONFIG.oauth.clientId isn't set yet");
+  if(!CONFIG.ga4PropertyId) throw new Error("CONFIG.ga4PropertyId isn't set yet");
+  const token = await ensureGoogleAuth_();
+  const url = `https://analyticsdata.googleapis.com/v1beta/properties/${CONFIG.ga4PropertyId}:runReport`;
+  const body = {
+    dateRanges: [{ startDate: "28daysAgo", endDate: "today" }],
+    dimensions: [{ name: "pagePath" }],
+    metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }, { name: "averageSessionDuration" }, { name: "engagementRate" }],
+    limit: 100000
+  };
+  const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` }, body: JSON.stringify(body) });
+  const json = await res.json();
+  if(!res.ok) throw new Error((json.error && json.error.message) || "GA4 request failed");
+  return (json.rows||[]).map(r=>({
+    pagePath: r.dimensionValues[0].value,
+    pageviews: Number(r.metricValues[0].value||0),
+    activeUsers: Number(r.metricValues[1].value||0),
+    avgEngagementTime: Number(r.metricValues[2].value||0),
+    engagementRate: Number(r.metricValues[3].value||0)
+  }));
+}
+async function fetchGscLive_(){
+  if(!CONFIG.oauth.clientId) throw new Error("CONFIG.oauth.clientId isn't set yet");
+  if(!CONFIG.gscSiteUrl) throw new Error("CONFIG.gscSiteUrl isn't set yet");
+  const token = await ensureGoogleAuth_();
+  const url = `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(CONFIG.gscSiteUrl)}/searchAnalytics/query`;
+  const end = new Date();
+  const start = new Date(); start.setDate(start.getDate() - 28);
+  const body = {
+    startDate: start.toISOString().slice(0,10), endDate: end.toISOString().slice(0,10),
+    dimensions: ["page"], rowLimit: 25000
+  };
+  const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` }, body: JSON.stringify(body) });
+  const json = await res.json();
+  if(!res.ok) throw new Error((json.error && json.error.message) || "Search Console request failed");
+  return (json.rows||[]).map(r=>({ page:r.keys[0], clicks:r.clicks, impressions:r.impressions, ctr:r.ctr, position:r.position }));
+}
+
+/* ---- Requirements Log: writes the row + sends the email directly from the browser (Sheets API +
+   Gmail API), using the same Google sign-in as Page/SEO Insights. No Apps Script, no spreadsheet
+   sharing restriction to work around. Requires CONFIG.sheets.requirementsLog to be set. ---- */
+async function resolveSheetTitleOAuth_(token, sheetId, gid){
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=sheets.properties`, { headers:{ Authorization:`Bearer ${token}` } });
+  const json = await res.json();
+  if(!res.ok) throw new Error((json.error && json.error.message) || "Couldn't read the Requirements Log spreadsheet");
+  const match = (json.sheets||[]).find(s => String(s.properties.sheetId) === String(gid||"0"));
+  if(!match) throw new Error(`Couldn't find a tab with gid ${gid} in that spreadsheet`);
+  return match.properties.title;
+}
+/* RFC 2047 encoding — required for any email header (Subject, etc.) that contains non-ASCII
+   characters like — em dashes, curly quotes, etc. Without this, different mail clients guess the
+   header's character set differently and you get mojibake like "Ã¢Â€Â"" instead of "—". */
+function encodeMimeHeader_(str){
+  return "=?UTF-8?B?" + btoa(unescape(encodeURIComponent(str||""))) + "?=";
+}
+function b64UrlEncodeUtf8_(str){
+  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+/* Verifies who's actually signed in right now — the "Requested By" email is always taken from
+   here, never from whatever was typed in the form, so nobody can submit a request under someone
+   else's email address. */
+async function getSignedInEmail_(token){
+  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", { headers:{ Authorization:`Bearer ${token}` } });
+  const json = await res.json();
+  if(!res.ok || !json.email) throw new Error("Couldn't verify your signed-in Google account");
+  return json.email;
+}
+const REQUEST_LOG_HEADER = ["Timestamp","University","Program","Request Type","Priority","Requested By","Email",
+  "Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key","Gmail Message ID","Gmail Thread ID"];
+function requestEmailHtml_(payload){
+  const rows = [
+    ["University", payload.university], ["Program", payload.program], ["Section", payload.section],
+    ["Request Type", payload.type], ["Priority", payload.priority],
+    ["Related Link", payload.link ? `<a href="${esc(payload.link)}" style="color:#0029A6">${esc(payload.link)}</a>` : "—"]
+  ].map(([label,val])=>`<tr>
+      <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${esc(label)}</td>
+      <td style="padding:7px 14px;font-size:13px;color:#111;border-bottom:1px solid #eef0f3">${val || "—"}</td>
+    </tr>`).join("");
+  return `
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto">
+  <div style="background:#0029A6;padding:20px 26px;border-radius:12px 12px 0 0">
+    <div style="color:#FFCF24;font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase">Jaro Dashboard</div>
+    <div style="color:#fff;font-weight:700;font-size:19px;margin-top:6px">New Request Raised</div>
+  </div>
+  <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:22px 26px">
+    <p style="font-size:13px;color:#333;margin:0 0 16px">Raised by <b>${esc(payload.name)}</b> (${esc(payload.email)})</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px">${rows}</table>
+    <div style="font-size:13px;color:#333">
+      <div style="font-weight:700;margin-bottom:8px">Description</div>
+      <div style="line-height:1.5">${payload.descriptionHtml && payload.descriptionHtml.trim() ? payload.descriptionHtml : esc(payload.descriptionText).replace(/\n/g,"<br>")}</div>
+    </div>
+  </div>
+  <p style="font-size:11px;color:#9aa1ab;margin:14px 4px 0">Subject: ${esc(payload.subject)} · Sent from the Jaro Web Pages Dashboard</p>
+</div>`;
+}
+async function submitRequestDirect_(payload){
+  const cfg = CONFIG.sheets.requirementsLog;
+  if(!cfg || !cfg.sheetId) throw new Error("CONFIG.sheets.requirementsLog isn't set");
+  const token = await ensureGoogleAuth_();
+
+  // Lock "Requested By" to whoever is actually signed in — overrides anything typed in the form.
+  const verifiedEmail = await getSignedInEmail_(token);
+  payload.email = verifiedEmail;
+  payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
+
+  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
+  const headerCheck = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1:R1")}`,
+    { headers:{ Authorization:`Bearer ${token}` } });
+  const headerJson = await headerCheck.json();
+  if(!headerJson.values || !headerJson.values.length){
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1")}?valueInputOption=RAW`, {
+      method:"PUT", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+      body: JSON.stringify({ values:[REQUEST_LOG_HEADER] })
+    });
+  }
+
+  // Our own Message-ID (for later threaded replies) — generated before sending so it can be both
+  // stamped on the outgoing email AND stored in the sheet for the status-update reply to reference.
+  const messageId = `<req-${Date.now()}-${Math.random().toString(36).slice(2)}@jaro-dashboard>`;
+  const to = (payload.to && payload.to.length) ? payload.to.join(",") : CONFIG.adminEmail;
+  const cc = (payload.cc||[]).join(",");
+  const mime = [
+    `To: ${to}`, cc ? `Cc: ${cc}` : null, `Message-ID: ${messageId}`,
+    `Subject: ${encodeMimeHeader_(payload.subject)}`, `Content-Type: text/html; charset=UTF-8`, "",
+    requestEmailHtml_(payload)
+  ].filter(Boolean).join("\r\n");
+  const mailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
+    method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ raw: b64UrlEncodeUtf8_(mime) })
+  });
+  const mailJson = await mailRes.json();
+  if(!mailRes.ok) throw new Error((mailJson.error && mailJson.error.message) || "Couldn't send the email");
+
+  const row = [ new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
+    payload.name||"", payload.email||"", payload.team||"", payload.section||"", payload.link||"", payload.subject||"",
+    payload.descriptionText||"", (payload.to||[]).join(", "), (payload.cc||[]).join(", "), "Not Started", payload.threadKey||"",
+    messageId, mailJson.threadId || "" ];
+  const appendRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A:A")}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+    method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ values:[row] })
+  });
+  if(!appendRes.ok){ const j = await appendRes.json(); throw new Error((j.error && j.error.message) || "Email sent, but couldn't save the request to the sheet"); }
+}
+/* ---- Status updates: writes the new Status into the sheet + replies in the same Gmail thread ---- */
+async function updateRequestStatus_({sheetRow, status, threadId, messageId, email, subject}){
+  const cfg = CONFIG.sheets.requirementsLog;
+  const token = await ensureGoogleAuth_();
+  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
+  const statusRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!O"+sheetRow)}?valueInputOption=RAW`, {
+    method:"PUT", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ values:[[status]] })
+  });
+  if(!statusRes.ok){ const j = await statusRes.json(); throw new Error((j.error && j.error.message) || "Couldn't update the status in the sheet"); }
+  if(!email) return; // nothing to notify
+
+  const replySubject = /^re:/i.test(subject||"") ? subject : `Re: ${subject||"Your request"}`;
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13.5px;color:#222;max-width:520px">
+    <p>Your request status has been updated to:</p>
+    <p style="font-size:17px;font-weight:800;color:#0029A6;margin:6px 0 16px">${esc(status)}</p>
+    <p style="font-size:11.5px;color:#9aa1ab">Jaro Web Pages Dashboard</p>
+  </div>`;
+  const mimeLines = [ `To: ${email}`, `Subject: ${encodeMimeHeader_(replySubject)}` ];
+  if(messageId){ mimeLines.push(`In-Reply-To: ${messageId}`, `References: ${messageId}`); }
+  mimeLines.push(`Content-Type: text/html; charset=UTF-8`, "", html);
+  const body = { raw: b64UrlEncodeUtf8_(mimeLines.join("\r\n")) };
+  if(threadId) body.threadId = threadId;
+  const mailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
+    method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify(body)
+  });
+  if(!mailRes.ok){ const j = await mailRes.json(); throw new Error((j.error && j.error.message) || "Status saved, but the reply email failed to send"); }
+}
+/* ---- Collects every unique page URL already loaded across your categories (no Apps Script
+   needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
+async function collectAllDashboardUrls_(){
+  const urls = new Set();
+  const urlRegex = /https?:\/\/[^\s",]+/g;
+  const keys = [...NAV_ORDER, "landingPagesChannel"];
+  for(const key of keys){
+    try{
+      const sheetKey = NAV_ORDER.includes(key) ? sheetKeyFor(key) : key;
+      const {data} = await getData(sheetKey);
+      const matches = JSON.stringify(data).match(urlRegex) || [];
+      matches.forEach(m=> urls.add(m.replace(/["')\\]+$/,"")));
+    }catch(e){ /* skip this category, keep going */ }
+  }
+  return [...urls];
+}
+
+/* ---- Core Web Vitals: entirely client-side via PageSpeed Insights, no sheet, no backend ---- */
+let VITALS_SCAN_RUNNING = false;
+async function runVitalsScan_(urls, onProgress, onRow){
+  VITALS_SCAN_RUNNING = true;
+  const CONCURRENCY = 6;
+  let idx = 0, done = 0;
+  async function worker(){
+    while(VITALS_SCAN_RUNNING){
+      const i = idx++; if(i >= urls.length) return;
+      const url = urls[i];
+      try{
+        const api = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${CONFIG.pagespeedApiKey}&strategy=mobile&category=performance`;
+        const res = await fetch(api);
+        const json = await res.json();
+        if(res.ok && json.lighthouseResult){
+          const perf = json.lighthouseResult.categories.performance.score;
+          const audits = json.lighthouseResult.audits || {};
+          onRow({
+            url, score: perf!=null ? Math.round(perf*100) : null,
+            lcp: audits["largest-contentful-paint"] ? (audits["largest-contentful-paint"].numericValue/1000) : null,
+            cls: audits["cumulative-layout-shift"] ? audits["cumulative-layout-shift"].numericValue : null,
+            inp: audits["interaction-to-next-paint"] ? audits["interaction-to-next-paint"].numericValue : null
+          });
+        }
+      }catch(e){ /* skip this URL, keep going */ }
+      done++;
+      onProgress(done, urls.length);
+    }
+  }
+  await Promise.all(Array.from({length:CONCURRENCY}, worker));
+  VITALS_SCAN_RUNNING = false;
+}
+function wireVitalsPanel_(){
+  const btn = document.getElementById("vitalsRunBtn");
+  if(!btn) return;
+  btn.addEventListener("click", async ()=>{
+    if(!CONFIG.pagespeedApiKey){ toast("Add CONFIG.pagespeedApiKey first", true); return; }
+    btn.disabled = true; btn.textContent = "Scanning…";
+    const body = document.getElementById("vitalsBody");
+    const progress = document.getElementById("vitalsProgress");
+    body.innerHTML = "";
+    const rows = [];
+    progress.textContent = "Collecting your page list…";
+    const urls = await collectAllDashboardUrls_();
+    progress.textContent = `Checking ${urls.length} pages — this can take a while (roughly 20-30s per page); feel free to leave this tab open in the background.`;
+    await runVitalsScan_(urls,
+      (done,total)=>{ progress.textContent = `Checked ${done} of ${total} pages…`; },
+      (row)=>{
+        rows.push(row);
+        rows.sort((a,b)=> (a.score??999) - (b.score??999));
+        body.innerHTML = rows.map(r=>`<tr>
+          <td class="cell-muted">${esc(r.url)}</td>
+          <td>${r.score!=null ? r.score : "—"}</td>
+          <td>${r.lcp!=null ? r.lcp.toFixed(1) : "—"}</td>
+          <td>${r.cls!=null ? r.cls.toFixed(3) : "—"}</td>
+          <td>${r.inp!=null ? Math.round(r.inp) : "—"}</td>
+        </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No results yet</td></tr>`;
+      }
+    );
+    btn.disabled = false; btn.textContent = "Run Vitals Scan Again";
+    progress.textContent = `Done — checked ${urls.length} pages.`;
+  });
+}
+
+/* ---- On-Page Audit: needs a tiny relay for CORS (fetching another site's HTML from a browser
+   isn't allowed unless that site opts in) — stateless, no sheet, just "check these 20 URLs". This
+   depends on the same Apps Script web app access fix as the request form. ---- */
+async function runAuditScan_(urls, onProgress, onRows){
+  const BATCH = 20;
+  let done = 0;
+  for(let i=0;i<urls.length;i+=BATCH){
+    const chunk = urls.slice(i, i+BATCH);
+    try{
+      const url = `${CONFIG.requestForm.webAppUrl}?action=auditBatch&urls=${encodeURIComponent(JSON.stringify(chunk))}`;
+      const res = await fetch(url);
+      const json = await res.json();
+      if(json.ok) onRows(json.rows);
+    }catch(e){ /* skip this chunk, keep going */ }
+    done += chunk.length;
+    onProgress(done, urls.length);
+  }
+}
+function wireAuditPanel_(){
+  const btn = document.getElementById("auditRunBtn");
+  if(!btn) return;
+  btn.addEventListener("click", async ()=>{
+    if(!CONFIG.requestForm.webAppUrl){ toast("Add CONFIG.requestForm.webAppUrl first", true); return; }
+    btn.disabled = true; btn.textContent = "Scanning…";
+    const body = document.getElementById("auditBody");
+    const progress = document.getElementById("auditProgress");
+    body.innerHTML = "";
+    let rows = [];
+    progress.textContent = "Collecting your page list…";
+    const urls = await collectAllDashboardUrls_();
+    progress.textContent = `Checking ${urls.length} pages, 20 at a time…`;
+    await runAuditScan_(urls,
+      (done,total)=>{ progress.textContent = `Checked ${done} of ${total} pages…`; },
+      (newRows)=>{
+        rows = rows.concat(newRows);
+        rows.sort((a,b)=> (a.flag==="OK"?1:0) - (b.flag==="OK"?1:0));
+        body.innerHTML = rows.map(r=>`<tr>
+          <td class="cell-muted">${esc(r.url)}</td>
+          <td>${esc(String(r.status))}</td>
+          <td>${esc(r.title)} <span class="cell-muted">(${r.titleLength})</span></td>
+          <td>${r.imagesMissingAlt}</td>
+          <td>${r.flag==="OK" ? `<span class="badge open">OK</span>` : `<span class="badge closed">${esc(r.flag)}</span>`}</td>
+        </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No results yet</td></tr>`;
+      }
+    );
+    btn.disabled = false; btn.textContent = "Run Audit Scan Again";
+    progress.textContent = `Done — checked ${urls.length} pages.`;
+  });
+}
+
+async function renderPageInsights(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  if(!CONFIG.oauth.clientId || !CONFIG.ga4PropertyId){
+    listWrap.innerHTML = emptyStateHTML(
+      "Page Insights isn't connected yet",
+      "Paste your OAuth Client ID into CONFIG.oauth.clientId and your GA4 Property ID into CONFIG.ga4PropertyId to see live traffic per page."
+    );
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Sign in with Google if prompted, then loading from Google Analytics…</div>`;
+  let rows;
+  try{ rows = await fetchGa4Live_(); }
+  catch(e){
+    listWrap.innerHTML = emptyStateHTML("Couldn't load Page Insights", e.message || "Check the Apps Script execution log for details.");
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  rows = rows.slice().sort((a,b)=> (b.pageviews||0) - (a.pageviews||0));
+  function draw(q){
+    q=(q||"").toLowerCase();
+    const items = rows.filter(r => (r.pagePath||"").toLowerCase().includes(q));
+    listWrap.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Page</th><th>Pageviews (28d)</th><th>Active Users</th><th>Avg. Engagement Time</th><th>Engagement Rate</th></tr></thead>
+          <tbody>
+            ${items.map(r=>`<tr>
+              <td class="cell-muted">${esc(r.pagePath)}</td>
+              <td>${(r.pageviews||0).toLocaleString()}</td>
+              <td>${(r.activeUsers||0).toLocaleString()}</td>
+              <td>${(r.avgEngagementTime||0).toFixed(1)}s</td>
+              <td>${((r.engagementRate||0)*100).toFixed(1)}%</td>
+            </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No pages match this search</td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+    document.getElementById("resultCount").textContent = `${items.length} pages`;
+  }
+  draw("");
+  document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+  el.insertAdjacentHTML("beforeend", `
+    <div class="section-head" style="margin-top:26px">
+      <div><h2>Core Web Vitals</h2><div class="meta">Checked live from PageSpeed Insights, on demand — no background job, no sheet</div></div>
+      <button class="btn" id="vitalsRunBtn">${ic("bolt")} Run Vitals Scan</button>
+    </div>
+    <div id="vitalsProgress" style="font-size:12.5px;color:var(--ink-50);margin-bottom:10px"></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Page</th><th>Score</th><th>LCP (s)</th><th>CLS</th><th>INP (ms)</th></tr></thead>
+      <tbody id="vitalsBody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">Click "Run Vitals Scan" to check your pages live</td></tr></tbody>
+    </table></div>
+  `);
+  wireVitalsPanel_();
+}
+async function renderSeoInsights(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  if(!CONFIG.oauth.clientId || !CONFIG.gscSiteUrl){
+    listWrap.innerHTML = emptyStateHTML(
+      "SEO Insights isn't connected yet",
+      "Paste your OAuth Client ID into CONFIG.oauth.clientId and your Search Console site URL into CONFIG.gscSiteUrl to see live search performance per page."
+    );
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Sign in with Google if prompted, then loading from Search Console…</div>`;
+  let rows;
+  try{ rows = await fetchGscLive_(); }
+  catch(e){
+    listWrap.innerHTML = emptyStateHTML("Couldn't load SEO Insights", e.message || "Check the Apps Script execution log for details.");
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  rows = rows.slice().sort((a,b)=> (b.clicks||0) - (a.clicks||0));
+  function draw(q){
+    q=(q||"").toLowerCase();
+    const items = rows.filter(r => (r.page||"").toLowerCase().includes(q));
+    listWrap.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Page</th><th>Clicks (28d)</th><th>Impressions</th><th>CTR</th><th>Avg. Position</th></tr></thead>
+          <tbody>
+            ${items.map(r=>`<tr>
+              <td class="cell-muted">${esc(r.page)}</td>
+              <td>${(r.clicks||0).toLocaleString()}</td>
+              <td>${(r.impressions||0).toLocaleString()}</td>
+              <td>${((r.ctr||0)*100).toFixed(1)}%</td>
+              <td>${(r.position||0).toFixed(1)}</td>
+            </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No pages match this search</td></tr>`}
+          </tbody>
+        </table>
+      </div>`;
+    document.getElementById("resultCount").textContent = `${items.length} pages`;
+  }
+  draw("");
+  document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
+  el.insertAdjacentHTML("beforeend", `
+    <div class="section-head" style="margin-top:26px">
+      <div><h2>On-Page Audit</h2><div class="meta">Checked live, on demand — title/meta/alt-text/broken-link scan of every page</div></div>
+      <button class="btn" id="auditRunBtn">${ic("search")} Run Audit Scan</button>
+    </div>
+    <div id="auditProgress" style="font-size:12.5px;color:var(--ink-50);margin-bottom:10px"></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Page</th><th>HTTP Status</th><th>Title</th><th>Images Missing Alt</th><th>Flag</th></tr></thead>
+      <tbody id="auditBody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">Click "Run Audit Scan" to check your pages live</td></tr></tbody>
+    </table></div>
+  `);
+  wireAuditPanel_();
+}
+
+/* ---- Password gates for the two live Insights sections (same pattern as Requirements Log) ---- */
+const PAGE_INSIGHTS_PASSWORD = "Pageinsights@Jaro";
+function isPageInsightsUnlocked(){ return sessionStorage.getItem("pageInsightsUnlocked") === "1"; }
+async function renderPageInsightsGateOrTable(sec){
+  if(isPageInsightsUnlocked()){ await renderPageInsights(sec); return; }
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <div style="max-width:380px;margin:70px auto;text-align:center">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--blue-tint-10);color:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <h2 style="margin-bottom:6px">Password Protected</h2>
+      <p style="color:var(--ink-50);font-size:13px;margin-bottom:22px">Enter the password to view Page Insights</p>
+      <input type="password" id="piPasswordInput" placeholder="Password" autocomplete="off"
+        style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;text-align:center;font-size:14px;margin-bottom:12px;box-sizing:border-box">
+      <div id="piPasswordError" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none">Incorrect password — try again.</div>
+      <button class="btn primary" id="piPasswordSubmit" style="width:100%;justify-content:center">Unlock</button>
+    </div>`;
+  const input = document.getElementById("piPasswordInput");
+  const submit = async ()=>{
+    if(input.value.trim() === PAGE_INSIGHTS_PASSWORD){
+      sessionStorage.setItem("pageInsightsUnlocked", "1");
+      await renderPageInsights(sec);
+    } else {
+      document.getElementById("piPasswordError").style.display = "block";
+      input.value = ""; input.focus();
+    }
+  };
+  document.getElementById("piPasswordSubmit").addEventListener("click", submit);
+  input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
+  input.focus();
+}
+const SEO_INSIGHTS_PASSWORD = "Seoinsights@Jaro";
+function isSeoInsightsUnlocked(){ return sessionStorage.getItem("seoInsightsUnlocked") === "1"; }
+async function renderSeoInsightsGateOrTable(sec){
+  if(isSeoInsightsUnlocked()){ await renderSeoInsights(sec); return; }
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <div style="max-width:380px;margin:70px auto;text-align:center">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--blue-tint-10);color:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <h2 style="margin-bottom:6px">Password Protected</h2>
+      <p style="color:var(--ink-50);font-size:13px;margin-bottom:22px">Enter the password to view SEO Insights</p>
+      <input type="password" id="siPasswordInput" placeholder="Password" autocomplete="off"
+        style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;text-align:center;font-size:14px;margin-bottom:12px;box-sizing:border-box">
+      <div id="siPasswordError" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none">Incorrect password — try again.</div>
+      <button class="btn primary" id="siPasswordSubmit" style="width:100%;justify-content:center">Unlock</button>
+    </div>`;
+  const input = document.getElementById("siPasswordInput");
+  const submit = async ()=>{
+    if(input.value.trim() === SEO_INSIGHTS_PASSWORD){
+      sessionStorage.setItem("seoInsightsUnlocked", "1");
+      await renderSeoInsights(sec);
+    } else {
+      document.getElementById("siPasswordError").style.display = "block";
+      input.value = ""; input.focus();
+    }
+  };
+  document.getElementById("siPasswordSubmit").addEventListener("click", submit);
+  input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
+  input.focus();
 }
 
 /* ================================================================================================
@@ -2360,6 +3108,75 @@ function statusPill(status){
   else if(s.includes("complete") || s.includes("done") || s.includes("closed")) cls = "done";
   return `<span class="req-status req-status-${cls}">${esc(status||"Open")}</span>`;
 }
+/* ---------------------------------------------------------------------------------------------- */
+const REQUIREMENTS_LOG_PASSWORD = "Logs@Preview";
+function isRequirementsUnlocked(){
+  return sessionStorage.getItem("reqLogUnlocked") === "1";
+}
+async function renderRequirementsGateOrTable(sec){
+  if(isRequirementsUnlocked()){ await renderRequirementsTable(sec); return; }
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <div style="max-width:380px;margin:70px auto;text-align:center">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--blue-tint-10);color:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <h2 style="margin-bottom:6px">Password Protected</h2>
+      <p style="color:var(--ink-50);font-size:13px;margin-bottom:22px">Enter the password to view the Requirements Log</p>
+      <input type="password" id="reqPasswordInput" placeholder="Password" autocomplete="off"
+        style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;text-align:center;font-size:14px;margin-bottom:12px;box-sizing:border-box">
+      <div id="reqPasswordError" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none">Incorrect password — try again.</div>
+      <button class="btn primary" id="reqPasswordSubmit" style="width:100%;justify-content:center">Unlock</button>
+    </div>`;
+  const input = document.getElementById("reqPasswordInput");
+  const submit = async ()=>{
+    if(input.value === REQUIREMENTS_LOG_PASSWORD){
+      sessionStorage.setItem("reqLogUnlocked", "1");
+      await renderRequirementsTable(sec);
+    } else {
+      document.getElementById("reqPasswordError").style.display = "block";
+      input.value = "";
+      input.focus();
+    }
+  };
+  document.getElementById("reqPasswordSubmit").addEventListener("click", submit);
+  input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
+  input.focus();
+}
+const REQUEST_STATUS_OPTIONS = ["Not Started","In Progress","At Risk","Delayed","Completed","Terminated"];
+const REQUEST_STATUS_COLORS = {
+  "Not Started":{bg:"var(--ink-35)",fg:"#fff"}, "In Progress":{bg:"var(--blue)",fg:"#fff"},
+  "At Risk":{bg:"#8a6800",fg:"#fff"}, "Delayed":{bg:"var(--red)",fg:"#fff"},
+  "Completed":{bg:"#1b9c58",fg:"#fff"}, "Terminated":{bg:"var(--black)",fg:"#fff"}
+};
+function requestStatusSelectHtml_(row){
+  const current = REQUEST_STATUS_OPTIONS.includes(row["Status"]) ? row["Status"] : "Not Started";
+  const c = REQUEST_STATUS_COLORS[current] || REQUEST_STATUS_COLORS["Not Started"];
+  return `<select class="req-status-select" style="background:${c.bg};color:${c.fg};border:none;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer"
+      data-row="${row._sheetRow}" data-threadid="${esc(row["Gmail Thread ID"]||"")}" data-msgid="${esc(row["Gmail Message ID"]||"")}"
+      data-email="${esc(row["Email"]||"")}" data-subject="${esc(row["Subject"]||"")}">
+    ${REQUEST_STATUS_OPTIONS.map(s=>`<option value="${s}" ${s===current?"selected":""}>${s}</option>`).join("")}
+  </select>`;
+}
+/* ---- Reads the Requirements Log via the same Google sign-in used to write it — keeps the sheet
+   private (no "anyone with link" sharing needed) while still showing live data in the dashboard. ---- */
+async function fetchRequirementsLogRows_(){
+  const cfg = CONFIG.sheets.requirementsLog;
+  const token = await ensureGoogleAuth_();
+  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
+  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1:R")}`,
+    { headers:{ Authorization:`Bearer ${token}` } });
+  const json = await res.json();
+  if(!res.ok) throw new Error((json.error && json.error.message) || "Couldn't load the Requirements Log");
+  const values = json.values || [];
+  if(values.length < 2) return [];
+  const headers = values[0];
+  return values.slice(1).map((r,i)=>{
+    const obj = {}; headers.forEach((h,idx)=> obj[h] = r[idx] || "");
+    obj._sheetRow = i + 2; // header is row 1
+    return obj;
+  });
+}
 async function renderRequirementsTable(sec){
   const el = document.getElementById("content");
   el.innerHTML = sectionShell(sec, false);
@@ -2368,14 +3185,20 @@ async function renderRequirementsTable(sec){
   if(!cfg || !cfg.sheetId){
     listWrap.innerHTML = emptyStateHTML(
       "Requirements Log isn't linked yet",
-      "Deploy the Apps Script (see SETUP_GUIDE.md), then paste the Requirements Log sheet's ID + GID into CONFIG.sheets.requirementsLog to see every request raised here, with live status."
+      "Paste the Requirements Log sheet's ID + GID into CONFIG.sheets.requirementsLog to see every request raised here, with live status."
     );
     document.getElementById("resultCount").textContent = "";
     return;
   }
-  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
-  const {data, isLive} = await getData("requirementsLog", ["Timestamp","University","Program"]);
-  setLivePill(isLive);
+  listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Sign in with Google if prompted, then loading…</div>`;
+  let data;
+  try{ data = await fetchRequirementsLogRows_(); }
+  catch(e){
+    listWrap.innerHTML = emptyStateHTML("Couldn't load the Requirements Log", e.message || "Try again in a moment.");
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  setLivePill(true);
   function draw(q){
     q=(q||"").toLowerCase();
     let items = data.filter(r => JSON.stringify(r).toLowerCase().includes(q));
@@ -2392,12 +3215,34 @@ async function renderRequirementsTable(sec){
               <td>${esc(row["Request Type"]||"—")}</td>
               <td>${esc(row["Priority"]||"—")}</td>
               <td class="cell-muted">${esc(row["Requested By"]||row["Email"]||"—")}</td>
-              <td>${statusPill(row["Status"])}</td>
+              <td>${requestStatusSelectHtml_(row)}</td>
             </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--ink-35)">No requests raised yet</td></tr>`}
           </tbody>
         </table>
       </div>`;
     document.getElementById("resultCount").textContent = `${items.length} requests`;
+    listWrap.querySelectorAll(".req-status-select").forEach(sel=>{
+      sel.addEventListener("change", async ()=>{
+        const newStatus = sel.value;
+        const prevColor = sel.style.background;
+        sel.disabled = true;
+        try{
+          await updateRequestStatus_({
+            sheetRow: +sel.dataset.row, status: newStatus,
+            threadId: sel.dataset.threadid, messageId: sel.dataset.msgid,
+            email: sel.dataset.email, subject: sel.dataset.subject
+          });
+          const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
+          sel.style.background = c.bg; sel.style.color = c.fg;
+          toast(sel.dataset.email ? `Status updated — ${sel.dataset.email} notified by email` : "Status updated");
+        }catch(err){
+          toast(err.message || "Couldn't update status", true);
+          sel.style.background = prevColor;
+        }finally{
+          sel.disabled = false;
+        }
+      });
+    });
   }
   draw("");
   document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
@@ -2453,6 +3298,8 @@ function init(){
   });
   document.querySelector('.navitem[data-nav="home"]').addEventListener("click", ()=>navigate("home"));
   document.querySelector('.navitem[data-nav="requirements"]').addEventListener("click", ()=>navigate("requirements"));
+  document.querySelector('.navitem[data-nav="pageInsights"]').addEventListener("click", ()=>navigate("pageInsights"));
+  document.querySelector('.navitem[data-nav="seoInsights"]').addEventListener("click", ()=>navigate("seoInsights"));
   document.getElementById("openRequestBtn").addEventListener("click", ()=>openRequestModal());
   document.getElementById("closeRequestBtn").addEventListener("click", closeRequestModal);
   document.getElementById("cancelRequestBtn").addEventListener("click", closeRequestModal);
