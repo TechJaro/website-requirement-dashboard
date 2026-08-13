@@ -1539,7 +1539,25 @@ async function renderHome(){
 }
 const STATUS_COLORS = { open:"#1b9c58", soon:"#8a6800", closed:"var(--red)", draft:"var(--blue)", other:"var(--ink-35)" };
 const TYPE_COLORS = ["var(--blue)","var(--yellow)","var(--red)","#7c5cff","#1b9c58","#8a6800","#0aa5a0"];
-function renderQuickInsights(data){
+/* Bucket a Program Pages row by Admission Status — shared by the counting pass below and by the
+   click-to-drill-down handlers, so the numbers shown and the list you get when you click always
+   match exactly. */
+function statusKeyFor(row){
+  const s = (row["Admission Status"]||"").toLowerCase();
+  if(s.includes("draft")) return "draft";
+  if(s.includes("open")) return "open";
+  if(s.includes("closing")) return "soon";
+  if(s.includes("closed")) return "closed";
+  return "other";
+}
+function renderQuickInsights(rawData){
+  // Legend/note rows that sit above or inside the real data (the Program Pages sheet has banner
+  // rows above its header — see the header-aware loader above) can slip through the generic
+  // "every cell blank" skip in parseRowsToObjects if they aren't 100% empty. They never have a real
+  // Program Name though, so filtering on that here keeps every count — and every drill-down list —
+  // matching exactly what you'd get filtering the sheet by hand (this is what was causing Draft to
+  // show one higher than the real 21).
+  const data = rawData.filter(r => (r["Program Name"]||"").toString().trim());
   const typeCounts = new Map();
   data.forEach(r=>{
     const t = (r["Type"]||"Unspecified").trim() || "Unspecified";
@@ -1551,35 +1569,82 @@ function renderQuickInsights(data){
   if(typeEl){
     typeEl.innerHTML = `
       <div class="status-bar">${typeEntries.map(([t,c],i)=>
-        `<div style="width:${(c/typeTotal)*100}%;background:${TYPE_COLORS[i%TYPE_COLORS.length]}" title="${esc(t)}: ${c}"></div>`
+        `<div data-type="${esc(t)}" style="width:${(c/typeTotal)*100}%;background:${TYPE_COLORS[i%TYPE_COLORS.length]};cursor:pointer" title="${esc(t)}: ${c} — click to view"></div>`
       ).join("")}</div>
       <div class="status-legend">${typeEntries.map(([t,c],i)=>`
-        <div class="status-legend-item">
+        <div class="status-legend-item" data-type="${esc(t)}" style="cursor:pointer">
           <span class="status-dot" style="background:${TYPE_COLORS[i%TYPE_COLORS.length]}"></span>${esc(t)} <b>${c}</b>
         </div>`).join("")}</div>`;
+    typeEl.querySelectorAll("[data-type]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const key = el.dataset.type;
+        openInsightListModal(`Programs — ${key}`, data.filter(r => ((r["Type"]||"Unspecified").trim() || "Unspecified") === key));
+      });
+    });
   }
   const counts = { open:0, soon:0, closed:0, draft:0, other:0 };
-  data.forEach(r=>{
-    const s = (r["Admission Status"]||"").toLowerCase();
-    if(s.includes("draft")) counts.draft++;
-    else if(s.includes("open")) counts.open++;
-    else if(s.includes("closing")) counts.soon++;
-    else if(s.includes("closed")) counts.closed++;
-    else counts.other++;
-  });
+  data.forEach(r=> counts[statusKeyFor(r)]++);
   const total = data.length || 1;
   const labels = { open:"Open", soon:"Closing Soon", closed:"Closed", draft:"Draft", other:"Unspecified" };
   const statusEl = document.getElementById("statusBreakdown");
   if(statusEl){
     statusEl.innerHTML = `
       <div class="status-bar">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>
-        `<div style="width:${(counts[k]/total)*100}%;background:${STATUS_COLORS[k]}" title="${labels[k]}: ${counts[k]}"></div>`
+        `<div data-status="${k}" style="width:${(counts[k]/total)*100}%;background:${STATUS_COLORS[k]};cursor:pointer" title="${labels[k]}: ${counts[k]} — click to view"></div>`
       ).join("")}</div>
       <div class="status-legend">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>`
-        <div class="status-legend-item">
+        <div class="status-legend-item" data-status="${k}" style="cursor:pointer">
           <span class="status-dot" style="background:${STATUS_COLORS[k]}"></span>${labels[k]} <b>${counts[k]}</b>
         </div>`).join("")}</div>`;
+    statusEl.querySelectorAll("[data-status]").forEach(el=>{
+      el.addEventListener("click", ()=>{
+        const key = el.dataset.status;
+        openInsightListModal(`Programs — ${labels[key]}`, data.filter(r => statusKeyFor(r) === key));
+      });
+    });
   }
+}
+/* Generic click-to-drill-down popup used by the Quick Insights breakdowns above — lists the actual
+   Program Name / University for whichever slice (type or status) was clicked, so a number in the
+   chart can always be checked against the real rows behind it. Built once and reused; injected at
+   runtime rather than in the static markup since it's only ever needed after Quick Insights loads. */
+function openInsightListModal(title, rows){
+  let overlay = document.getElementById("insightListOverlay");
+  if(!overlay){
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal-overlay" id="insightListOverlay">
+        <div class="modal" style="max-width:540px">
+          <div class="modal-watermark"></div>
+          <div class="modal-head">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg></div>
+            <div>
+              <h3 id="insightListTitle"></h3>
+              <p id="insightListSub"></p>
+            </div>
+            <button class="modal-close" id="insightListClose">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" id="insightListBody" style="max-height:60vh;overflow:auto"></div>
+        </div>
+      </div>`);
+    overlay = document.getElementById("insightListOverlay");
+    overlay.addEventListener("click", (e)=>{ if(e.target.id === "insightListOverlay") overlay.classList.remove("show"); });
+    document.getElementById("insightListClose").addEventListener("click", ()=> overlay.classList.remove("show"));
+  }
+  document.getElementById("insightListTitle").textContent = title;
+  document.getElementById("insightListSub").textContent = `${rows.length} program${rows.length===1?"":"s"}`;
+  const body = document.getElementById("insightListBody");
+  body.innerHTML = rows.length ? rows.map(r=>{
+    const uni = esc(r["University/Institute"]||"—");
+    const prog = esc(r["Program Name"]||"Untitled Program");
+    const link = firstLink(r["Webpage Link"]);
+    return `<div style="padding:10px 2px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px">
+      <div><div style="font-weight:700;font-size:13px">${prog}</div><div style="font-size:12px;color:var(--ink-50)">${uni}</div></div>
+      ${link ? `<a href="${esc(link)}" target="_blank" rel="noopener" class="btn" style="flex-shrink:0">${ic("external")}</a>` : ""}
+    </div>`;
+  }).join("") : emptyStateHTML("Nothing here", "No programs match this slice.");
+  overlay.classList.add("show");
 }
 /* Fetches both Landing Pages tabs (Domain Tracker + Channel/PR) once, independent of the per-card
    NAV_ORDER loop above, since "by source" needs both counts side by side. */
