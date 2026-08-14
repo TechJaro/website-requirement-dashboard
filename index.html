@@ -949,11 +949,6 @@ const CONFIG = {
     // below (pick()) tries several common header spellings, so exact wording isn't fragile.
     newsItems:            { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "1921003461" },
     awardsItems:          { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "480734245" },
-    // "Website URL Form Mappings" — read positionally (columns A-F by index), not by header name,
-    // since this loader doesn't know your exact header text. A: page URL, B: University Mapped,
-    // C: Product Mapped, D: extra field (used for Pillar Pages only), E: Category, F: non-blank
-    // means "commented out, skip this row". See loadUrlMappings_() for the matching logic.
-    urlMappings:          { sheetId: "1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI", gid: "1697800953" },
 
     // ===== From: Landing Pages Tracker =====
     // Per your latest instruction: Landing Pages now reads from "Domain Tracker" (plain) + the
@@ -1855,11 +1850,6 @@ async function renderHome(){
         <div class="click-hint">Click any slice to see the list ›</div>
         <div id="landingLinkBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
       </div>
-      <div class="insight-panel">
-        <h4>URL Mapping Coverage</h4>
-        <div class="click-hint">Click any slice to see the list ›</div>
-        <div id="urlMappingBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
-      </div>
     </div>
 
     <div class="trending-section">
@@ -1914,7 +1904,6 @@ async function renderHome(){
     });
   }
   loadLandingInsights();
-  loadUrlMappingCoverage_();
 }
 const STATUS_COLORS = { open:"#1b9c58", soon:"#8a6800", closed:"var(--red)", draft:"var(--blue)", other:"var(--ink-35)" };
 const TYPE_COLORS = ["var(--blue)","var(--yellow)","var(--red)","#7c5cff","#1b9c58","#8a6800","#0aa5a0"];
@@ -1943,6 +1932,7 @@ const TRENDING_COURSES = [
   { title:"Professional Certificate Programme in AI-Powered Digital Marketing for Performance & Growth", org:"IIM Kozhikode", orgShort:"IIM Kozhikode" },
   { title:"Blended MBA for Working Professionals", org:"IIM Nagpur", orgShort:"IIM Nagpur" },
   { title:"Post Graduate Certificate Programme in Strategic Human Resource Management with AI & Analytics", org:"IIM Tiruchirappalli", orgShort:"IIM Tiruchirappalli" },
+  { title:"Professional Certificate Programme in Sustainability Leadership and Practice", org:"Indian Institute of Technology Bombay", orgShort:"IIT Bombay" },
   { title:"Chief Technology Officer Programme", org:"IIT Bombay", orgShort:"IIT Bombay" },
   { title:"Advanced Programme in Electric Vehicle (EV) Technology", org:"Programme offered by Continuing Education Programme (CEP), IIT Delhi", orgShort:"CEP, IIT Delhi" },
   { title:"Executive Programme in Autonomous Robotics & AI", org:"Programme offered by Continuing Education Programme (CEP), IIT Delhi", orgShort:"CEP, IIT Delhi" },
@@ -2134,61 +2124,6 @@ function openNewsModal(){
       </div>`).join("")}</div>`;
   overlay.classList.add("show");
 }
-/* "URL Mapping Coverage" — combined across Program, University, Free Course and Pillar Pages
-   (the four categories this mapping tab covers): for each page's own link field, checks whether a
-   row was found in the URL Mappings tab (see loadUrlMappings_ above) and shows Mapped vs Not
-   Mapped, same look-and-click-to-drill-down pattern as the other Quick Insights panels. */
-async function loadUrlMappingCoverage_(){
-  const el = document.getElementById("urlMappingBreakdown");
-  if(!el) return;
-  try{
-    const CATS = [
-      { key:"program", field:"Webpage Link", label:"Program Pages" },
-      { key:"university", field:"Webpage Link", label:"University Pages" },
-      { key:"free", field:"Webpage Link", label:"Free Course Pages" },
-      { key:"pillar", field:"Webpage Link", label:"Pillar Pages" },
-    ];
-    const mappings = await loadUrlMappings_();
-    const mapped = [], unmapped = [];
-    for(const cat of CATS){
-      const {data} = await getData(sheetKeyFor(cat.key));
-      (data||[]).forEach(row=>{
-        const link = firstLink(row[cat.field]);
-        if(!link) return; // no link on this page yet — not counted either way
-        const rec = urlMappingFor_(mappings[cat.key], link);
-        const entry = { row, cat, link, rec };
-        (rec ? mapped : unmapped).push(entry);
-      });
-    }
-    const total = (mapped.length + unmapped.length) || 1;
-    const counts = { mapped: mapped.length, unmapped: unmapped.length };
-    const colors = { mapped:"#1b9c58", unmapped:"var(--red)" };
-    const labels = { mapped:"Mapped", unmapped:"Not Mapped" };
-    const mapRow = e => ({
-      title: e.row["Program Name"] || e.row["Title"] || e.row["University"] || "Untitled",
-      sub: `${e.cat.label}${e.rec ? " · " + [e.rec.universityMapped, e.rec.productMapped, e.rec.extra].filter(Boolean).join(" · ") : ""}`,
-      link: e.link,
-    });
-    el.innerHTML = `
-      <div class="status-bar">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>
-        `<div data-maprow="${k}" style="width:${(counts[k]/total)*100}%;background:${colors[k]};cursor:pointer" title="${labels[k]}: ${counts[k]} — click to view"></div>`
-      ).join("")}</div>
-      <div class="status-legend">${Object.keys(counts).filter(k=>counts[k]>0).map(k=>`
-        <div class="status-legend-item" data-maprow="${k}" style="cursor:pointer">
-          <span class="status-dot" style="background:${colors[k]}"></span>${labels[k]} <b>${counts[k]}</b>
-        </div>`).join("")}</div>`;
-    el.querySelectorAll("[data-maprow]").forEach(node=>{
-      node.addEventListener("click", ()=>{
-        const key = node.dataset.maprow;
-        const list = key === "mapped" ? mapped : unmapped;
-        openInsightListModal(`URL Mapping Coverage — ${labels[key]}`, list, mapRow);
-      });
-    });
-  }catch(e){
-    console.warn("URL Mapping Coverage failed", e);
-    el.innerHTML = `<div class="insight-loading">Couldn't load this right now.</div>`;
-  }
-}
 /* Fetches both Landing Pages tabs (Domain Tracker + Channel/PR) once, independent of the per-card
    NAV_ORDER loop above, since "by source" needs both counts side by side. */
 async function loadLandingInsights(){
@@ -2302,9 +2237,6 @@ async function renderGroupedSection(sec){
   const {data, isLive} = await getData(sheetKeyFor(sec.key), ["University","Program Name","Webpage Link"]);
   setLivePill(isLive);
   const groups = groupBy(data, sec.groupField);
-  // Additive: URL Mappings tab lookup, keyed by this row's own Webpage Link. Only applies when
-  // this section is Program Pages ("program") — University/Free Course/Pillar are wired separately.
-  const urlMappings_ = sec.key === "program" ? await loadUrlMappings_() : null;
 
   function draw(filterText, statusFilter){
     const q = (filterText||"").toLowerCase();
@@ -2343,7 +2275,6 @@ async function renderGroupedSection(sec){
               ${row["Category / Domain"] ? `<span class="badge neutral">${esc(row["Category / Domain"])}</span>` : ""}
               ${isValidLink(row["Application Closure Date"]) ? `<span class="badge" style="background:var(--yellow-tint);color:#8a6800">Admission Closure Date: ${esc(formatClosureDate_(row["Application Closure Date"]))}</span>` : ""}
               ${raiseBtn({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" })}
-              ${urlMappings_ ? mappingBadgeHTML_(urlMappingFor_(urlMappings_.program, row["Webpage Link"])) : ""}
               <div class="linkrow">${buildLinkChips(row, isDraft ? [["Preview Link","Preview Page"], ...sec.linkFields.slice(1)] : sec.linkFields)}</div>
               ${(isValidLink(row["Meta Title"])||isValidLink(row["Meta Description"])) ? `
                 <div class="meta-block" style="width:100%">
@@ -2532,9 +2463,6 @@ async function renderFlatCards(sec){
   listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
   const {data, isLive} = await getData(sheetKeyFor(sec.key), sec.key==="b2b" ? ["B2B Pages Links"] : ["University","Webpage Link"]);
   setLivePill(isLive);
-  // Additive: URL Mappings tab lookup — applies to University and Pillar Pages only (not B2B,
-  // which isn't one of the categories mentioned for this mapping).
-  const urlMappings_ = (sec.key === "university" || sec.key === "pillar") ? await loadUrlMappings_() : null;
 
   function titleize(slug){
     const ACRONYMS = ["Bfil","Dtdc","Hcl","Hdfc","Iifl","Rsb","Wns","Pnb","Au"];
@@ -2566,7 +2494,6 @@ async function renderFlatCards(sec){
           ${link ? `<a class="link-chip" href="${esc(link)}" target="_blank" rel="noopener">${ic("external")}Visit Page</a>` : `<span class="link-chip disabled">${ic("link")}No link yet</span>`}
           ${raiseBtn({ university: sec.key==="university" ? title : "", section: sec.label, link: link||"" })}
         </div>
-        ${urlMappings_ ? mappingBadgeHTML_(urlMappingFor_(sec.key==="university" ? urlMappings_.university : urlMappings_.pillar, link)) : ""}
       </div>`;
     }).join("")}</div>` : emptyStateHTML("No results", "Try a different search term.");
     document.getElementById("resultCount").textContent = `${items.length} pages`;
@@ -2640,8 +2567,6 @@ async function renderFreeCourses(sec){
   listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
   const {data, isLive} = await getData("freeCoursePages", ["Title","Duration","Webpage Link"]);
   setLivePill(isLive);
-  // Additive: URL Mappings tab lookup for Free Course Pages.
-  const urlMappings_ = await loadUrlMappings_();
 
   function draw(q){
     q=(q||"").toLowerCase();
@@ -2656,7 +2581,6 @@ async function renderFreeCourses(sec){
           ${firstLink(row["Webpage Link"]) ? `<a class="link-chip" href="${esc(firstLink(row["Webpage Link"]))}" target="_blank" rel="noopener">${ic("external")}View Course</a>` : `<span class="link-chip disabled">${ic("link")}No link yet</span>`}
           ${raiseBtn({ section: "Free Course Pages", link: firstLink(row["Webpage Link"]) })}
         </div>
-        ${mappingBadgeHTML_(urlMappingFor_(urlMappings_.free, firstLink(row["Webpage Link"])))}
       </div>`).join("")}</div>` : emptyStateHTML("No courses found","Try a different search term.");
     document.getElementById("resultCount").textContent = `${items.length} courses`;
   }
@@ -3457,100 +3381,6 @@ async function collectAllDashboardUrls_(){
   }catch(e){ /* skip, keep going */ }
   return [...urls];
 }
-
-/* ================================================================================================
-   WEBSITE URL <> FORM MAPPINGS  (Web Pages<>JARO sheet, tab "Website URL Form Mappings", gid 1697800953)
-   Column A: page URL   Column B: University Mapped   Column C: Product Mapped
-   Column D: (Pillar Page only) an extra mapped field   Column E: Category   Column F: "Commented" flag
-   This is purely ADDITIVE display data layered on top of the existing Program/University/Free
-   Course/Pillar cards below — nothing already shown on those cards is touched or removed.
-   NOTE ON ASSUMPTIONS (no header row text was given for this tab, so these are read positionally
-   and matched with best-judgment defaults — flag any of these to correct them):
-     1) Column F "Commented": ANY non-blank value in column F is treated as "this row is commented
-        out / inactive" and the row is skipped entirely.
-     2) Column E "Category": matched with a tolerant, case-insensitive substring check (contains
-        "program" / "university" / "free" / "pillar") rather than an exact string match, so small
-        wording differences in the sheet don't silently drop rows.
-     3) Column D is only read (and only shown) for rows whose Category is Pillar Page — for every
-        other category it's ignored, per your instruction.
-     4) URL matching between column A and each page's own link field (e.g. "Webpage Link") is done
-        on a normalized form (protocol stripped, "www." stripped, trailing slash stripped, lower-
-        cased) so things like "https://" vs no-protocol or a trailing "/" don't cause a false miss.
-   ================================================================================================ */
-let URL_MAPPINGS_CACHE = null; // {program:Map, university:Map, free:Map, pillar:Map} keyed by normalized URL
-function normUrlForMatch_(u){
-  return (u||"").toString().trim().toLowerCase()
-    .replace(/^https?:\/\//,"").replace(/^www\./,"").replace(/\/+$/,"");
-}
-function categoryBucketFor_(catText){
-  const c = (catText||"").toString().toLowerCase();
-  if(c.includes("pillar")) return "pillar";
-  if(c.includes("university")) return "university";
-  if(c.includes("free")) return "free";
-  if(c.includes("program")) return "program";
-  return null;
-}
-/* Reads a sheet tab by raw row position (array-of-arrays), not by header name — used only for the
-   URL Mappings tab since its exact header text is unknown; every other tab keeps using the
-   header-aware parseRowsToObjects() path via loadSheet()/getData(). */
-async function loadRawSheetRows_(cfg){
-  if(hasApiKey()){
-    const title = await resolveSheetTitle(cfg.sheetId, cfg.gid);
-    if(!title) throw new Error(`Could not find a tab with gid ${cfg.gid}`);
-    const range = encodeURIComponent(`${title}!A1:ZZ`);
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${range}?key=${CONFIG.googleApiKey}&valueRenderOption=UNFORMATTED_VALUE`;
-    const res = await fetch(url);
-    if(!res.ok) throw new Error("Sheet values fetch failed: " + res.status);
-    const json = await res.json();
-    return json.values || [];
-  }
-  const url = `https://docs.google.com/spreadsheets/d/${cfg.sheetId}/gviz/tq?tqx=out:csv&gid=${cfg.gid||"0"}`;
-  const res = await fetch(url);
-  if(!res.ok) throw new Error("Sheet fetch failed: " + res.status);
-  const csvText = await res.text();
-  return Papa.parse(csvText, { skipEmptyLines:false }).data;
-}
-/* Loads + buckets the URL Mappings tab once (cached for the session). Returns
-   {program, university, free, pillar} each a Map<normalizedUrl, {universityMapped, productMapped, extra?}>. */
-async function loadUrlMappings_(){
-  if(URL_MAPPINGS_CACHE) return URL_MAPPINGS_CACHE;
-  const buckets = { program:new Map(), university:new Map(), free:new Map(), pillar:new Map() };
-  try{
-    const cfg = CONFIG.sheets.urlMappings;
-    if(cfg && cfg.sheetId){
-      const rows = await loadRawSheetRows_(cfg);
-      for(let i=1;i<rows.length;i++){ // row 0 assumed to be the header row
-        const r = rows[i] || [];
-        const url = (r[0]||"").toString().trim();
-        if(!url) continue;
-        const commented = (r[5]||"").toString().trim();
-        if(commented) continue; // column F non-blank -> skip (see assumption #1 above)
-        const bucket = categoryBucketFor_(r[4]);
-        if(!bucket) continue;
-        const rec = { universityMapped: (r[1]||"").toString().trim(), productMapped: (r[2]||"").toString().trim() };
-        if(bucket === "pillar") rec.extra = (r[3]||"").toString().trim(); // column D, Pillar only
-        if(!rec.universityMapped && !rec.productMapped && !rec.extra) continue;
-        buckets[bucket].set(normUrlForMatch_(url), rec);
-      }
-    }
-  }catch(e){ console.warn("URL Mappings load failed", e); }
-  URL_MAPPINGS_CACHE = buckets;
-  return buckets;
-}
-function urlMappingFor_(bucketMap, link){
-  if(!bucketMap || !link) return null;
-  return bucketMap.get(normUrlForMatch_(link)) || null;
-}
-/* Small additive badge chip shown on a page card when a mapping was found — never replaces or
-   hides anything already on the card. */
-function mappingBadgeHTML_(rec){
-  if(!rec) return "";
-  const parts = [];
-  if(rec.universityMapped) parts.push(`<span class="badge" style="background:var(--blue-tint-10);color:var(--blue)">University Mapped: ${esc(rec.universityMapped)}</span>`);
-  if(rec.productMapped) parts.push(`<span class="badge" style="background:var(--blue-tint-10);color:var(--blue)">Product Mapped: ${esc(rec.productMapped)}</span>`);
-  if(rec.extra) parts.push(`<span class="badge" style="background:var(--yellow-tint);color:#8a6800">Pillar Mapping: ${esc(rec.extra)}</span>`);
-  return parts.join("");
-}
 /* Small shared retry/backoff wrapper — both scans hit rate-limited third-party APIs (PageSpeed's
    free-tier quota, the Apps Script relay), and a bare fetch failing once shouldn't permanently drop
    that page from the results. One retry with a short backoff smooths over most transient hiccups
@@ -3577,36 +3407,17 @@ function sleep_(ms){ return new Promise(r=>setTimeout(r, ms)); }
    see the "runs for a bit then stops" note above wireVitalsPanel_. With state kept here, the panel
    can always repaint its current true progress no matter how many times its DOM gets rebuilt. ---- */
 let VITALS_SCAN_RUNNING = false;
-let VITALS_URLS = [];
 let VITALS_RESULTS = [];
 let VITALS_DONE = 0, VITALS_FAILED = 0, VITALS_TOTAL = 0;
-/* Scan state survives a normal refresh, a hard refresh (Ctrl/Cmd+Shift+R), and even closing and
-   reopening the tab, by mirroring progress into localStorage as it goes and resuming automatically
-   from resumeBackgroundScans_() at startup (see init()). A real page reload throws away all JS
-   state including any in-flight fetches, so "surviving a refresh" isn't possible by keeping the
-   loop alive — instead every reload picks the scan back up where the last save left off, skipping
-   whatever's already in the results. The ONLY way to actually stop a scan is a deliberate
-   double-click on its Run button (single clicks while running are ignored, on purpose, so an
-   accidental extra click never kills a multi-minute scan). */
-const VITALS_STATE_KEY = "jaroDash_vitalsScan_v1";
-function persistVitalsState_(){
-  try{
-    if(VITALS_SCAN_RUNNING) localStorage.setItem(VITALS_STATE_KEY, JSON.stringify({urls:VITALS_URLS, results:VITALS_RESULTS, failed:VITALS_FAILED}));
-    else localStorage.removeItem(VITALS_STATE_KEY);
-  }catch(e){ /* storage full/unavailable — scan still works, just won't survive a refresh */ }
-}
-async function runVitalsScan_(fullUrls, toFetch){
-  toFetch = toFetch || fullUrls;
+async function runVitalsScan_(urls){
   VITALS_SCAN_RUNNING = true;
-  VITALS_URLS = fullUrls; VITALS_TOTAL = fullUrls.length;
-  persistVitalsState_();
-  paintVitalsPanel_();
+  VITALS_RESULTS = []; VITALS_DONE = 0; VITALS_FAILED = 0; VITALS_TOTAL = urls.length;
   const CONCURRENCY = 5; // PageSpeed's default quota is tight enough that 6+ started tripping 429s
-  let idx = 0, sinceSave = 0;
+  let idx = 0;
   async function worker(){
     while(VITALS_SCAN_RUNNING){
-      const i = idx++; if(i >= toFetch.length) return;
-      const url = toFetch[i];
+      const i = idx++; if(i >= urls.length) return;
+      const url = urls[i];
       try{
         const api = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${CONFIG.pagespeedApiKey}&strategy=mobile&category=performance`;
         const res = await fetchWithRetry_(api);
@@ -3623,21 +3434,11 @@ async function runVitalsScan_(fullUrls, toFetch){
         } else { VITALS_FAILED++; }
       }catch(e){ VITALS_FAILED++; }
       VITALS_DONE++;
-      sinceSave++;
-      if(sinceSave >= 3){ sinceSave = 0; persistVitalsState_(); } // throttled — no need to write every single row
       paintVitalsPanel_();
     }
   }
-  await Promise.all(Array.from({length:Math.min(CONCURRENCY, toFetch.length)}, worker));
+  await Promise.all(Array.from({length:Math.min(CONCURRENCY, urls.length)}, worker));
   VITALS_SCAN_RUNNING = false;
-  persistVitalsState_(); // running=false now, so this clears the saved state — scan finished cleanly
-  paintVitalsPanel_();
-}
-function stopVitalsScan_(){
-  if(!VITALS_SCAN_RUNNING) return;
-  VITALS_SCAN_RUNNING = false; // workers notice between iterations and exit gracefully, no hard abort
-  persistVitalsState_();
-  toast("Vitals scan stopped");
   paintVitalsPanel_();
 }
 /* Repaints whatever the Vitals panel currently knows, from the shared state above — safe to call
@@ -3648,9 +3449,9 @@ function paintVitalsPanel_(){
   const progress = document.getElementById("vitalsProgress");
   if(!btn || !body || !progress) return;
   if(VITALS_SCAN_RUNNING){
-    btn.disabled = false; btn.textContent = "Scanning… (double-click to stop)";
+    btn.disabled = true; btn.textContent = "Scanning…";
     const failNote = VITALS_FAILED ? `, ${VITALS_FAILED} failed/retried` : "";
-    progress.textContent = `Checked ${VITALS_DONE} of ${VITALS_TOTAL} pages${failNote} — this keeps running in the background (even through a refresh) until it finishes or you double-click the button above to stop it.`;
+    progress.textContent = `Checked ${VITALS_DONE} of ${VITALS_TOTAL} pages${failNote} — this can take a while over ${VITALS_TOTAL} pages; feel free to browse the rest of the dashboard, this keeps running in the background.`;
   } else if(VITALS_TOTAL){
     btn.disabled = false; btn.textContent = "Run Vitals Scan Again";
     const failNote = VITALS_FAILED ? ` (${VITALS_FAILED} pages couldn't be checked — usually rate-limiting; run again to retry just those)` : "";
@@ -3670,42 +3471,28 @@ function wireVitalsPanel_(){
   const btn = document.getElementById("vitalsRunBtn");
   if(!btn || btn.dataset.wired) return;
   btn.dataset.wired = "1";
-  btn.addEventListener("click", async (e)=>{
-    if(e.detail > 1) return; // part of a double-click sequence — the dblclick handler below owns that
-    if(VITALS_SCAN_RUNNING){ toast("Already scanning in the background — double-click the button to stop it", true); return; }
+  btn.addEventListener("click", async ()=>{
+    if(VITALS_SCAN_RUNNING) return; // already running — this button is disabled, but belt and suspenders
     if(!CONFIG.pagespeedApiKey){ toast("Add CONFIG.pagespeedApiKey first", true); return; }
     document.getElementById("vitalsProgress").textContent = "Collecting your page list…";
     const urls = await collectAllDashboardUrls_();
-    VITALS_RESULTS = []; VITALS_DONE = 0; VITALS_FAILED = 0; // fresh run — resumeBackgroundScans_ is what preserves state across a refresh, not this path
-    runVitalsScan_(urls); // deliberately not awaited — a refresh mid-scan is expected and handled via resumeBackgroundScans_
+    await runVitalsScan_(urls);
   });
-  btn.addEventListener("dblclick", ()=> stopVitalsScan_());
 }
 
 /* ---- On-Page Audit: needs a tiny relay for CORS (fetching another site's HTML from a browser
    isn't allowed unless that site opts in) — stateless, no sheet, just "check these 20 URLs". This
-   depends on the same Apps Script web app access fix as the request form. Same persist-and-resume
-   pattern as Vitals above, for the same reason (survive a refresh, only stop on double-click). ---- */
+   depends on the same Apps Script web app access fix as the request form. Same module-level-state
+   pattern as Vitals above, for the same reason (survive the panel's DOM being rebuilt mid-scan). ---- */
 let AUDIT_SCAN_RUNNING = false;
-let AUDIT_URLS = [];
 let AUDIT_RESULTS = [];
 let AUDIT_DONE = 0, AUDIT_TOTAL = 0;
-const AUDIT_STATE_KEY = "jaroDash_auditScan_v1";
-function persistAuditState_(){
-  try{
-    if(AUDIT_SCAN_RUNNING) localStorage.setItem(AUDIT_STATE_KEY, JSON.stringify({urls:AUDIT_URLS, results:AUDIT_RESULTS}));
-    else localStorage.removeItem(AUDIT_STATE_KEY);
-  }catch(e){ /* storage full/unavailable — scan still works, just won't survive a refresh */ }
-}
-async function runAuditScan_(fullUrls, toFetch){
-  toFetch = toFetch || fullUrls;
+async function runAuditScan_(urls){
   AUDIT_SCAN_RUNNING = true;
-  AUDIT_URLS = fullUrls; AUDIT_TOTAL = fullUrls.length;
-  persistAuditState_();
-  paintAuditPanel_();
+  AUDIT_RESULTS = []; AUDIT_DONE = 0; AUDIT_TOTAL = urls.length;
   const BATCH = 20;
-  for(let i=0;i<toFetch.length && AUDIT_SCAN_RUNNING;i+=BATCH){
-    const chunk = toFetch.slice(i, i+BATCH);
+  for(let i=0;i<urls.length && AUDIT_SCAN_RUNNING;i+=BATCH){
+    const chunk = urls.slice(i, i+BATCH);
     try{
       const apiUrl = `${CONFIG.requestForm.webAppUrl}?action=auditBatch&urls=${encodeURIComponent(JSON.stringify(chunk))}`;
       const res = await fetchWithRetry_(apiUrl);
@@ -3713,18 +3500,9 @@ async function runAuditScan_(fullUrls, toFetch){
       if(json.ok) AUDIT_RESULTS = AUDIT_RESULTS.concat(json.rows);
     }catch(e){ /* skip this chunk, keep going */ }
     AUDIT_DONE += chunk.length;
-    persistAuditState_(); // each chunk is already only 20 urls, so this is naturally throttled
     paintAuditPanel_();
   }
   AUDIT_SCAN_RUNNING = false;
-  persistAuditState_();
-  paintAuditPanel_();
-}
-function stopAuditScan_(){
-  if(!AUDIT_SCAN_RUNNING) return;
-  AUDIT_SCAN_RUNNING = false; // the for-loop above checks this between chunks and exits gracefully
-  persistAuditState_();
-  toast("Audit scan stopped");
   paintAuditPanel_();
 }
 function paintAuditPanel_(){
@@ -3733,8 +3511,8 @@ function paintAuditPanel_(){
   const progress = document.getElementById("auditProgress");
   if(!btn || !body || !progress) return;
   if(AUDIT_SCAN_RUNNING){
-    btn.disabled = false; btn.textContent = "Scanning… (double-click to stop)";
-    progress.textContent = `Checked ${AUDIT_DONE} of ${AUDIT_TOTAL} pages, 20 at a time — this keeps running in the background (even through a refresh) until it finishes or you double-click the button above to stop it.`;
+    btn.disabled = true; btn.textContent = "Scanning…";
+    progress.textContent = `Checked ${AUDIT_DONE} of ${AUDIT_TOTAL} pages, 20 at a time — feel free to browse the rest of the dashboard, this keeps running in the background.`;
   } else if(AUDIT_TOTAL){
     btn.disabled = false; btn.textContent = "Run Audit Scan Again";
     progress.textContent = `Done — checked ${AUDIT_TOTAL} pages.`;
@@ -3753,46 +3531,13 @@ function wireAuditPanel_(){
   const btn = document.getElementById("auditRunBtn");
   if(!btn || btn.dataset.wired) return;
   btn.dataset.wired = "1";
-  btn.addEventListener("click", async (e)=>{
-    if(e.detail > 1) return; // part of a double-click sequence — the dblclick handler below owns that
-    if(AUDIT_SCAN_RUNNING){ toast("Already scanning in the background — double-click the button to stop it", true); return; }
+  btn.addEventListener("click", async ()=>{
+    if(AUDIT_SCAN_RUNNING) return;
     if(!CONFIG.requestForm.webAppUrl){ toast("Add CONFIG.requestForm.webAppUrl first", true); return; }
     document.getElementById("auditProgress").textContent = "Collecting your page list…";
     const urls = await collectAllDashboardUrls_();
-    AUDIT_RESULTS = []; AUDIT_DONE = 0; // fresh run — resumeBackgroundScans_ is what preserves state across a refresh, not this path
-    runAuditScan_(urls); // deliberately not awaited — a refresh mid-scan is expected and handled via resumeBackgroundScans_
+    await runAuditScan_(urls);
   });
-  btn.addEventListener("dblclick", ()=> stopAuditScan_());
-}
-/* Called once at startup (see init()). If a scan was mid-flight when the page was last closed or
-   refreshed, its progress is sitting in localStorage — pick up exactly where it left off (skipping
-   whatever URLs already have a result) rather than starting over, and rather than losing it. Runs
-   regardless of which page is currently open; the scan itself never touched the DOM directly (see
-   paintVitalsPanel_/paintAuditPanel_ above), so it can keep going headless until the user happens
-   to be looking at Page Insights / SEO Insights again, or finishes on its own. */
-function resumeBackgroundScans_(){
-  try{
-    const v = JSON.parse(localStorage.getItem(VITALS_STATE_KEY) || "null");
-    if(v && Array.isArray(v.urls) && v.urls.length && CONFIG.pagespeedApiKey){
-      VITALS_RESULTS = v.results || []; VITALS_FAILED = v.failed || 0;
-      const doneSet = new Set(VITALS_RESULTS.map(r=>r.url));
-      const remaining = v.urls.filter(u=>!doneSet.has(u));
-      VITALS_TOTAL = v.urls.length; VITALS_DONE = VITALS_TOTAL - remaining.length;
-      if(remaining.length) runVitalsScan_(v.urls, remaining);
-      else localStorage.removeItem(VITALS_STATE_KEY);
-    }
-  }catch(e){ /* corrupt/unreadable saved state — ignore and let the user start a fresh scan */ }
-  try{
-    const a = JSON.parse(localStorage.getItem(AUDIT_STATE_KEY) || "null");
-    if(a && Array.isArray(a.urls) && a.urls.length && CONFIG.requestForm.webAppUrl){
-      AUDIT_RESULTS = a.results || [];
-      const doneSet = new Set(AUDIT_RESULTS.map(r=>r.url));
-      const remaining = a.urls.filter(u=>!doneSet.has(u));
-      AUDIT_TOTAL = a.urls.length; AUDIT_DONE = AUDIT_TOTAL - remaining.length;
-      if(remaining.length) runAuditScan_(a.urls, remaining);
-      else localStorage.removeItem(AUDIT_STATE_KEY);
-    }
-  }catch(e){ /* corrupt/unreadable saved state — ignore and let the user start a fresh scan */ }
 }
 
 async function renderPageInsights(sec){
@@ -4169,7 +3914,6 @@ function init(){
   populateSectionDropdown();
   mountNewsFab();
   loadHomeExtras();
-  resumeBackgroundScans_(); // pick back up any Vitals/Audit scan that was running before this load
   document.getElementById("refreshDataBtn").addEventListener("click", forceRefreshCurrentSection);
   // Gentle background auto-refresh: checks once a minute, but each section's own 5-minute TTL
   // (see getData) decides whether that actually triggers a real re-fetch. Skipped while someone
