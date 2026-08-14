@@ -3356,132 +3356,187 @@ async function updateRequestStatus_({sheetRow, status, threadId, messageId, emai
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
+/* Pulls only genuine PAGE urls — the field(s) each section actually uses as its "Webpage Link" —
+   instead of every URL-shaped string anywhere in the sheet data (brochures, payment links, S3
+   images, etc). That blanket-regex approach was inflating "3000+ pages" with a lot of non-page
+   assets that PageSpeed/the audit relay would just fail on anyway, wasting scan time on links that
+   were never meant to be scanned. Deduplicated and filtered through isValidLink(). */
 async function collectAllDashboardUrls_(){
   const urls = new Set();
-  const urlRegex = /https?:\/\/[^\s",]+/g;
-  const keys = [...NAV_ORDER, "landingPagesChannel"];
-  for(const key of keys){
+  const LINK_FIELDS = {
+    program:["Webpage Link"], landing:["Landing Page Link"], unique:["URLs"], b2b:["B2B Pages Links"],
+    location:["Location Webpage"], blog:["Webpage Link"], university:["Webpage Link"],
+    free:["Webpage Link"], pillar:["Webpage Link"],
+  };
+  for(const key of NAV_ORDER){
     try{
-      const sheetKey = NAV_ORDER.includes(key) ? sheetKeyFor(key) : key;
-      const {data} = await getData(sheetKey);
-      const matches = JSON.stringify(data).match(urlRegex) || [];
-      matches.forEach(m=> urls.add(m.replace(/["')\\]+$/,"")));
+      const {data} = await getData(sheetKeyFor(key));
+      const fields = LINK_FIELDS[key] || ["Webpage Link"];
+      (data||[]).forEach(row => fields.forEach(f => { if(isValidLink(row[f])) urls.add(firstLink(row[f]) || row[f].toString().trim()); }));
     }catch(e){ /* skip this category, keep going */ }
   }
+  try{
+    const {data} = await getData("landingPagesChannel");
+    (data||[]).forEach(row => { if(isValidLink(row["Landing Page Link"])) urls.add(firstLink(row["Landing Page Link"]) || row["Landing Page Link"].toString().trim()); });
+  }catch(e){ /* skip, keep going */ }
   return [...urls];
 }
+/* Small shared retry/backoff wrapper — both scans hit rate-limited third-party APIs (PageSpeed's
+   free-tier quota, the Apps Script relay), and a bare fetch failing once shouldn't permanently drop
+   that page from the results. One retry with a short backoff smooths over most transient hiccups
+   without meaningfully slowing down a scan across thousands of pages. */
+async function fetchWithRetry_(url, tries=2, backoffMs=700){
+  let lastErr;
+  for(let i=0;i<tries;i++){
+    try{
+      const res = await fetch(url);
+      if(res.ok) return res;
+      if(res.status === 429 || res.status >= 500){ lastErr = new Error("HTTP "+res.status); await sleep_(backoffMs*(i+1)); continue; }
+      return res; // a real 4xx (bad url etc) — no point retrying
+    }catch(e){ lastErr = e; await sleep_(backoffMs*(i+1)); }
+  }
+  throw lastErr || new Error("fetch failed");
+}
+function sleep_(ms){ return new Promise(r=>setTimeout(r, ms)); }
 
-/* ---- Core Web Vitals: entirely client-side via PageSpeed Insights, no sheet, no backend ---- */
+/* ---- Core Web Vitals: entirely client-side via PageSpeed Insights, no sheet, no backend.
+   State (RUNNING flag + accumulated results/progress) lives in module-level variables rather than
+   inside the click handler's closure, on purpose: renderPageInsights() can be re-entered at any
+   time (manual nav away/back, a stray re-render) while a scan spanning 3000+ pages is still going,
+   and previously that orphaned the scan's DOM references so results silently stopped appearing —
+   see the "runs for a bit then stops" note above wireVitalsPanel_. With state kept here, the panel
+   can always repaint its current true progress no matter how many times its DOM gets rebuilt. ---- */
 let VITALS_SCAN_RUNNING = false;
-async function runVitalsScan_(urls, onProgress, onRow){
+let VITALS_RESULTS = [];
+let VITALS_DONE = 0, VITALS_FAILED = 0, VITALS_TOTAL = 0;
+async function runVitalsScan_(urls){
   VITALS_SCAN_RUNNING = true;
-  const CONCURRENCY = 6;
-  let idx = 0, done = 0;
+  VITALS_RESULTS = []; VITALS_DONE = 0; VITALS_FAILED = 0; VITALS_TOTAL = urls.length;
+  const CONCURRENCY = 5; // PageSpeed's default quota is tight enough that 6+ started tripping 429s
+  let idx = 0;
   async function worker(){
     while(VITALS_SCAN_RUNNING){
       const i = idx++; if(i >= urls.length) return;
       const url = urls[i];
       try{
         const api = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(url)}&key=${CONFIG.pagespeedApiKey}&strategy=mobile&category=performance`;
-        const res = await fetch(api);
+        const res = await fetchWithRetry_(api);
         const json = await res.json();
         if(res.ok && json.lighthouseResult){
           const perf = json.lighthouseResult.categories.performance.score;
           const audits = json.lighthouseResult.audits || {};
-          onRow({
+          VITALS_RESULTS.push({
             url, score: perf!=null ? Math.round(perf*100) : null,
             lcp: audits["largest-contentful-paint"] ? (audits["largest-contentful-paint"].numericValue/1000) : null,
             cls: audits["cumulative-layout-shift"] ? audits["cumulative-layout-shift"].numericValue : null,
             inp: audits["interaction-to-next-paint"] ? audits["interaction-to-next-paint"].numericValue : null
           });
-        }
-      }catch(e){ /* skip this URL, keep going */ }
-      done++;
-      onProgress(done, urls.length);
+        } else { VITALS_FAILED++; }
+      }catch(e){ VITALS_FAILED++; }
+      VITALS_DONE++;
+      paintVitalsPanel_();
     }
   }
-  await Promise.all(Array.from({length:CONCURRENCY}, worker));
+  await Promise.all(Array.from({length:Math.min(CONCURRENCY, urls.length)}, worker));
   VITALS_SCAN_RUNNING = false;
+  paintVitalsPanel_();
+}
+/* Repaints whatever the Vitals panel currently knows, from the shared state above — safe to call
+   even when the panel isn't on screen (its elements just won't exist, so this is a no-op then). */
+function paintVitalsPanel_(){
+  const btn = document.getElementById("vitalsRunBtn");
+  const body = document.getElementById("vitalsBody");
+  const progress = document.getElementById("vitalsProgress");
+  if(!btn || !body || !progress) return;
+  if(VITALS_SCAN_RUNNING){
+    btn.disabled = true; btn.textContent = "Scanning…";
+    const failNote = VITALS_FAILED ? `, ${VITALS_FAILED} failed/retried` : "";
+    progress.textContent = `Checked ${VITALS_DONE} of ${VITALS_TOTAL} pages${failNote} — this can take a while over ${VITALS_TOTAL} pages; feel free to browse the rest of the dashboard, this keeps running in the background.`;
+  } else if(VITALS_TOTAL){
+    btn.disabled = false; btn.textContent = "Run Vitals Scan Again";
+    const failNote = VITALS_FAILED ? ` (${VITALS_FAILED} pages couldn't be checked — usually rate-limiting; run again to retry just those)` : "";
+    progress.textContent = `Done — checked ${VITALS_TOTAL} pages${failNote}.`;
+  }
+  const rows = VITALS_RESULTS.slice().sort((a,b)=> (a.score??999) - (b.score??999));
+  body.innerHTML = rows.map(r=>`<tr>
+    <td class="cell-muted">${esc(r.url)}</td>
+    <td>${r.score!=null ? r.score : "—"}</td>
+    <td>${r.lcp!=null ? r.lcp.toFixed(1) : "—"}</td>
+    <td>${r.cls!=null ? r.cls.toFixed(3) : "—"}</td>
+    <td>${r.inp!=null ? Math.round(r.inp) : "—"}</td>
+  </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">${VITALS_SCAN_RUNNING ? "Checking your pages…" : "Click \"Run Vitals Scan\" to check your pages live"}</td></tr>`;
 }
 function wireVitalsPanel_(){
+  paintVitalsPanel_(); // in case a scan is already running/finished from before this panel remounted
   const btn = document.getElementById("vitalsRunBtn");
-  if(!btn) return;
+  if(!btn || btn.dataset.wired) return;
+  btn.dataset.wired = "1";
   btn.addEventListener("click", async ()=>{
+    if(VITALS_SCAN_RUNNING) return; // already running — this button is disabled, but belt and suspenders
     if(!CONFIG.pagespeedApiKey){ toast("Add CONFIG.pagespeedApiKey first", true); return; }
-    btn.disabled = true; btn.textContent = "Scanning…";
-    const body = document.getElementById("vitalsBody");
-    const progress = document.getElementById("vitalsProgress");
-    body.innerHTML = "";
-    const rows = [];
-    progress.textContent = "Collecting your page list…";
+    document.getElementById("vitalsProgress").textContent = "Collecting your page list…";
     const urls = await collectAllDashboardUrls_();
-    progress.textContent = `Checking ${urls.length} pages — this can take a while (roughly 20-30s per page); feel free to leave this tab open in the background.`;
-    await runVitalsScan_(urls,
-      (done,total)=>{ progress.textContent = `Checked ${done} of ${total} pages…`; },
-      (row)=>{
-        rows.push(row);
-        rows.sort((a,b)=> (a.score??999) - (b.score??999));
-        body.innerHTML = rows.map(r=>`<tr>
-          <td class="cell-muted">${esc(r.url)}</td>
-          <td>${r.score!=null ? r.score : "—"}</td>
-          <td>${r.lcp!=null ? r.lcp.toFixed(1) : "—"}</td>
-          <td>${r.cls!=null ? r.cls.toFixed(3) : "—"}</td>
-          <td>${r.inp!=null ? Math.round(r.inp) : "—"}</td>
-        </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No results yet</td></tr>`;
-      }
-    );
-    btn.disabled = false; btn.textContent = "Run Vitals Scan Again";
-    progress.textContent = `Done — checked ${urls.length} pages.`;
+    await runVitalsScan_(urls);
   });
 }
 
 /* ---- On-Page Audit: needs a tiny relay for CORS (fetching another site's HTML from a browser
    isn't allowed unless that site opts in) — stateless, no sheet, just "check these 20 URLs". This
-   depends on the same Apps Script web app access fix as the request form. ---- */
-async function runAuditScan_(urls, onProgress, onRows){
+   depends on the same Apps Script web app access fix as the request form. Same module-level-state
+   pattern as Vitals above, for the same reason (survive the panel's DOM being rebuilt mid-scan). ---- */
+let AUDIT_SCAN_RUNNING = false;
+let AUDIT_RESULTS = [];
+let AUDIT_DONE = 0, AUDIT_TOTAL = 0;
+async function runAuditScan_(urls){
+  AUDIT_SCAN_RUNNING = true;
+  AUDIT_RESULTS = []; AUDIT_DONE = 0; AUDIT_TOTAL = urls.length;
   const BATCH = 20;
-  let done = 0;
-  for(let i=0;i<urls.length;i+=BATCH){
+  for(let i=0;i<urls.length && AUDIT_SCAN_RUNNING;i+=BATCH){
     const chunk = urls.slice(i, i+BATCH);
     try{
-      const url = `${CONFIG.requestForm.webAppUrl}?action=auditBatch&urls=${encodeURIComponent(JSON.stringify(chunk))}`;
-      const res = await fetch(url);
+      const apiUrl = `${CONFIG.requestForm.webAppUrl}?action=auditBatch&urls=${encodeURIComponent(JSON.stringify(chunk))}`;
+      const res = await fetchWithRetry_(apiUrl);
       const json = await res.json();
-      if(json.ok) onRows(json.rows);
+      if(json.ok) AUDIT_RESULTS = AUDIT_RESULTS.concat(json.rows);
     }catch(e){ /* skip this chunk, keep going */ }
-    done += chunk.length;
-    onProgress(done, urls.length);
+    AUDIT_DONE += chunk.length;
+    paintAuditPanel_();
   }
+  AUDIT_SCAN_RUNNING = false;
+  paintAuditPanel_();
+}
+function paintAuditPanel_(){
+  const btn = document.getElementById("auditRunBtn");
+  const body = document.getElementById("auditBody");
+  const progress = document.getElementById("auditProgress");
+  if(!btn || !body || !progress) return;
+  if(AUDIT_SCAN_RUNNING){
+    btn.disabled = true; btn.textContent = "Scanning…";
+    progress.textContent = `Checked ${AUDIT_DONE} of ${AUDIT_TOTAL} pages, 20 at a time — feel free to browse the rest of the dashboard, this keeps running in the background.`;
+  } else if(AUDIT_TOTAL){
+    btn.disabled = false; btn.textContent = "Run Audit Scan Again";
+    progress.textContent = `Done — checked ${AUDIT_TOTAL} pages.`;
+  }
+  const rows = AUDIT_RESULTS.slice().sort((a,b)=> (a.flag==="OK"?1:0) - (b.flag==="OK"?1:0));
+  body.innerHTML = rows.map(r=>`<tr>
+    <td class="cell-muted">${esc(r.url)}</td>
+    <td>${esc(String(r.status))}</td>
+    <td>${esc(r.title)} <span class="cell-muted">(${r.titleLength})</span></td>
+    <td>${r.imagesMissingAlt}</td>
+    <td>${r.flag==="OK" ? `<span class="badge open">OK</span>` : `<span class="badge closed">${esc(r.flag)}</span>`}</td>
+  </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">${AUDIT_SCAN_RUNNING ? "Checking your pages…" : "Click \"Run Audit Scan\" to check your pages live"}</td></tr>`;
 }
 function wireAuditPanel_(){
+  paintAuditPanel_(); // in case a scan is already running/finished from before this panel remounted
   const btn = document.getElementById("auditRunBtn");
-  if(!btn) return;
+  if(!btn || btn.dataset.wired) return;
+  btn.dataset.wired = "1";
   btn.addEventListener("click", async ()=>{
+    if(AUDIT_SCAN_RUNNING) return;
     if(!CONFIG.requestForm.webAppUrl){ toast("Add CONFIG.requestForm.webAppUrl first", true); return; }
-    btn.disabled = true; btn.textContent = "Scanning…";
-    const body = document.getElementById("auditBody");
-    const progress = document.getElementById("auditProgress");
-    body.innerHTML = "";
-    let rows = [];
-    progress.textContent = "Collecting your page list…";
+    document.getElementById("auditProgress").textContent = "Collecting your page list…";
     const urls = await collectAllDashboardUrls_();
-    progress.textContent = `Checking ${urls.length} pages, 20 at a time…`;
-    await runAuditScan_(urls,
-      (done,total)=>{ progress.textContent = `Checked ${done} of ${total} pages…`; },
-      (newRows)=>{
-        rows = rows.concat(newRows);
-        rows.sort((a,b)=> (a.flag==="OK"?1:0) - (b.flag==="OK"?1:0));
-        body.innerHTML = rows.map(r=>`<tr>
-          <td class="cell-muted">${esc(r.url)}</td>
-          <td>${esc(String(r.status))}</td>
-          <td>${esc(r.title)} <span class="cell-muted">(${r.titleLength})</span></td>
-          <td>${r.imagesMissingAlt}</td>
-          <td>${r.flag==="OK" ? `<span class="badge open">OK</span>` : `<span class="badge closed">${esc(r.flag)}</span>`}</td>
-        </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">No results yet</td></tr>`;
-      }
-    );
-    btn.disabled = false; btn.textContent = "Run Audit Scan Again";
-    progress.textContent = `Done — checked ${urls.length} pages.`;
+    await runAuditScan_(urls);
   });
 }
 
@@ -3863,8 +3918,14 @@ function init(){
   // Gentle background auto-refresh: checks once a minute, but each section's own 5-minute TTL
   // (see getData) decides whether that actually triggers a real re-fetch. Skipped while someone
   // is actively typing or the request form is open, so it never disrupts what they're doing.
+  // Also skipped entirely while a Core Web Vitals / On-Page Audit scan is running — those scans
+  // can take many minutes over 3000+ pages, and re-running navigate() rebuilds #content from
+  // scratch, orphaning the scan's DOM references (vitalsBody/auditBody) so results silently stop
+  // appearing even though the scan is technically still running in the background. This was the
+  // "runs for a bit then stops" bug: the interval just happened to land mid-scan.
   setInterval(()=>{
     if(document.getElementById("requestOverlay").classList.contains("show")) return;
+    if(VITALS_SCAN_RUNNING || AUDIT_SCAN_RUNNING) return;
     const active = document.activeElement;
     const isTyping = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable);
     if(isTyping) return;
