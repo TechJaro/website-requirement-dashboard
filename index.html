@@ -649,31 +649,36 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .status-legend-item[data-type],
 .status-legend-item[data-status],
 .status-legend-item[data-source],
-.status-legend-item[data-linkcat]{
+.status-legend-item[data-linkcat],
+.status-legend-item[data-maprow]{
   border:1px solid var(--line);border-radius:100px;padding:5px 10px 5px 6px;
   background:var(--canvas);transition:background .15s,border-color .15s,transform .15s;
 }
 .status-legend-item[data-type]:hover,
 .status-legend-item[data-status]:hover,
 .status-legend-item[data-source]:hover,
-.status-legend-item[data-linkcat]:hover{
+.status-legend-item[data-linkcat]:hover,
+.status-legend-item[data-maprow]:hover{
   background:var(--blue-tint-10);border-color:var(--blue);transform:translateY(-1px);
 }
 .status-legend-item[data-type]::after,
 .status-legend-item[data-status]::after,
 .status-legend-item[data-source]::after,
-.status-legend-item[data-linkcat]::after{
+.status-legend-item[data-linkcat]::after,
+.status-legend-item[data-maprow]::after{
   content:"›";margin-left:2px;font-weight:800;color:var(--ink-35);
 }
 .insight-panel .click-hint{font-size:11px;color:var(--ink-35);font-weight:600;margin:-10px 0 12px}
 .status-bar > div[data-type],
 .status-bar > div[data-status],
 .status-bar > div[data-source],
-.status-bar > div[data-linkcat]{outline:2px solid transparent;outline-offset:1px}
+.status-bar > div[data-linkcat],
+.status-bar > div[data-maprow]{outline:2px solid transparent;outline-offset:1px}
 .status-bar > div[data-type]:hover,
 .status-bar > div[data-status]:hover,
 .status-bar > div[data-source]:hover,
-.status-bar > div[data-linkcat]:hover{outline-color:var(--blue)}
+.status-bar > div[data-linkcat]:hover,
+.status-bar > div[data-maprow]:hover{outline-color:var(--blue)}
 .insight-list-item{padding:10px 2px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
 .insight-list-item:last-child{border-bottom:none}
 .insight-list-item .ili-title{font-weight:700;font-size:13px}
@@ -1856,7 +1861,7 @@ async function renderHome(){
         <div id="landingLinkBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
       </div>
       <div class="insight-panel">
-        <h4>URL Mapping Coverage</h4>
+        <h4>Form Mappings Coverage</h4>
         <div class="click-hint">Click any slice to see the list ›</div>
         <div id="urlMappingBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
       </div>
@@ -2169,7 +2174,7 @@ async function loadUrlMappingCoverage_(){
     el.querySelectorAll("[data-maprow]").forEach(node=>{
       node.addEventListener("click", ()=>{
         const key = node.dataset.maprow;
-        openInsightListModal(`URL Mapping Coverage — ${labels[key]}`, lists[key], mapRow);
+        openInsightListModal(`Form Mappings Coverage — ${labels[key]}`, lists[key], mapRow);
       });
     });
   }catch(e){
