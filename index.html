@@ -148,6 +148,7 @@ input,select,textarea{font-family:inherit}
   font-weight:600;font-size:13.5px;letter-spacing:.01em;
   box-shadow:0 10px 24px -8px rgba(246,61,68,.55);
   transition:transform .15s ease, box-shadow .15s ease;
+  margin-top:10px;
 }
 .raise-btn:hover{transform:translateY(-1px);box-shadow:0 14px 30px -8px rgba(246,61,68,.65)}
 .sync-note{margin-top:12px;font-size:11px;color:rgba(255,255,255,.35);text-align:center;line-height:1.5}
@@ -764,11 +765,16 @@ body.auth-locked #app{display:none}
 /* Secondary sidebar actions (View as Support / Log Out) sit side by side as a compact, lower-key
    row underneath the primary Raise a Request CTA, instead of stacking as separate full-width bars
    that all look equally important. */
-.sidebar-foot-row{display:flex;gap:8px;margin-top:8px}
+.sidebar-foot-row{display:flex;gap:8px;margin-top:10px}
 .sidebar-foot-row .sidebar-foot-btn{margin-top:0;padding:8px 6px;font-size:11.5px;flex:1;min-width:0}
 .sidebar-foot-row .sidebar-foot-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .user-pill{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:10px;background:var(--canvas);
   font-size:12px;color:var(--ink-70);margin-bottom:8px}
+/* Inside the sidebar-foot-row, the Admin pill should read as the same kind of control as Log Out —
+   same white card, border and weight — rather than the duller --canvas fill it uses elsewhere. */
+.sidebar-foot-row .user-pill.sidebar-foot-btn{
+  background:#fff;border:1px solid var(--line);color:var(--ink-70);font-weight:700;margin-bottom:0;
+}
 .user-pill .role-tag{margin-left:auto;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;
   padding:2px 7px;border-radius:20px;background:var(--blue-tint-10);color:var(--blue)}
 </style>
@@ -3571,9 +3577,9 @@ async function submitRequestDirect_(payload){
    sheet row itself and replies in-thread via GmailApp (far more reliable than hand-building
    In-Reply-To/References headers client-side), with a status email styled to match the original
    "New Request Raised" template instead of the old plain one-liner. ---- */
-async function updateRequestStatus_({sheetRow, status}){
+async function updateRequestStatus_({sheetRow, status, note}){
   if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
-  await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status });
+  await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, note: note || "" });
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
@@ -4281,6 +4287,88 @@ function requestStatusSelectHtml_(row){
     ${REQUEST_STATUS_OPTIONS.map(s=>`<option value="${s}" ${s===current?"selected":""}>${s}</option>`).join("")}
   </select>`;
 }
+/* Marking a status now pauses on a small popup (same .modal-overlay/.modal shell used elsewhere)
+   instead of firing the notification email the instant the dropdown changes — this lets the Admin
+   optionally add a note ("waiting on legal review", "pushed live, please verify") that gets folded
+   into the status-update email instead of it being a bare "Status: Completed" line with nothing
+   else. Cancelling reverts the dropdown to its previous value rather than leaving it changed with
+   no email sent. */
+function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email}){
+  let overlay = document.getElementById("statusNoteOverlay");
+  if(!overlay){
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal-overlay" id="statusNoteOverlay">
+        <div class="modal" style="max-width:480px">
+          <div class="modal-watermark"></div>
+          <div class="modal-head">
+            <div class="ic">${ic("link")}</div>
+            <div>
+              <h3 id="statusNoteTitle">Update Status</h3>
+              <p id="statusNoteSubtitle">This will email everyone on the original request thread</p>
+            </div>
+            <button class="modal-close" id="statusNoteClose" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" style="display:grid;gap:14px">
+            <div class="field">
+              <label>Message to include (optional)</label>
+              <textarea id="statusNoteText" placeholder="Add any details you want included in this update email…" style="min-height:110px"></textarea>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button type="button" class="btn" id="statusNoteCancel">Cancel</button>
+            <button type="button" class="btn primary" id="statusNoteConfirm">Send Update</button>
+          </div>
+        </div>
+      </div>`);
+    overlay = document.getElementById("statusNoteOverlay");
+  }
+  document.getElementById("statusNoteTitle").textContent = `Mark as "${newStatus}"`;
+  document.getElementById("statusNoteSubtitle").textContent = email
+    ? `This will email ${email} and everyone else on the original request thread`
+    : "This will email everyone on the original request thread";
+  const textEl = document.getElementById("statusNoteText");
+  textEl.value = "";
+  overlay.classList.add("show");
+  setTimeout(()=>textEl.focus(), 30);
+
+  const cancelBtn = document.getElementById("statusNoteCancel");
+  const closeBtn = document.getElementById("statusNoteClose");
+  const confirmBtn = document.getElementById("statusNoteConfirm");
+
+  const cleanup = ()=>{
+    overlay.removeEventListener("click", onOverlayClick);
+    cancelBtn.removeEventListener("click", revert);
+    closeBtn.removeEventListener("click", revert);
+    confirmBtn.removeEventListener("click", onConfirm);
+  };
+  const revert = ()=>{ sel.value = prevValue; overlay.classList.remove("show"); cleanup(); };
+  const onOverlayClick = (e)=>{ if(e.target.id === "statusNoteOverlay") revert(); };
+  const onConfirm = async ()=>{
+    const note = textEl.value.trim();
+    confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
+    sel.disabled = true;
+    try{
+      await updateRequestStatus_({ sheetRow, status: newStatus, note });
+      const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
+      sel.style.background = c.bg; sel.style.color = c.fg;
+      toast(email ? `Status updated — ${email} and thread notified by email` : "Status updated");
+      overlay.classList.remove("show");
+      cleanup();
+    }catch(err){
+      toast(err.message || "Couldn't update status", true);
+      sel.value = prevValue;
+    }finally{
+      sel.disabled = false;
+      confirmBtn.disabled = false; confirmBtn.textContent = "Send Update";
+    }
+  };
+  overlay.addEventListener("click", onOverlayClick);
+  cancelBtn.addEventListener("click", revert);
+  closeBtn.addEventListener("click", revert);
+  confirmBtn.addEventListener("click", onConfirm);
+}
 /* ---- Reads the Requirements Log via the Apps Script backend (same login-session token used for
    submitting/updating requests) instead of a separate client-side Google OAuth grant. That older
    OAuth-based reader is what kept popping the "Choose an account" consent screen even after
@@ -4337,21 +4425,10 @@ async function renderRequirementsTable(sec){
       </div>`;
     document.getElementById("resultCount").textContent = `${items.length} requests`;
     listWrap.querySelectorAll(".req-status-select").forEach(sel=>{
-      sel.addEventListener("change", async ()=>{
-        const newStatus = sel.value;
-        const prevColor = sel.style.background;
-        sel.disabled = true;
-        try{
-          await updateRequestStatus_({ sheetRow: +sel.dataset.row, status: newStatus });
-          const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
-          sel.style.background = c.bg; sel.style.color = c.fg;
-          toast(sel.dataset.email ? `Status updated — ${sel.dataset.email} notified by email` : "Status updated");
-        }catch(err){
-          toast(err.message || "Couldn't update status", true);
-          sel.style.background = prevColor;
-        }finally{
-          sel.disabled = false;
-        }
+      let prevValue = sel.value;
+      sel.addEventListener("mousedown", ()=>{ prevValue = sel.value; });
+      sel.addEventListener("change", ()=>{
+        openStatusNoteModal_({ sel, newStatus: sel.value, prevValue, sheetRow: +sel.dataset.row, email: sel.dataset.email });
       });
     });
   }
