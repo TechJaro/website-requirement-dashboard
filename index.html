@@ -4488,7 +4488,7 @@ function authApiCall_(action, data){
       settled = true;
       cleanup();
       reject(new Error("The login service didn't respond — check your connection and try again"));
-    }, 20000);
+    }, 30000); // 20s was occasionally too tight for a slower Apps Script execution/cold start
 
     script.src = url;
     document.head.appendChild(script);
