@@ -4360,21 +4360,61 @@ function isAdmin_(){ return getCurrentUserRole_() === "Admin"; }
 /* Every call is a POST with a plain-text body (no custom Content-Type header) on purpose — that's
    what keeps the browser from sending a CORS preflight OPTIONS request, which Apps Script Web
    Apps can't answer. Apps Script reads the raw body itself (e.postData.contents) and parses it. */
-async function authApiCall_(action, data){
-  if(!CONFIG.authApiUrl) throw new Error("CONFIG.authApiUrl isn't set yet");
-  // credentials:"include" so the browser sends the user's existing jaro.in Google
-  // session cookies — required because the Apps Script Web App is deployed at a
-  // domain-restricted URL (Anyone within Jaro Institute...), which gates every
-  // request on Google-session auth before it ever reaches doPost().
-  const res = await fetch(CONFIG.authApiUrl, {
-    method:"POST",
-    credentials:"include",
-    body: JSON.stringify(Object.assign({ action }, data||{}))
+// authApiCall_ talks to the Apps Script Web App via a hidden <iframe> + real <form> POST instead
+// of fetch(). The Web App is deployed at a domain-restricted URL (Anyone within Jaro Institute...),
+// which is the correct setting since every dashboard user is a jaro.in Workspace account — but it
+// means every request is gated on the caller's Google session cookie before Apps Script ever runs.
+// A cross-origin fetch() (even with credentials:"include") can't carry that cookie through Google's
+// auth redirect and reliably ends in "TypeError: Failed to fetch". A form POST is a real browser
+// navigation, so it isn't subject to CORS and follows that redirect exactly like a normal page load.
+// The Apps Script side (doPost) detects the form submission and replies with a tiny HTML page that
+// posts the JSON result back to this window via postMessage, tagged with a reqId so concurrent
+// calls don't cross wires.
+function authApiCall_(action, data){
+  return new Promise((resolve, reject)=>{
+    if(!CONFIG.authApiUrl){ reject(new Error("CONFIG.authApiUrl isn't set yet")); return; }
+    const reqId = "req_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+    const iframe = document.createElement("iframe");
+    const frameName = "authFrame_" + reqId;
+    iframe.name = frameName;
+    iframe.style.display = "none";
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = CONFIG.authApiUrl;
+    form.target = frameName;
+    form.style.display = "none";
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "payload";
+    input.value = JSON.stringify(Object.assign({ action, reqId }, data||{}));
+    form.appendChild(input);
+
+    let settled = false;
+    const cleanup = ()=>{
+      window.removeEventListener("message", onMessage);
+      clearTimeout(timer);
+      form.remove();
+      setTimeout(()=> iframe.remove(), 3000);
+    };
+    const onMessage = (ev)=>{
+      if(settled || !ev.data || ev.data.reqId !== reqId) return;
+      settled = true;
+      cleanup();
+      if(ev.data.ok) resolve(ev.data);
+      else reject(new Error(ev.data.error || "Something went wrong — try again"));
+    };
+    const timer = setTimeout(()=>{
+      if(settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("The login service didn't respond — check your connection and try again"));
+    }, 20000);
+
+    window.addEventListener("message", onMessage);
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    form.submit();
   });
-  let json;
-  try{ json = await res.json(); }catch(e){ throw new Error("Unexpected response from the login service"); }
-  if(!json || !json.ok) throw new Error((json && json.error) || "Something went wrong — try again");
-  return json;
 }
 
 /* ---- Screens ---- */
