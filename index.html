@@ -3040,10 +3040,17 @@ const CONTACTS = [
    `locked` (used for "Send To") hides the input/suggest entirely and drops the remove button on
    each chip — the list is fully computed from the Related Section (see updateSendToForSection_
    above) and isn't meant to be hand-edited; CC stays a normal, fully-editable picker. ---- */
-function createChipPicker(prefix, defaultEmails, locked){
-  const chipsEl = document.getElementById(`rf_${prefix}_chips`);
-  const inputEl = document.getElementById(`rf_${prefix}_input`);
-  const suggestEl = document.getElementById(`rf_${prefix}_suggest`);
+// ids can be a plain string (the original "to"/"cc" request-form prefix — kept working exactly as
+// before, resolving to rf_<prefix>_chips/input/suggest/picker) or an explicit {chips,input,
+// suggest,picker} id object, so this same picker can be reused anywhere on the page (e.g. the
+// status-update modal's own To/Cc fields) without colliding with the request form's ids.
+function createChipPicker(ids, defaultEmails, locked){
+  const idSet = (typeof ids === "string")
+    ? { chips:`rf_${ids}_chips`, input:`rf_${ids}_input`, suggest:`rf_${ids}_suggest`, picker:`rf_${ids}_picker` }
+    : ids;
+  const chipsEl = document.getElementById(idSet.chips);
+  const inputEl = document.getElementById(idSet.input);
+  const suggestEl = document.getElementById(idSet.suggest);
   let selected = []; // {name, email}
   if(locked){ inputEl.style.display = "none"; suggestEl.style.display = "none"; }
 
@@ -3096,7 +3103,7 @@ function createChipPicker(prefix, defaultEmails, locked){
     }
   });
   document.addEventListener("click", (e)=>{
-    if(!e.target.closest(`#rf_${prefix}_picker`)) hideSuggest();
+    if(!e.target.closest(`#${idSet.picker}`)) hideSuggest();
   });
   if(defaultEmails && defaultEmails.length){
     defaultEmails.forEach(email=>{
@@ -3586,19 +3593,22 @@ async function submitRequestDirect_(payload){
    sheet row itself and replies in-thread via GmailApp (far more reliable than hand-building
    In-Reply-To/References headers client-side), with a status email styled to match the original
    "New Request Raised" template instead of the old plain one-liner. ---- */
-async function updateRequestStatus_({sheetRow, status, noteHtml, noteText}){
+async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, cc}){
   if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
   // noteHtml carries formatting/links/pasted screenshots from the status modal's rich text editor;
   // noteText is the plain-text fallback Code.gs uses if noteHtml is empty (e.g. a fresh <br>-only div).
+  // to/cc are whatever the Admin picked in the status modal's own Send To/CC fields — editable per
+  // update, independent of who was on the original request (Code.gs falls back to the original
+  // To/Cc if these come through empty for some reason).
   // Same URL-length safeguard as submitRequestDirect_ — this call still rides the JSONP GET
   // transport, so a big pasted screenshot in the note can blow past the practical URL length limit.
   noteHtml = noteHtml || "";
-  const probeLen = encodeURIComponent(JSON.stringify({ action:"updateStatus", token:AUTH_SESSION.token, sheetRow, status, noteHtml, noteText })).length;
+  const probeLen = encodeURIComponent(JSON.stringify({ action:"updateStatus", token:AUTH_SESSION.token, sheetRow, status, noteHtml, noteText, to, cc })).length;
   if(probeLen > 6000 && /<img/i.test(noteHtml)){
     noteHtml = noteHtml.replace(/<img[^>]*>/gi,
       "[a pasted screenshot was too large to send and was left out — please attach it separately if needed]");
   }
-  await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml, noteText: noteText || "" });
+  await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml, noteText: noteText || "", to: to || [], cc: cc || [] });
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
@@ -4302,7 +4312,8 @@ function requestStatusSelectHtml_(row){
   const c = REQUEST_STATUS_COLORS[current] || REQUEST_STATUS_COLORS["Not Started"];
   return `<select class="req-status-select" style="background:${c.bg};color:${c.fg};border:none;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer"
       data-row="${row._sheetRow}" data-threadid="${esc(row["Gmail Thread ID"]||"")}" data-msgid="${esc(row["Gmail Message ID"]||"")}"
-      data-email="${esc(row["Email"]||"")}" data-subject="${esc(row["Subject"]||"")}">
+      data-email="${esc(row["Email"]||"")}" data-subject="${esc(row["Subject"]||"")}"
+      data-to="${esc(row["To"]||"")}" data-cc="${esc(row["Cc"]||"")}">
     ${REQUEST_STATUS_OPTIONS.map(s=>`<option value="${s}" ${s===current?"selected":""}>${s}</option>`).join("")}
   </select>`;
 }
@@ -4312,7 +4323,8 @@ function requestStatusSelectHtml_(row){
    into the status-update email instead of it being a bare "Status: Completed" line with nothing
    else. Cancelling reverts the dropdown to its previous value rather than leaving it changed with
    no email sent. */
-function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email}){
+let statusNoteToPicker, statusNoteCcPicker;
+function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, cc}){
   let overlay = document.getElementById("statusNoteOverlay");
   if(!overlay){
     document.body.insertAdjacentHTML("beforeend", `
@@ -4330,6 +4342,22 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email}){
             </button>
           </div>
           <div class="modal-body" style="display:grid;gap:14px">
+            <div class="field">
+              <label>Send To</label>
+              <div class="chip-picker" id="statusNoteTo_picker" style="background:var(--canvas)">
+                <div class="chip-list" id="statusNoteTo_chips"></div>
+                <input type="text" id="statusNoteTo_input" placeholder="Type a name/email or pick below…" autocomplete="off">
+                <div class="chip-suggest" id="statusNoteTo_suggest"></div>
+              </div>
+            </div>
+            <div class="field">
+              <label>CC (optional)</label>
+              <div class="chip-picker" id="statusNoteCc_picker">
+                <div class="chip-list" id="statusNoteCc_chips"></div>
+                <input type="text" id="statusNoteCc_input" placeholder="Type a name/email or pick below…" autocomplete="off">
+                <div class="chip-suggest" id="statusNoteCc_suggest"></div>
+              </div>
+            </div>
             <div class="field">
               <label>Message to include (optional)</label>
               <div class="rte-toolbar" id="statusNoteToolbar">
@@ -4354,11 +4382,22 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email}){
       bodyId:"statusNoteText", scopeEl:document.getElementById("statusNoteToolbar"),
       linkBtnId:"statusNoteLinkBtn", imageBtnId:"statusNoteImageBtn", imageInputId:"statusNoteImageInput"
     });
+    statusNoteToPicker = createChipPicker(
+      { chips:"statusNoteTo_chips", input:"statusNoteTo_input", suggest:"statusNoteTo_suggest", picker:"statusNoteTo_picker" }, [], false
+    );
+    statusNoteCcPicker = createChipPicker(
+      { chips:"statusNoteCc_chips", input:"statusNoteCc_input", suggest:"statusNoteCc_suggest", picker:"statusNoteCc_picker" }, [], false
+    );
   }
   document.getElementById("statusNoteTitle").textContent = `Mark as "${newStatus}"`;
   document.getElementById("statusNoteSubtitle").textContent = email
-    ? `This will email ${email} and everyone else on the original request thread`
-    : "This will email everyone on the original request thread";
+    ? `This will email ${email} and everyone else on the original request thread — edit below if needed`
+    : "This will email everyone on the original request thread — edit below if needed";
+  // Pre-filled with whoever was on the original request's To/Cc, since that's the thread this
+  // update is going into — but freely editable, so the Admin can add or drop recipients for this
+  // particular update without that changing who's on the underlying request thread.
+  statusNoteToPicker.reset(to && to.length ? to : (email ? [email] : []));
+  statusNoteCcPicker.reset(cc || []);
   const textEl = document.getElementById("statusNoteText");
   textEl.innerHTML = "";
   overlay.classList.add("show");
@@ -4379,10 +4418,13 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email}){
   const onConfirm = async ()=>{
     const noteHtml = textEl.innerHTML.trim();
     const noteText = textEl.innerText.trim();
+    const toEmails = statusNoteToPicker.get().map(c=>c.email);
+    const ccEmails = statusNoteCcPicker.get().map(c=>c.email);
+    if(!toEmails.length){ toast("Add at least one recipient in 'Send To'", true); return; }
     confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
     sel.disabled = true;
     try{
-      await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText });
+      await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails });
       const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
       sel.style.background = c.bg; sel.style.color = c.fg;
       toast(email ? `Status updated — ${email} and thread notified by email` : "Status updated");
@@ -4460,7 +4502,11 @@ async function renderRequirementsTable(sec){
       let prevValue = sel.value;
       sel.addEventListener("mousedown", ()=>{ prevValue = sel.value; });
       sel.addEventListener("change", ()=>{
-        openStatusNoteModal_({ sel, newStatus: sel.value, prevValue, sheetRow: +sel.dataset.row, email: sel.dataset.email });
+        openStatusNoteModal_({
+          sel, newStatus: sel.value, prevValue, sheetRow: +sel.dataset.row, email: sel.dataset.email,
+          to: (sel.dataset.to||"").split(",").map(s=>s.trim()).filter(Boolean),
+          cc: (sel.dataset.cc||"").split(",").map(s=>s.trim()).filter(Boolean)
+        });
       });
     });
   }
@@ -4578,21 +4624,27 @@ function toggleViewAsSupport_(){
 // time — e.g. the domain-restricted deployment's cookie/redirect check occasionally serves a
 // non-script response to the very first request in a while, which the browser can't execute as
 // JS, immediately firing onerror even though the server-side call may well have gone through
-// (this is why the OTP email sometimes still arrives even when the page shows an error). A short
-// pause and one retry clears the large majority of these without the person having to notice
-// anything went wrong the first time, let alone manually retry themselves. Skips the extra round
-// trip entirely once it works, so a call that succeeds on the first try is exactly as fast as
-// before.
-function authApiCall_(action, data, _attempt){
-  const attempt = _attempt || 1;
-  return authApiCallOnce_(action, data).catch(err=>{
-    if(attempt < 2){
-      return new Promise(resolve=>setTimeout(resolve, 500)).then(()=> authApiCall_(action, data, attempt + 1));
+// (this is why the OTP email sometimes still arrives even when the page shows an error).
+//
+// IMPORTANT: because the server-side call can genuinely have already succeeded even when the
+// browser sees a failure, a retry must NOT just re-run the same action blind — for submitRequest/
+// updateStatus that would send a second real email (this happened: the very first version of this
+// retry caused duplicate "Request Status Updated" emails). Every call carries an idemKey that
+// stays IDENTICAL across a call and its retry (Code.gs's dispatch_ caches the first execution's
+// result under that key for a few minutes and just replays it on a repeat) — so a retry is always
+// safe, whether the first attempt actually ran or not.
+function authApiCall_(action, data, _ctx){
+  const ctx = _ctx || { attempt: 1, idemKey: "idem_" + Date.now() + "_" + Math.random().toString(36).slice(2) };
+  const payload = Object.assign({ idemKey: ctx.idemKey }, data || {});
+  return authApiCallOnce_(action, payload, ctx.attempt).catch(err=>{
+    if(ctx.attempt < 2){
+      return new Promise(resolve=>setTimeout(resolve, 500)).then(()=> authApiCall_(action, data, { attempt: ctx.attempt + 1, idemKey: ctx.idemKey }));
     }
     throw err;
   });
 }
-function authApiCallOnce_(action, data){
+function authApiCallOnce_(action, data, attempt){
+  attempt = attempt || 1;
   return new Promise((resolve, reject)=>{
     if(!CONFIG.authApiUrl){ reject(new Error("CONFIG.authApiUrl isn't set yet")); return; }
     const reqId = "req_" + Date.now() + "_" + Math.random().toString(36).slice(2);
