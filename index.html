@@ -758,25 +758,36 @@ body.auth-locked #app{display:none}
 .auth-note{font-size:12px;color:var(--ink-50);margin-top:16px;text-align:center}
 .auth-note a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:none}
 .auth-note a:hover{text-decoration:underline}
-.logout-btn{display:flex;align-items:center;gap:8px;justify-content:center;width:100%;padding:10px;
-  border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink-70);font-size:12.5px;
-  font-weight:700;cursor:pointer;margin-top:8px}
-.logout-btn:hover{background:var(--canvas);color:var(--red)}
-/* Secondary sidebar actions (View as Support / Log Out) sit side by side as a compact, lower-key
-   row underneath the primary Raise a Request CTA, instead of stacking as separate full-width bars
+/* Redesigned as translucent "glass" chips matching the dark sidebar itself (same family as
+   .navitem's rgba(255,255,255,.06) hover fill) instead of the previous solid white cards, which
+   sat as stark, off-theme boxes against the dark gradient background. Each control gets its own
+   hover accent so the two actions read as distinct rather than identical grey buttons. */
+.logout-btn{display:flex;align-items:center;gap:8px;justify-content:center;width:100%;padding:10px 12px;
+  border-radius:11px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);
+  color:rgba(255,255,255,.85);font-size:12.5px;font-weight:700;cursor:pointer;margin-top:8px;
+  transition:background .15s ease,border-color .15s ease,color .15s ease,transform .15s ease}
+.logout-btn svg{opacity:.9;flex-shrink:0}
+.logout-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.26);color:#fff;transform:translateY(-1px)}
+#viewAsToggleBtn:hover{background:rgba(255,207,36,.16);border-color:rgba(255,207,36,.45);color:var(--yellow)}
+#logoutBtn:hover{background:rgba(246,61,68,.16);border-color:rgba(246,61,68,.42);color:#fff}
+/* Secondary sidebar actions (Admin pill / Log Out) sit side by side as a compact, lower-key row
+   underneath the primary Raise a Request CTA, instead of stacking as separate full-width bars
    that all look equally important. */
 .sidebar-foot-row{display:flex;gap:8px;margin-top:10px}
 .sidebar-foot-row .sidebar-foot-btn{margin-top:0;padding:8px 6px;font-size:11.5px;flex:1;min-width:0}
 .sidebar-foot-row .sidebar-foot-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.user-pill{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:10px;background:var(--canvas);
-  font-size:12px;color:var(--ink-70);margin-bottom:8px}
-/* Inside the sidebar-foot-row, the Admin pill should read as the same kind of control as Log Out —
-   same white card, border and weight — rather than the duller --canvas fill it uses elsewhere. */
-.sidebar-foot-row .user-pill.sidebar-foot-btn{
-  background:#fff;border:1px solid var(--line);color:var(--ink-70);font-weight:700;margin-bottom:0;
-}
+.user-pill{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:11px;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.14);
+  font-size:12px;color:rgba(255,255,255,.85);font-weight:700;margin-bottom:8px}
+/* A small filled badge for the identity icon reads as an avatar rather than a bare stroked glyph
+   — reuses the same yellow accent the active-nav indicator and brand mark already use, so it
+   feels like part of the existing system rather than a new color introduced just for this. */
+.user-pill .ic-badge{width:22px;height:22px;border-radius:7px;background:var(--yellow);color:var(--black);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.user-pill .ic-badge svg{width:12px;height:12px}
+.sidebar-foot-row .user-pill.sidebar-foot-btn{margin-bottom:0}
 .user-pill .role-tag{margin-left:auto;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;
-  padding:2px 7px;border-radius:20px;background:var(--blue-tint-10);color:var(--blue)}
+  padding:2px 7px;border-radius:20px;background:rgba(255,207,36,.18);color:var(--yellow)}
 </style>
 </head>
 <body class="auth-locked">
@@ -822,6 +833,10 @@ body.auth-locked #app{display:none}
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/></svg>
         <span>Core Web Vitals</span>
       </div>
+      <div class="navitem" data-nav="onPageAudit">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>On-Page Audit</span>
+      </div>
       <div class="nav-group-label" id="adminGroupLabel" style="display:none">Admin</div>
       <div class="navitem" data-nav="users" id="usersNavItem" style="display:none">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -839,7 +854,7 @@ body.auth-locked #app{display:none}
       </button>
       <div class="sidebar-foot-row">
         <div class="user-pill sidebar-foot-btn" id="userPill" style="display:none">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+          <span class="ic-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></span>
           <span id="userPillEmail"></span>
           <span class="role-tag" id="userPillRole" style="display:none"></span>
         </div>
@@ -1137,7 +1152,8 @@ const SECTIONS = {
   requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" },
   pageInsights: { key:"pageInsights", label:"Page Insights", desc:"Traffic & engagement per page, live from Google Analytics (last 28 days)", icon:"bolt", type:"page-insights" },
   seoInsights: { key:"seoInsights", label:"SEO Insights", desc:"Clicks, impressions & search ranking per page, live from Google Search Console (last 28 days)", icon:"search", type:"seo-insights" },
-  coreWebVitals: { key:"coreWebVitals", label:"Core Web Vitals", desc:"LCP, CLS & INP per page, checked live from PageSpeed Insights on demand", icon:"bolt", type:"core-web-vitals" }
+  coreWebVitals: { key:"coreWebVitals", label:"Core Web Vitals", desc:"LCP, CLS & INP per page, checked live from PageSpeed Insights on demand", icon:"bolt", type:"core-web-vitals" },
+  onPageAudit: { key:"onPageAudit", label:"On-Page Audit", desc:"Title/meta/alt-text/broken-link scan of every page, checked live on demand", icon:"search", type:"on-page-audit" }
 };
 const NAV_ORDER = ["program","landing","unique","b2b","location","blog","university","free","pillar"];
 
@@ -3006,6 +3022,7 @@ async function navigate(route){
   else if(sec.type === "page-insights") await renderPageInsights(sec);
   else if(sec.type === "seo-insights") await renderSeoInsights(sec);
   else if(sec.type === "core-web-vitals") await renderCoreWebVitals(sec);
+  else if(sec.type === "on-page-audit") await renderOnPageAudit(sec);
 }
 
 /* ================================================================================================
@@ -4147,8 +4164,16 @@ async function renderSeoInsights(sec){
   }
   draw("");
   document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
-  el.insertAdjacentHTML("beforeend", `
-    <div class="section-head" style="margin-top:26px">
+}
+/* On-Page Audit used to be bolted onto the bottom of SEO Insights — split into its own nav item,
+   following the same pattern Core Web Vitals already uses for being split out of Page Insights. */
+async function renderOnPageAudit(sec){
+  const el = document.getElementById("content");
+  document.getElementById("globalSearchWrap").style.display = "none";
+  document.getElementById("refreshDataBtn").style.display = "none";
+  el.innerHTML = `
+    <div class="toolbar-only"><span class="pill" id="livePill" style="display:none">${ic("bolt")} Live from Google Sheets</span></div>
+    <div class="section-head" style="margin-top:6px">
       <div><h2>On-Page Audit</h2><div class="meta">Checked live, on demand — title/meta/alt-text/broken-link scan of every page</div></div>
       <button class="btn" id="auditRunBtn">${ic("search")} Run Audit Scan</button>
     </div>
@@ -4157,7 +4182,7 @@ async function renderSeoInsights(sec){
       <thead><tr><th>Page</th><th>HTTP Status</th><th>Title</th><th>Images Missing Alt</th><th>Flag</th></tr></thead>
       <tbody id="auditBody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">Click "Run Audit Scan" to check your pages live</td></tr></tbody>
     </table></div>
-  `);
+  `;
   wireAuditPanel_();
 }
 
@@ -4588,21 +4613,32 @@ function clearAuthSession_(){
   try{ localStorage.removeItem(AUTH_SESSION_KEY); }catch(e){}
 }
 function getCurrentUserEmail_(){ return AUTH_SESSION ? AUTH_SESSION.email : ""; }
-// VIEW_AS_SUPPORT lets an Admin flip their own panel into the Support-limited view without logging
-// out and back in as someone else — useful for checking exactly what a Support teammate sees. It's
-// purely a front-end display toggle (resets on reload); every backend call still uses the real
-// session token, so Apps Script still enforces the real Admin/Support permission on its end
-// regardless of which view is showing here.
-let VIEW_AS_SUPPORT = false;
 function isRealAdmin_(){ return !!AUTH_SESSION && AUTH_SESSION.role === "Admin"; }
+// True regardless of any "view as" preview below — this is who's actually logged in.
+function isSuperAdminReal_(){ return isRealAdmin_() && !!AUTH_SESSION.isSuperAdmin; }
+// VIEW_OVERRIDE lets an Admin flip their own panel into a lower-privilege view without logging
+// out and back in as someone else — useful for checking exactly what a teammate sees. It's purely
+// a front-end display toggle (resets on reload); every backend call still uses the real session
+// token, so Apps Script still enforces the real permission on its end regardless of which view is
+// showing here. A regular Admin gets the original two states (their own view, or Support); the
+// Super Admin gets a third (their own view, Admin, or Support).
+let VIEW_OVERRIDE = null; // null | "Admin" | "Support"
 function getCurrentUserRole_(){
   if(!AUTH_SESSION) return "";
-  if(AUTH_SESSION.role === "Admin" && VIEW_AS_SUPPORT) return "Support";
+  if(AUTH_SESSION.role === "Admin" && VIEW_OVERRIDE) return VIEW_OVERRIDE;
   return AUTH_SESSION.role;
 }
 function isAdmin_(){ return getCurrentUserRole_() === "Admin"; }
-function toggleViewAsSupport_(){
-  VIEW_AS_SUPPORT = !VIEW_AS_SUPPORT;
+// The Super-Admin-only controls (Regenerate Password, change role, add-user role picker) should
+// disappear the moment a Super Admin previews a lower view — this is the "am I currently showing
+// as Super Admin" check those controls gate on, distinct from isSuperAdminReal_ above.
+function isSuperAdminView_(){ return isSuperAdminReal_() && !VIEW_OVERRIDE; }
+function cycleViewMode_(){
+  if(isSuperAdminReal_()){
+    VIEW_OVERRIDE = VIEW_OVERRIDE === null ? "Admin" : (VIEW_OVERRIDE === "Admin" ? "Support" : null);
+  } else {
+    VIEW_OVERRIDE = VIEW_OVERRIDE === "Support" ? null : "Support";
+  }
   applyRoleGating_();
   navigate("home");
 }
@@ -4810,7 +4846,7 @@ function drawAuthOtp_(email, purpose){
     try{
       const r = await authApiCall_("verifyOtp", { email, otp, purpose });
       if(purpose === "login"){
-        saveAuthSession_({ token:r.token, email:r.email, role:r.role, name:r.name, expiresAt: Date.now() + SESSION_TTL_MS });
+        saveAuthSession_({ token:r.token, email:r.email, role:r.role, name:r.name, isSuperAdmin: !!r.isSuperAdmin, expiresAt: Date.now() + SESSION_TTL_MS });
         completeLogin_();
       } else { // purpose === "setup" — proceed to choosing a password
         drawAuthSetupPassword_(email, r.setupToken);
@@ -4860,7 +4896,7 @@ function drawAuthSetupPassword_(email, setupToken){
     const btn = document.getElementById("authSetPwBtn"); btn.disabled = true; btn.textContent = "Saving…";
     try{
       const r = await authApiCall_("setPassword", { email, setupToken, newPassword: pw });
-      saveAuthSession_({ token:r.token, email:r.email, role:r.role, name:r.name, expiresAt: Date.now() + SESSION_TTL_MS });
+      saveAuthSession_({ token:r.token, email:r.email, role:r.role, name:r.name, isSuperAdmin: !!r.isSuperAdmin, expiresAt: Date.now() + SESSION_TTL_MS });
       completeLogin_();
     }catch(e){ showAuthError_(e.message); btn.disabled = false; btn.textContent = "Set Password & Log In"; }
   };
@@ -4888,25 +4924,32 @@ function logout_(){
 /* ---- Role gating: Support only sees the Web Page category sections + Home (Live Insights
    hidden there too); everything else (Requirements Log, Page/SEO Insights, Core Web Vitals, and
    the Users admin page) is Admin-only. ---- */
-const SUPPORT_HIDDEN_NAV = ["requirements","pageInsights","seoInsights","coreWebVitals"];
+const SUPPORT_HIDDEN_NAV = ["requirements","pageInsights","seoInsights","coreWebVitals","onPageAudit"];
 function applyRoleGating_(){
   const role = getCurrentUserRole_();
   document.getElementById("userPill").style.display = "flex";
   // Shows the role, not the raw email — the full address is still there as a hover tooltip for
   // anyone who needs to confirm exactly who's logged in, without cluttering the sidebar with it.
   const pillEmailEl = document.getElementById("userPillEmail");
-  pillEmailEl.textContent = role || "—";
+  pillEmailEl.textContent = isSuperAdminView_() ? "Super Admin" : (role || "—");
   pillEmailEl.title = getCurrentUserEmail_();
   document.getElementById("userPillRole").style.display = "none";
   const admin = role === "Admin";
-  // Only a REAL Admin ever sees the toggle — it lets them preview the Support-limited panel
-  // without logging out, and switch back the same way. Short labels on purpose — this sits in a
-  // half-width slot next to Log Out and truncates badly with anything longer.
+  // Only a REAL Admin ever sees the toggle — it lets them preview a lower-privilege panel without
+  // logging out, and cycle back the same way. Short labels on purpose — this sits in a half-width
+  // slot next to Log Out and truncates badly with anything longer. Label always shows the view
+  // clicking will switch INTO next, same convention as the original two-state toggle.
   const toggleBtn = document.getElementById("viewAsToggleBtn");
   if(toggleBtn){
     toggleBtn.style.display = isRealAdmin_() ? "flex" : "none";
-    toggleBtn.title = VIEW_AS_SUPPORT ? "Switch back to the full Admin view" : "Preview the dashboard as a Support user would see it";
-    document.getElementById("viewAsToggleLabel").textContent = VIEW_AS_SUPPORT ? "Admin View" : "Support View";
+    let nextLabel;
+    if(isSuperAdminReal_()){
+      nextLabel = VIEW_OVERRIDE === null ? "Admin View" : (VIEW_OVERRIDE === "Admin" ? "Support View" : "Super Admin View");
+    } else {
+      nextLabel = VIEW_OVERRIDE === "Support" ? "Admin View" : "Support View";
+    }
+    toggleBtn.title = VIEW_OVERRIDE ? "Switch to " + nextLabel.replace(" View","") + "'s view" : "Preview the dashboard as a lower-privilege view";
+    document.getElementById("viewAsToggleLabel").textContent = nextLabel;
   }
   document.getElementById("usersNavItem").style.display = admin ? "" : "none";
   document.getElementById("adminGroupLabel").style.display = admin ? "" : "none";
@@ -4928,20 +4971,26 @@ function applyRoleGating_(){
 async function renderUsersTable(){
   const el = document.getElementById("content");
   if(!isAdmin_()){ el.innerHTML = emptyStateHTML("Admins only", "This page is only visible to Admin accounts."); return; }
+  const superAdmin = isSuperAdminView_();
   el.innerHTML = `
-    <div class="section-head"><div><h2>Add a Support User</h2><div class="meta">They'll set their own password the first time they log in</div></div></div>
+    <div class="section-head"><div><h2>Add a ${superAdmin ? "User" : "Support User"}</h2><div class="meta">They'll set their own password the first time they log in</div></div></div>
     <div class="form-grid" style="margin-bottom:22px;max-width:520px">
       <div class="field"><label>Email</label><input type="email" id="newUserEmail" placeholder="name@jaro.in"></div>
-      <div class="field" style="align-self:end"><button class="btn primary" id="addUserBtn" style="width:100%;justify-content:center">Add Support User</button></div>
+      ${superAdmin ? `<div class="field"><label>Role</label>
+        <select id="newUserRole"><option value="Support">Support</option><option value="Admin">Admin</option></select>
+      </div>` : ""}
+      <div class="field" style="align-self:end"><button class="btn primary" id="addUserBtn" style="width:100%;justify-content:center">Add User</button></div>
     </div>
     <div class="section-head"><div><h2>Everyone With Access</h2><div class="meta" id="usersCount">Loading…</div></div></div>
     <div id="usersTableWrap"><div style="padding:40px;text-align:center;color:var(--ink-35)">Loading…</div></div>`;
   document.getElementById("addUserBtn").addEventListener("click", async ()=>{
     const email = document.getElementById("newUserEmail").value.trim();
     if(!email){ toast("Enter an email", true); return; }
+    const roleEl = document.getElementById("newUserRole");
+    const role = roleEl ? roleEl.value : "Support";
     try{
-      await authApiCall_("addUser", { token: AUTH_SESSION.token, email, role:"Support" });
-      toast("Support user added — they can now set up their password");
+      await authApiCall_("addUser", { token: AUTH_SESSION.token, email, role });
+      toast(`${role} user added — they can now set up their password`);
       document.getElementById("newUserEmail").value = "";
       loadUsersTable_();
     }catch(e){ toast(e.message, true); }
@@ -4951,17 +5000,25 @@ async function renderUsersTable(){
 async function loadUsersTable_(){
   const wrap = document.getElementById("usersTableWrap");
   const countEl = document.getElementById("usersCount");
+  const superAdmin = isSuperAdminView_();
   try{
     const r = await authApiCall_("listUsers", { token: AUTH_SESSION.token });
     const users = r.users || [];
     if(countEl) countEl.textContent = users.length ? `${users.length} ${users.length === 1 ? "person" : "people"} with access` : "No records";
+    // Regenerate Password and the role toggle are Super Admin only, for anyone else's account —
+    // never shown at all for a regular Admin's view, and never shown on the Super Admin's own row.
     wrap.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr></thead>
-      <tbody>${users.map(u=>`<tr>
+      <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th></th><th></th></tr></thead>
+      <tbody>${users.map(u=>{
+        const isSelf = u.email.toLowerCase() === getCurrentUserEmail_().toLowerCase();
+        const canManage = superAdmin && !isSelf;
+        return `<tr>
         <td>${esc(u.email)}</td><td>${esc(u.role)}</td>
         <td>${esc(u.status)}</td><td class="cell-muted">${esc(u.lastLogin||"Never")}</td>
-        <td>${u.role === "Support" ? `<button class="btn reset-pw-btn" data-email="${esc(u.email)}" style="font-size:11.5px;padding:5px 10px">Regenerate Password</button>` : ""}</td>
-      </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--ink-35)">No records for other members</td></tr>`}</tbody>
+        <td>${canManage ? `<button class="btn reset-pw-btn" data-email="${esc(u.email)}" style="font-size:11.5px;padding:5px 10px">Regenerate Password</button>` : ""}</td>
+        <td>${canManage ? `<button class="btn set-role-btn" data-email="${esc(u.email)}" data-role="${u.role === "Admin" ? "Support" : "Admin"}" style="font-size:11.5px;padding:5px 10px">Make ${u.role === "Admin" ? "Support" : "Admin"}</button>` : ""}</td>
+      </tr>`;
+      }).join("") || `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--ink-35)">No records for other members</td></tr>`}</tbody>
     </table></div>`;
     wrap.querySelectorAll(".reset-pw-btn").forEach(btn=>{
       btn.addEventListener("click", async ()=>{
@@ -4973,6 +5030,18 @@ async function loadUsersTable_(){
           toast(`Password reset for ${email} — they'll set a new one next time they log in`);
           loadUsersTable_();
         }catch(e){ toast(e.message, true); btn.disabled = false; btn.textContent = "Regenerate Password"; }
+      });
+    });
+    wrap.querySelectorAll(".set-role-btn").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const email = btn.dataset.email, role = btn.dataset.role;
+        if(!confirm(`Make ${email} ${role === "Admin" ? "an Admin" : "a Support user"}?`)) return;
+        btn.disabled = true; btn.textContent = "Updating…";
+        try{
+          await authApiCall_("setUserRole", { token: AUTH_SESSION.token, email, role });
+          toast(`${email} is now ${role === "Admin" ? "an Admin" : "a Support user"}`);
+          loadUsersTable_();
+        }catch(e){ toast(e.message, true); btn.disabled = false; btn.textContent = `Make ${role}`; }
       });
     });
   }catch(e){
@@ -5012,6 +5081,7 @@ function init(){
   document.querySelector('.navitem[data-nav="pageInsights"]').addEventListener("click", ()=>navigate("pageInsights"));
   document.querySelector('.navitem[data-nav="seoInsights"]').addEventListener("click", ()=>navigate("seoInsights"));
   document.querySelector('.navitem[data-nav="coreWebVitals"]').addEventListener("click", ()=>navigate("coreWebVitals"));
+  document.querySelector('.navitem[data-nav="onPageAudit"]').addEventListener("click", ()=>navigate("onPageAudit"));
   document.querySelector('.navitem[data-nav="users"]').addEventListener("click", ()=>navigate("users"));
   document.getElementById("openRequestBtn").addEventListener("click", ()=>openRequestModal());
   document.getElementById("closeRequestBtn").addEventListener("click", closeRequestModal);
@@ -5059,7 +5129,7 @@ function wireRequestFormDependencies(){
    otherwise the email+password+OTP screen shows first and init() only runs after that succeeds
    (see completeLogin_ above). */
 document.getElementById("logoutBtn").addEventListener("click", logout_);
-document.getElementById("viewAsToggleBtn").addEventListener("click", toggleViewAsSupport_);
+document.getElementById("viewAsToggleBtn").addEventListener("click", cycleViewMode_);
 AUTH_SESSION = loadAuthSession_();
 if(AUTH_SESSION){
   document.body.classList.remove("auth-locked");

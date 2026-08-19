@@ -208,6 +208,7 @@ function dispatchAction_(body){
     case "listUsers": return handleListUsers_(body);
     case "addUser": return handleAddUser_(body);
     case "resetUserPassword": return handleResetUserPassword_(body);
+    case "setUserRole": return handleSetUserRole_(body);
     case "submitRequest": return handleSubmitRequest_(body);
     case "updateStatus": return handleUpdateStatus_(body);
     case "listRequirements": return handleListRequirements_(body);
@@ -388,6 +389,17 @@ function requireAdmin_(token){
   if(session.Role !== "Admin") throw new Error("Admins only.");
   return session;
 }
+/* ---- Super Admin: one specific account, identified by email rather than a stored Role value —
+   so it can't be granted/revoked by editing the Dashboard Users sheet, only by changing this
+   constant. Only the Super Admin can regenerate another user's password or change someone's role
+   (Support <-> Admin); a regular Admin can still view the Users list and add new Support users. */
+const SUPER_ADMIN_EMAIL = "lalit.rade@jaro.in";
+function isSuperAdmin_(email){ return (email||"").trim().toLowerCase() === SUPER_ADMIN_EMAIL; }
+function requireSuperAdmin_(token){
+  const session = requireAdmin_(token);
+  if(!isSuperAdmin_(session.Email)) throw new Error("Only the Super Admin can do that.");
+  return session;
+}
 
 /* ---- Action handlers ---- */
 function handleLogin_(body){
@@ -428,7 +440,7 @@ function handleVerifyOtp_(body){
   sheet.appendRow([token, email, user.Role, user.Email, new Date(Date.now() + SESSION_TTL_HOURS*3600000).toISOString()]);
   const usersSheet = getOrCreateSheet_("Dashboard Users", USERS_HEADER);
   usersSheet.getRange(user._row, USERS_HEADER.indexOf("LastLogin") + 1).setValue(new Date().toISOString());
-  return { ok:true, token, role:user.Role, email:user.Email, name:user.Email };
+  return { ok:true, token, role:user.Role, email:user.Email, name:user.Email, isSuperAdmin: isSuperAdmin_(user.Email) };
 }
 function handleRequestPasswordSetup_(body){
   const email = (body.email||"").trim().toLowerCase();
@@ -459,7 +471,7 @@ function handleSetPassword_(body){
   const token = randomToken_();
   const sessSheet = getOrCreateSheet_("Sessions", SESSIONS_HEADER);
   sessSheet.appendRow([token, email, user.Role, email, new Date(Date.now() + SESSION_TTL_HOURS*3600000).toISOString()]);
-  return { ok:true, token, role:user.Role, email, name:email };
+  return { ok:true, token, role:user.Role, email, name:email, isSuperAdmin: isSuperAdmin_(email) };
 }
 function handleChangePassword_(body){
   const session = requireSession_(body.token);
@@ -474,7 +486,7 @@ function handleChangePassword_(body){
 }
 function handleCheckSession_(body){
   const session = requireSession_(body.token);
-  return { ok:true, email:session.Email, role:session.Role };
+  return { ok:true, email:session.Email, role:session.Role, isSuperAdmin: isSuperAdmin_(session.Email) };
 }
 function handleLogout_(body){
   const sheet = getOrCreateSheet_("Sessions", SESSIONS_HEADER);
@@ -489,20 +501,24 @@ function handleListUsers_(body){
   return { ok:true, users: rows.map(r => ({ email:r.Email, role:r.Role, status:r.Status, lastLogin:r.LastLogin })) };
 }
 function handleAddUser_(body){
-  requireAdmin_(body.token);
+  const session = requireAdmin_(body.token);
   const email = (body.email||"").trim().toLowerCase();
   if(!email) throw new Error("Enter an email.");
   if(getUser_(email)) throw new Error("That email already has an account.");
+  // A regular Admin can add new people, but only the Super Admin can add them straight in as an
+  // Admin — enforced here server-side, not just by hiding the role picker in the UI, so a crafted
+  // request can't grant Admin either.
+  const role = (body.role === "Admin" && isSuperAdmin_(session.Email)) ? "Admin" : "Support";
   const sheet = getOrCreateSheet_("Dashboard Users", USERS_HEADER);
-  sheet.appendRow([email, body.role === "Admin" ? "Admin" : "Support", "", "", "Pending", new Date().toISOString(), ""]);
+  sheet.appendRow([email, role, "", "", "Pending", new Date().toISOString(), ""]);
   return { ok:true };
 }
-/* Admin-only "Regenerate Password" — clears the stored hash/salt and flips Status back to
+/* Super-Admin-only "Regenerate Password" — clears the stored hash/salt and flips Status back to
    "Pending", which routes that person back through the existing "Set up your password" (email OTP
-   verified) flow the next time they try to log in, instead of an Admin ever seeing or setting a
-   password on someone else's behalf. */
+   verified) flow the next time they try to log in, instead of anyone ever seeing or setting a
+   password on someone else's behalf. Works for both Support and Admin accounts. */
 function handleResetUserPassword_(body){
-  requireAdmin_(body.token);
+  requireSuperAdmin_(body.token);
   const email = (body.email||"").trim().toLowerCase();
   const user = getUser_(email);
   if(!user) throw new Error("That account doesn't exist.");
@@ -534,6 +550,21 @@ function handleResetUserPassword_(body){
       </div>`
     });
   }catch(err){ /* password is already reset even if this notification email fails */ }
+  return { ok:true };
+}
+/* Super-Admin-only: promote a Support account to Admin, or demote an Admin back to Support.
+   Doesn't touch that person's password/sessions — an existing session keeps whatever Role it was
+   issued with until they next log in or the session is checked fresh, same as any other Role edit
+   made directly in the sheet would behave. */
+function handleSetUserRole_(body){
+  requireSuperAdmin_(body.token);
+  const email = (body.email||"").trim().toLowerCase();
+  const role = body.role === "Admin" ? "Admin" : "Support";
+  if(isSuperAdmin_(email)) throw new Error("The Super Admin's own role can't be changed here.");
+  const user = getUser_(email);
+  if(!user) throw new Error("That account doesn't exist.");
+  const sheet = getOrCreateSheet_("Dashboard Users", USERS_HEADER);
+  sheet.getRange(user._row, USERS_HEADER.indexOf("Role") + 1).setValue(role);
   return { ok:true };
 }
 
@@ -625,12 +656,9 @@ function escHtml_(s){ return (s||"").toString().replace(/[&<>"']/g, m => ({"&":"
 function friendlyGmailError_(err){
   const msg = (err && err.message) || String(err);
   if(/specified permissions/i.test(msg) || /not sufficient/i.test(msg)){
-    // TEMPORARY DIAGNOSTIC: the raw Google error is appended in [brackets] below (normally hidden
-    // behind the friendly sentence) — this exact scope list is what's pinpointing the real gap
-    // while this authorization issue is still being tracked down. Safe to remove once resolved.
     return new Error("Gmail access hasn't been authorized for this script yet. In the Apps Script editor, " +
       "select authorizeGmailAccess from the function dropdown, click Run, approve the prompts, then " +
-      "redeploy (Deploy > Manage deployments > New version). This is a one-time step. [raw: " + msg + "]");
+      "redeploy (Deploy > Manage deployments > New version). This is a one-time step.");
   }
   return err;
 }
