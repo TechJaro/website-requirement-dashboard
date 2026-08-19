@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4396,7 +4396,11 @@ function authApiCall_(action, data){
       form.remove();
       setTimeout(()=> iframe.remove(), 3000);
     };
+    // TEMP DIAGNOSTIC LOGGING — safe to leave in, only writes to console, remove once login is confirmed working.
+    iframe.addEventListener("load", ()=> console.log("[authApiCall_] iframe finished loading for", action, reqId));
+    console.log("[authApiCall_] submitting", action, "reqId=", reqId, "to", CONFIG.authApiUrl);
     const onMessage = (ev)=>{
+      console.log("[authApiCall_] message event received, origin=", ev.origin, "data=", ev.data);
       if(settled || !ev.data || ev.data.reqId !== reqId) return;
       settled = true;
       cleanup();
@@ -4406,6 +4410,7 @@ function authApiCall_(action, data){
     const timer = setTimeout(()=>{
       if(settled) return;
       settled = true;
+      console.log("[authApiCall_] TIMED OUT waiting for reqId=", reqId);
       cleanup();
       reject(new Error("The login service didn't respond — check your connection and try again"));
     }, 20000);
