@@ -4573,7 +4573,26 @@ function toggleViewAsSupport_(){
 // response text and runs it as JS directly in THIS page's context. Script tags still send the
 // browser's cookies for the target domain by default, so the auth gate still passes. This is the
 // original JSONP technique, and it's the most reliable option for a domain-restricted deployment.
-function authApiCall_(action, data){
+// authApiCall_ wraps authApiCallOnce_ with one silent automatic retry. The "Couldn't reach the
+// login service" (script.onerror) failure has turned out to be a transient hiccup most of the
+// time — e.g. the domain-restricted deployment's cookie/redirect check occasionally serves a
+// non-script response to the very first request in a while, which the browser can't execute as
+// JS, immediately firing onerror even though the server-side call may well have gone through
+// (this is why the OTP email sometimes still arrives even when the page shows an error). A short
+// pause and one retry clears the large majority of these without the person having to notice
+// anything went wrong the first time, let alone manually retry themselves. Skips the extra round
+// trip entirely once it works, so a call that succeeds on the first try is exactly as fast as
+// before.
+function authApiCall_(action, data, _attempt){
+  const attempt = _attempt || 1;
+  return authApiCallOnce_(action, data).catch(err=>{
+    if(attempt < 2){
+      return new Promise(resolve=>setTimeout(resolve, 500)).then(()=> authApiCall_(action, data, attempt + 1));
+    }
+    throw err;
+  });
+}
+function authApiCallOnce_(action, data){
   return new Promise((resolve, reject)=>{
     if(!CONFIG.authApiUrl){ reject(new Error("CONFIG.authApiUrl isn't set yet")); return; }
     const reqId = "req_" + Date.now() + "_" + Math.random().toString(36).slice(2);
@@ -4585,6 +4604,7 @@ function authApiCall_(action, data){
     let settled = false;
     const cleanup = ()=>{
       clearTimeout(timer);
+      clearTimeout(slowHintTimer);
       delete window[callbackName];
       script.remove();
     };
@@ -4601,6 +4621,13 @@ function authApiCall_(action, data){
       cleanup();
       reject(new Error("Couldn't reach the login service — check your connection and try again"));
     };
+    // A quiet reassurance for the genuinely-slow-not-broken case (Apps Script cold start), so a
+    // long wait reads as "still working" instead of "did this freeze?" — only fires if the call is
+    // still pending after 7s, and only on the final attempt so a fast, silently-retried first
+    // attempt never bothers the person with it.
+    const slowHintTimer = setTimeout(()=>{
+      if(!settled && attempt >= 2 && typeof toast === "function") toast("Still working — this can take a few extra seconds…");
+    }, 7000);
     const timer = setTimeout(()=>{
       if(settled) return;
       settled = true;
