@@ -3608,7 +3608,7 @@ async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, c
     noteHtml = noteHtml.replace(/<img[^>]*>/gi,
       "[a pasted screenshot was too large to send and was left out — please attach it separately if needed]");
   }
-  await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml, noteText: noteText || "", to: to || [], cc: cc || [] });
+  return await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml, noteText: noteText || "", to: to || [], cc: cc || [] });
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
@@ -4424,10 +4424,14 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
     confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
     sel.disabled = true;
     try{
-      await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails });
+      const r = await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails });
       const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
       sel.style.background = c.bg; sel.style.color = c.fg;
-      toast(email ? `Status updated — ${email} and thread notified by email` : "Status updated");
+      // Surfacing Code.gs's debug trail directly here — Google's own Executions/Cloud Logging
+      // viewer has proven unreliable to read (showing "No logs available" even for completed
+      // runs), so this is the one place that's actually guaranteed visible: which path the email
+      // took (real threaded reply vs. a no-thread-on-record fallback) and the thread id it used.
+      toast(r && r.debug ? `Status updated — ${r.debug}` : "Status updated");
       overlay.classList.remove("show");
       cleanup();
     }catch(err){
