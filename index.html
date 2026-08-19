@@ -3221,7 +3221,9 @@ function openRequestModal(prefill){
   sectionEl.disabled = isLocked;
   sectionHint.style.display = isLocked ? "block" : "none";
   if(p.university) document.getElementById("rf_university").value = p.university;
-  if(p.program) document.getElementById("rf_program").value = p.program;
+  // Some sheet cells carry the program title plus extra lines (notes, a second variant, etc.) —
+  // only the first line belongs in this field.
+  if(p.program) document.getElementById("rf_program").value = p.program.split("\n")[0].trim();
   if(p.link) document.getElementById("rf_link").value = p.link;
   updateUniProgVisibility();
   populateRequestDatalists().then(()=>{
@@ -3239,6 +3241,11 @@ function openRequestModal(prefill){
 }
 function closeRequestModal(){
   document.getElementById("requestOverlay").classList.remove("show");
+  // Closing (Cancel/X) without submitting now clears the draft, same as a successful submit does —
+  // otherwise the next "Raise a Request" you open (even for a completely different program) starts
+  // from whatever was left over, including a Subject line that only auto-fills when the field is
+  // empty, which is exactly what was blocking it from updating for the newly-selected program.
+  resetRequestForm();
 }
 /* Delegated click handler — works for buttons rendered dynamically inside any section's list. */
 document.addEventListener("click", (e)=>{
@@ -3535,9 +3542,21 @@ async function submitRequestDirect_(payload){
   // dashboard needs to grant anything themselves; their identity comes from the login session.
   if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
   payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
-  // Uses the POST+poll transport, not the plain JSONP one — the description can carry pasted
-  // screenshots as inline base64 images, which can easily be too large for a GET URL.
-  await authApiCallLarge_("submitRequest", { token: AUTH_SESSION.token, payload });
+  // Back on the plain JSONP transport (authApiCall_), not the hidden-iframe POST+poll one
+  // (authApiCallLarge_) — it turns out that path never actually worked here: browsers withhold
+  // Google's session cookie from a cross-site POST even when it happily sends it on the GET
+  // navigations JSONP relies on (a SameSite=Lax quirk), so the POST silently never reached doPost
+  // at all, and every submission just sat there until the 45s poll gave up. JSONP GET is the
+  // transport that's actually proven reliable end to end for this domain-restricted deployment.
+  // The one trade-off: a GET URL has a practical length ceiling, so a very large pasted screenshot
+  // (inline base64 image) in the description could occasionally not fit — stripped out below with
+  // a note left in its place, rather than letting the whole submission silently fail again.
+  const encoded = encodeURIComponent(JSON.stringify({ action:"submitRequest", token: AUTH_SESSION.token, payload }));
+  if(encoded.length > 6000 && /<img/i.test(payload.descriptionHtml||"")){
+    payload.descriptionHtml = (payload.descriptionHtml||"").replace(/<img[^>]*>/gi,
+      "[a pasted screenshot was too large to send and was left out — please attach it separately if needed]");
+  }
+  await authApiCall_("submitRequest", { token: AUTH_SESSION.token, payload });
 }
 /* ---- Status updates: same backend call — Code.gs looks up the original message/thread from the
    sheet row itself and replies in-thread via GmailApp (far more reliable than hand-building
@@ -4672,15 +4691,21 @@ const SUPPORT_HIDDEN_NAV = ["requirements","pageInsights","seoInsights","coreWeb
 function applyRoleGating_(){
   const role = getCurrentUserRole_();
   document.getElementById("userPill").style.display = "flex";
-  document.getElementById("userPillEmail").textContent = getCurrentUserEmail_();
-  document.getElementById("userPillRole").textContent = role || "—";
+  // Shows the role, not the raw email — the full address is still there as a hover tooltip for
+  // anyone who needs to confirm exactly who's logged in, without cluttering the sidebar with it.
+  const pillEmailEl = document.getElementById("userPillEmail");
+  pillEmailEl.textContent = role || "—";
+  pillEmailEl.title = getCurrentUserEmail_();
+  document.getElementById("userPillRole").style.display = "none";
   const admin = role === "Admin";
   // Only a REAL Admin ever sees the toggle — it lets them preview the Support-limited panel
-  // without logging out, and switch back the same way.
+  // without logging out, and switch back the same way. Short labels on purpose — this sits in a
+  // half-width slot next to Log Out and truncates badly with anything longer.
   const toggleBtn = document.getElementById("viewAsToggleBtn");
   if(toggleBtn){
     toggleBtn.style.display = isRealAdmin_() ? "flex" : "none";
-    document.getElementById("viewAsToggleLabel").textContent = VIEW_AS_SUPPORT ? "Back to Admin View" : "View as Support";
+    toggleBtn.title = VIEW_AS_SUPPORT ? "Switch back to the full Admin view" : "Preview the dashboard as a Support user would see it";
+    document.getElementById("viewAsToggleLabel").textContent = VIEW_AS_SUPPORT ? "Admin View" : "Support View";
   }
   document.getElementById("usersNavItem").style.display = admin ? "" : "none";
   document.getElementById("adminGroupLabel").style.display = admin ? "" : "none";
