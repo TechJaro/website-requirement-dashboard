@@ -1,4 +1,4 @@
-\<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -4360,65 +4360,57 @@ function isAdmin_(){ return getCurrentUserRole_() === "Admin"; }
 /* Every call is a POST with a plain-text body (no custom Content-Type header) on purpose — that's
    what keeps the browser from sending a CORS preflight OPTIONS request, which Apps Script Web
    Apps can't answer. Apps Script reads the raw body itself (e.postData.contents) and parses it. */
-// authApiCall_ talks to the Apps Script Web App via a hidden <iframe> + real <form> POST instead
-// of fetch(). The Web App is deployed at a domain-restricted URL (Anyone within Jaro Institute...),
-// which is the correct setting since every dashboard user is a jaro.in Workspace account — but it
-// means every request is gated on the caller's Google session cookie before Apps Script ever runs.
-// A cross-origin fetch() (even with credentials:"include") can't carry that cookie through Google's
-// auth redirect and reliably ends in "TypeError: Failed to fetch". A form POST is a real browser
-// navigation, so it isn't subject to CORS and follows that redirect exactly like a normal page load.
-// The Apps Script side (doPost) detects the form submission and replies with a tiny HTML page that
-// posts the JSON result back to this window via postMessage, tagged with a reqId so concurrent
-// calls don't cross wires.
+// authApiCall_ talks to the Apps Script Web App via JSONP — a <script src="..."> tag, not fetch()
+// or an iframe/form. The Web App is deployed at a domain-restricted URL (Anyone within Jaro
+// Institute...), which is the correct setting since every dashboard user is a jaro.in Workspace
+// account — but it means every request needs the caller's Google session cookie to clear Google's
+// auth gate before Apps Script runs at all. A cross-origin fetch() can't carry that cookie through
+// Google's auth redirect ("Failed to fetch"). A hidden iframe+form POST does carry it (confirmed —
+// the OTP email actually sends), but Apps Script's own response page has a Content-Security-Policy
+// that blocks the inline <script> that would postMessage the result back, so the caller never hears
+// back even though the server-side work succeeded.
+// A <script src="...exec?..."> tag sidesteps both problems at once: it's not a framed navigation or
+// an XHR, so CORS/X-Frame-Options/the remote page's CSP don't apply — the browser just downloads the
+// response text and runs it as JS directly in THIS page's context. Script tags still send the
+// browser's cookies for the target domain by default, so the auth gate still passes. This is the
+// original JSONP technique, and it's the most reliable option for a domain-restricted deployment.
 function authApiCall_(action, data){
   return new Promise((resolve, reject)=>{
     if(!CONFIG.authApiUrl){ reject(new Error("CONFIG.authApiUrl isn't set yet")); return; }
     const reqId = "req_" + Date.now() + "_" + Math.random().toString(36).slice(2);
-    const iframe = document.createElement("iframe");
-    const frameName = "authFrame_" + reqId;
-    iframe.name = frameName;
-    iframe.style.display = "none";
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = CONFIG.authApiUrl;
-    form.target = frameName;
-    form.style.display = "none";
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = "payload";
-    input.value = JSON.stringify(Object.assign({ action, reqId }, data||{}));
-    form.appendChild(input);
+    const callbackName = "__authCb_" + reqId;
+    const payload = JSON.stringify(Object.assign({ action }, data||{}));
+    const url = CONFIG.authApiUrl + "?callback=" + encodeURIComponent(callbackName) + "&payload=" + encodeURIComponent(payload);
 
+    const script = document.createElement("script");
     let settled = false;
     const cleanup = ()=>{
-      window.removeEventListener("message", onMessage);
       clearTimeout(timer);
-      form.remove();
-      setTimeout(()=> iframe.remove(), 3000);
+      delete window[callbackName];
+      script.remove();
     };
-    // TEMP DIAGNOSTIC LOGGING — safe to leave in, only writes to console, remove once login is confirmed working.
-    iframe.addEventListener("load", ()=> console.log("[authApiCall_] iframe finished loading for", action, reqId));
-    console.log("[authApiCall_] submitting", action, "reqId=", reqId, "to", CONFIG.authApiUrl);
-    const onMessage = (ev)=>{
-      console.log("[authApiCall_] message event received, origin=", ev.origin, "data=", ev.data);
-      if(settled || !ev.data || ev.data.reqId !== reqId) return;
+    window[callbackName] = (json)=>{
+      if(settled) return;
       settled = true;
       cleanup();
-      if(ev.data.ok) resolve(ev.data);
-      else reject(new Error(ev.data.error || "Something went wrong — try again"));
+      if(json && json.ok) resolve(json);
+      else reject(new Error((json && json.error) || "Something went wrong — try again"));
+    };
+    script.onerror = ()=>{
+      if(settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("Couldn't reach the login service — check your connection and try again"));
     };
     const timer = setTimeout(()=>{
       if(settled) return;
       settled = true;
-      console.log("[authApiCall_] TIMED OUT waiting for reqId=", reqId);
       cleanup();
       reject(new Error("The login service didn't respond — check your connection and try again"));
     }, 20000);
 
-    window.addEventListener("message", onMessage);
-    document.body.appendChild(iframe);
-    document.body.appendChild(form);
-    form.submit();
+    script.src = url;
+    document.head.appendChild(script);
   });
 }
 
