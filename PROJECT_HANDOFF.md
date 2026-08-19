@@ -66,6 +66,25 @@ Core design holds up: email+password → 6-digit email OTP → 12-hour session t
 
 They are **not** linked/joined in any backend sense. `CONFIG.sheets.programPages` lives in the "Web Pages<>JARO" spreadsheet; `CONFIG.sheets.landingPages`/`landingPagesChannel` live in a completely separate "Landing Pages Tracker" spreadsheet — different spreadsheet IDs, no shared key. They're grouped/searched the same way in the UI (`renderGroupedSection` / `renderLandingTabs`) only because both sheets happen to use the same column names, "University/Institute" and "Program Name" — a naming convention, not an enforced relationship. The one genuine cross-referencing feature in the dashboard, the "Website URL Form Mappings" tab (`CONFIG.sheets.urlMappings`, matched by exact URL via `loadUrlMappings_`/`urlMappingFor_` to overlay "University Mapped"/"Product Mapped" badges), explicitly covers only Program/University/Free Course/Pillar Pages — `categoryBucketFor_` has no bucket for Landing Pages at all.
 
-## Immediate next action
+## Google Sheets connected — full data flow (documented 2026-08-19)
 
-Waiting on the user to paste the updated `Code.gs` into the Apps Script editor and redeploy (Deploy → Manage deployments → New version), then submit one fresh test request and change its status once, to confirm in Gmail that the update now lands in the same thread as the original (see "Status-update threading" above for what changed and why).
+Three separate Google Spreadsheet **files**, 18 tabs total.
+
+**1. "Web Pages<>JARO"** (`1eSY2RSo5QoT1kmUniA2_xISxwejX7veHyuAEMvASKSI`) — 11 tabs: `programPages`, `b2bPages`, `locationPages`, `blogPages`, `universityPages`, `freeCoursePages`, `pillarPages`, `uniquePages`, `newsItems`, `awardsItems`, `urlMappings` ("Website URL Form Mappings"). **Flow:** read-only, straight from the browser — no Apps Script involved. Uses the Sheets API v4 directly if `CONFIG.googleApiKey` works (ignores filters), else falls back to the public gviz/CSV export (respects filters). The dashboard never writes to any of these; the team maintains them manually. `urlMappings` is the one cross-referencing layer that exists (matches by exact URL to overlay "University Mapped"/"Product Mapped" badges and feed the Home page's "URL Mapping Coverage" insight) — covers Program/University/Free Course/Pillar Pages only, not Landing Pages.
+
+**2. "Landing Pages Tracker"** (`1nIZ_qZmugMslTFxS2QosDYNZzjNzoYKPNxxApQsBkiA`) — 2 tabs: `landingPages` (Domain Tracker), `landingPagesChannel` (Channel PR). Same read-only browser-direct flow as above.
+
+**3. "Jaro Dashboard — Requirements & Insights"** (`1JGsWhpTOalVOPoO0CwlAaCCgPMVv0ExSYTxrRErCVV0`) — 5 tabs, entirely owned by `Code.gs` (this is the only spreadsheet the backend writes to; the front-end never touches it via the Sheets API — always through session-authenticated Apps Script actions):
+  - **Requirements Log** — written by `handleSubmitRequest_` (new row per request) / `handleUpdateStatus_` (status changes); read by `handleListRequirements_`.
+  - **Dashboard Users** — Email/Role/PasswordHash/Salt/Status/CreatedAt/LastLogin; written by `handleAddUser_`/`handleSetPassword_`/`handleResetUserPassword_`/`setupAdmin()`; read by `handleLogin_`/`handleListUsers_`.
+  - **Sessions** — Token/Email/Role/Name/ExpiresAt; written by `handleVerifyOtp_`/`handleSetPassword_` (create) and `handleLogout_`/`handleResetUserPassword_` (delete); read by `requireSession_`/`requireAdmin_`.
+  - **OTPs** — written by `issueOtp_`, read by `verifyOtp_`.
+  - **PendingResults** — dead code, belongs to the unused `authApiCallLarge_` transport (see "Known rough edges").
+
+Not backed by any sheet: Page Insights and SEO Insights pull live from GA4/Search Console via the visitor's own Google sign-in.
+
+## Immediate next action — Gmail permission error mid-diagnosis (started 2026-08-19)
+
+After the threading fix above, submitting a new request started failing with "Gmail access hasn't been authorized for this script yet." The user has already: run `authorizeGmailAccess()` successfully, redeployed a **new version of the same deployment** (URL confirmed matching `CONFIG.authApiUrl` exactly — ruled out a stale/different deployment), and shared the `appsscript.json` manifest, which looks correct (`https://mail.google.com/` scope present, Gmail Advanced Service correctly enabled as `gmail` v1) — so the obvious causes are ruled out.
+
+Current step: `friendlyGmailError_` in `Code.gs` has been temporarily changed to append the **raw** underlying Google error text in `[raw: ...]` at the end of the friendly message, instead of hiding it — waiting on the user to paste this version in, redeploy, retest, and report back that bracketed raw text so the exact missing permission can be identified instead of guessed at. **Once root-caused and fixed, remove this temporary `[raw: ...]` diagnostic append** (marked with a comment in the code) so end users don't see raw Google error text again.
