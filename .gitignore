@@ -1,2 +1,6 @@
 .vercel
 .env*
+# Local editing copy only — index.html is the single source of truth that's actually deployed.
+# This file used to also be tracked under this same name as a stale, unrelated duplicate, which
+# caused a git branch switch to silently overwrite the real local working copy. Never re-add it.
+Unified Dashboard.txt
