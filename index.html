@@ -725,51 +725,9 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
   text-decoration:none;transition:background .15s}
 .news-card-link:hover{background:var(--blue-dark)}
 .news-card-link svg{width:12px;height:12px}
-/* ================================================================================================
-   LOGIN / AUTH GATE
-   ================================================================================================ */
-body.auth-locked #app{display:none}
-.auth-overlay{position:fixed;inset:0;background:linear-gradient(160deg,#001a66,#0029A6 55%,#00348a);
-  display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
-.auth-overlay.show{display:flex}
-.auth-card{width:100%;max-width:380px;background:#fff;border-radius:18px;padding:32px 30px 28px;
-  box-shadow:0 30px 70px -20px rgba(0,0,0,.5)}
-.auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:22px}
-.auth-brand img{width:34px;height:34px;border-radius:8px}
-.auth-brand div{font-weight:800;font-size:15px;color:var(--ink)}
-.auth-brand div span{display:block;font-weight:600;font-size:11px;color:var(--ink-50)}
-.auth-card h2{font-size:18px;margin-bottom:4px}
-.auth-card .sub{font-size:12.5px;color:var(--ink-50);margin-bottom:20px}
-.auth-field{margin-bottom:14px}
-.auth-field label{display:block;font-size:12px;font-weight:700;color:var(--ink-70);margin-bottom:5px}
-.auth-field input{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;
-  font-size:13.5px;box-sizing:border-box;font-family:inherit}
-.auth-field input:focus{outline:none;border-color:var(--blue)}
-.auth-otp-input{letter-spacing:.5em;text-align:center;font-weight:800;font-size:18px !important}
-.auth-btn{width:100%;padding:12px;border:none;border-radius:10px;background:var(--blue);color:#fff;
-  font-weight:700;font-size:13.5px;cursor:pointer;transition:background .15s}
-.auth-btn:hover{background:var(--blue-dark)}
-.auth-btn:disabled{opacity:.6;cursor:default}
-.auth-error{color:var(--red);font-size:12px;margin:-6px 0 12px;display:none}
-.auth-note{font-size:12px;color:var(--ink-50);margin-top:16px;text-align:center}
-.auth-note a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:none}
-.auth-note a:hover{text-decoration:underline}
-.logout-btn{display:flex;align-items:center;gap:8px;justify-content:center;width:100%;padding:10px;
-  border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink-60);font-size:12.5px;
-  font-weight:700;cursor:pointer;margin-top:8px}
-.logout-btn:hover{background:var(--canvas);color:var(--red)}
-.user-pill{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:10px;background:var(--canvas);
-  font-size:12px;color:var(--ink-70);margin-bottom:8px}
-.user-pill .role-tag{margin-left:auto;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;
-  padding:2px 7px;border-radius:20px;background:var(--blue-tint-10);color:var(--blue)}
 </style>
 </head>
-<body class="auth-locked">
-
-<!-- ============ AUTH GATE (email + password, then email OTP) ============ -->
-<div class="auth-overlay" id="authOverlay">
-  <div class="auth-card" id="authCard"></div>
-</div>
+<body>
 
 <div id="app">
   <!-- ============ SIDEBAR ============ -->
@@ -803,29 +761,11 @@ body.auth-locked #app{display:none}
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <span>SEO Insights</span>
       </div>
-      <div class="navitem" data-nav="coreWebVitals">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/></svg>
-        <span>Core Web Vitals</span>
-      </div>
-      <div class="nav-group-label" id="adminGroupLabel" style="display:none">Admin</div>
-      <div class="navitem" data-nav="users" id="usersNavItem" style="display:none">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        <span>Users</span>
-      </div>
     </div>
     <div class="sidebar-foot">
-      <div class="user-pill" id="userPill" style="display:none">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-        <span id="userPillEmail"></span>
-        <span class="role-tag" id="userPillRole"></span>
-      </div>
       <button class="raise-btn" id="openRequestBtn">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
         Raise a Request
-      </button>
-      <button class="logout-btn" id="logoutBtn">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-        Log Out
       </button>
     </div>
   </aside>
@@ -872,6 +812,7 @@ body.auth-locked #app{display:none}
       <div class="modal-body" style="display:grid;gap:14px">
         <div class="form-grid">
           <div class="field"><label>Your Name *</label><input type="text" id="rf_name" required placeholder="e.g. Ananya Rao"></div>
+          <div class="field"><label>Work Email *</label><input type="email" id="rf_email" required placeholder="you@jaroeducation.com"></div>
         </div>
         <div class="form-grid">
           <div class="field">
@@ -885,13 +826,12 @@ body.auth-locked #app{display:none}
         </div>
         <div class="form-grid">
           <div class="field">
-            <label>Send To</label>
-            <div class="chip-picker" id="rf_to_picker" style="background:var(--canvas)">
+            <label>Send To *</label>
+            <div class="chip-picker" id="rf_to_picker">
               <div class="chip-list" id="rf_to_chips"></div>
               <input type="text" id="rf_to_input" placeholder="Type a name/email or pick below…" autocomplete="off">
               <div class="chip-suggest" id="rf_to_suggest"></div>
             </div>
-            <div style="font-size:11px;color:var(--ink-35);margin-top:4px">Fixed automatically by Related Section — add anyone else in CC</div>
           </div>
           <div class="field">
             <label>CC (optional)</label>
@@ -1052,16 +992,8 @@ const CONFIG = {
   pagespeedApiKey: "AIzaSyAeSWkzQof55kMc6tpPyWqM5WOzMZEk3jA", // paste your PageSpeed-only restricted API key here (the one you created earlier)
 
   requestForm: {
-    webAppUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec" // Apps Script backend: handles request-form submissions + status updates
-  },
-  // ---- LOGIN / AUTH ----
-  // Same Apps Script Web App as requestForm.webAppUrl above — see the companion Code.gs (delivered
-  // separately). Login, OTP, sessions, user management, request submission and status-update
-  // emails all now live in one Apps Script project so real emails send under Jaro's own authorized
-  // Gmail account, without ever asking whoever's using the dashboard to grant a personal Google
-  // OAuth consent just to submit a request. Point this at the exact same URL unless you deploy
-  // auth on a separate Apps Script project.
-  authApiUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec"
+    webAppUrl: "https://script.google.com/a/macros/jaro.in/s/AKfycbwEgl09bxJyEKHDchtgIZMYxeYzOiMmutPJngx-sq-iDAi9obgE4AiLbpf17feN2HocDA/exec" // Apps Script backend: handles request-form submissions only now
+  }
 };
 
 /* ================================================================================================
@@ -1102,7 +1034,7 @@ const SECTIONS = {
     groupField:"University/Institute", itemField:"Program Name", statusField:"Admission Status",
     linkFields:[["Webpage Link","Live Page"],["Brochure Link","Brochure"],["Payment Link","Payment"],["Login Link","Login"],["Enrolment Link","Enrolment"]] },
   landing: { key:"landing", label:"Landing Pages", desc:"Campaign & channel landing pages by university", icon:"landing", type:"landing-tabs" },
-  unique: { key:"unique", label:"Page Library", desc:"Standalone / one-off pages that don't fit other buckets", icon:"unique", type:"unique" },
+  unique: { key:"unique", label:"Unique Pages", desc:"Standalone / one-off pages that don't fit other buckets", icon:"unique", type:"unique" },
   b2b: { key:"b2b", label:"B2B Pages", desc:"Corporate & partner-branded landing pages", icon:"b2b", type:"flat-cards",
     titleField:"Remarks", linkField:"B2B Pages Links" },
   location: { key:"location", label:"Location Pages", desc:"Branch offices & study centres across cities", icon:"location", type:"location" },
@@ -1114,8 +1046,7 @@ const SECTIONS = {
     titleField:"Page", linkField:"Webpage Link", tagField:"Column 4", tagFallback:"Pillar Page" },
   requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" },
   pageInsights: { key:"pageInsights", label:"Page Insights", desc:"Traffic & engagement per page, live from Google Analytics (last 28 days)", icon:"bolt", type:"page-insights" },
-  seoInsights: { key:"seoInsights", label:"SEO Insights", desc:"Clicks, impressions & search ranking per page, live from Google Search Console (last 28 days)", icon:"search", type:"seo-insights" },
-  coreWebVitals: { key:"coreWebVitals", label:"Core Web Vitals", desc:"LCP, CLS & INP per page, checked live from PageSpeed Insights on demand", icon:"bolt", type:"core-web-vitals" }
+  seoInsights: { key:"seoInsights", label:"SEO Insights", desc:"Clicks, impressions & search ranking per page, live from Google Search Console (last 28 days)", icon:"search", type:"seo-insights" }
 };
 const NAV_ORDER = ["program","landing","unique","b2b","location","blog","university","free","pillar"];
 
@@ -1894,22 +1825,17 @@ async function renderHome(){
       </button>
     </div>`;}).join("")}</div>
 
-    <div class="section-head" id="liveInsightsHead"><div><h2>Live Insights</h2><div class="meta">Traffic, search performance, page vitals & audit — password protected</div></div></div>
-    <div class="stat-grid" id="liveInsightsGrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:26px">
+    <div class="section-head"><div><h2>Live Insights</h2><div class="meta">Traffic, search performance, page vitals & audit — password protected</div></div></div>
+    <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);margin-bottom:26px">
       <div class="stat-card" data-go="pageInsights" style="--glass:var(--blue-tint-10);--fg:var(--blue)">
         <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--blue)">${ic("bolt")}</div></div>
-        <div><div class="val" style="font-size:19px">Page Insights</div><div class="lbl">GA4 traffic, live</div></div>
+        <div><div class="val" style="font-size:19px">Page Insights</div><div class="lbl">GA4 traffic + Core Web Vitals, live</div></div>
         <button type="button" class="stat-explore-btn" style="background:var(--blue)">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
       <div class="stat-card" data-go="seoInsights" style="--glass:var(--red-tint);--fg:var(--red)">
         <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--red)">${ic("search")}</div></div>
         <div><div class="val" style="font-size:19px">SEO Insights</div><div class="lbl">Search Console + On-Page Audit, live</div></div>
         <button type="button" class="stat-explore-btn" style="background:var(--red)">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-      </div>
-      <div class="stat-card" data-go="coreWebVitals" style="--glass:var(--yellow-tint);--fg:#8a6800">
-        <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:#8a6800">${ic("bolt")}</div></div>
-        <div><div class="val" style="font-size:19px">Core Web Vitals</div><div class="lbl">PageSpeed Insights, on demand</div></div>
-        <button type="button" class="stat-explore-btn" style="background:#8a6800">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
     </div>
 
@@ -1952,9 +1878,6 @@ async function renderHome(){
     </div>
   `;
   el.querySelectorAll("[data-go]").forEach(c=>c.addEventListener("click", ()=>navigate(c.dataset.go)));
-  // Re-apply role gating every time Home draws — a Support session should never see "Live
-  // Insights" flash into view, even for a split second, on a fresh boot or a re-render.
-  if(typeof AUTH_SESSION !== "undefined") applyRoleGating_();
   document.getElementById("refreshHomeBtn").addEventListener("click", forceRefreshCurrentSection);
   renderTrendingCourses();
   const heroSearchEl = document.getElementById("heroSearch");
@@ -2861,7 +2784,7 @@ async function renderUnique(sec){
         ${row.notes ? `<p>${esc(row.notes)}</p>` : ""}
         <div class="foot">
           <a class="link-chip" href="${esc(firstLink(row.link))}" target="_blank" rel="noopener">${ic("external")}Open Page</a>
-          ${raiseBtn({ section: "Page Library", link: firstLink(row.link)||"" })}
+          ${raiseBtn({ section: "Unique Pages", link: firstLink(row.link)||"" })}
         </div>
       </div>`).join("")}</div>` : emptyStateHTML("No unique pages found", "Try a different search term.");
     document.getElementById("resultCount").textContent = `${items.length} pages`;
@@ -2959,12 +2882,6 @@ async function navigate(route){
     return;
   }
 
-  if(route === "users"){
-    document.getElementById("pageTitle").textContent = "Users";
-    document.getElementById("pageDesc").textContent = "Everyone who can sign in to this dashboard, and their role";
-    await renderUsersTable();
-    return;
-  }
   const sec = SECTIONS[route];
   document.getElementById("pageTitle").textContent = sec.label;
   document.getElementById("pageDesc").textContent = sec.desc;
@@ -2979,7 +2896,6 @@ async function navigate(route){
   else if(sec.type === "requirements-table") await renderRequirementsGateOrTable(sec);
   else if(sec.type === "page-insights") await renderPageInsightsGateOrTable(sec);
   else if(sec.type === "seo-insights") await renderSeoInsightsGateOrTable(sec);
-  else if(sec.type === "core-web-vitals") await renderCoreWebVitalsGateOrTable(sec);
 }
 
 /* ================================================================================================
@@ -3010,26 +2926,20 @@ const CONTACTS = [
   { name:"Tushar", email:"seo@jaro.in" }
 ];
 
-/* ---- Chip picker: multi-recipient input backed by CONTACTS, with free-text email support.
-   `locked` (used for "Send To") hides the input/suggest entirely and drops the remove button on
-   each chip — the list is fully computed from the Related Section (see updateSendToForSection_
-   above) and isn't meant to be hand-edited; CC stays a normal, fully-editable picker. ---- */
-function createChipPicker(prefix, defaultEmails, locked){
+/* ---- Chip picker: multi-recipient input backed by CONTACTS, with free-text email support ---- */
+function createChipPicker(prefix, defaultEmails){
   const chipsEl = document.getElementById(`rf_${prefix}_chips`);
   const inputEl = document.getElementById(`rf_${prefix}_input`);
   const suggestEl = document.getElementById(`rf_${prefix}_suggest`);
   let selected = []; // {name, email}
-  if(locked){ inputEl.style.display = "none"; suggestEl.style.display = "none"; }
 
   function render(){
     chipsEl.innerHTML = selected.map((c,i)=>`
-      <span class="chip">${esc(c.name||c.email)}${locked ? "" : `<button type="button" data-i="${i}" aria-label="Remove">✕</button>`}</span>
+      <span class="chip">${esc(c.name||c.email)}<button type="button" data-i="${i}" aria-label="Remove">✕</button></span>
     `).join("");
-    if(!locked){
-      chipsEl.querySelectorAll("button").forEach(b=>{
-        b.addEventListener("click", ()=>{ selected.splice(+b.dataset.i,1); render(); });
-      });
-    }
+    chipsEl.querySelectorAll("button").forEach(b=>{
+      b.addEventListener("click", ()=>{ selected.splice(+b.dataset.i,1); render(); });
+    });
   }
   function add(contact){
     if(selected.some(c=>c.email.toLowerCase()===contact.email.toLowerCase())) return;
@@ -3090,26 +3000,8 @@ let toPicker, ccPicker;
 
 function populateSectionDropdown(){
   const sel = document.getElementById("rf_section");
-  // Program Pages and Landing Pages are combined into a single option — a change raised against
-  // either now shows up (and routes to the same fixed recipients, see fixedRecipientsFor_ below)
-  // as one "Program Pages/Landing Pages" entry, per your instruction that the update applies to
-  // both.
-  const rest = NAV_ORDER.filter(k => k!=="program" && k!=="landing").map(k=>SECTIONS[k].label);
   sel.innerHTML = `<option value="">Select a section</option><option>General / Not sure</option>` +
-    `<option>Program Pages/Landing Pages</option>` +
-    rest.map(l=>`<option>${l}</option>`).join("");
-}
-/* "Send To" is fixed by section, not user-editable — Program Pages/Landing Pages always goes to
-   both Lalit and Jasmeet; every other section goes to Lalit only. Anyone who needs to loop in
-   someone else uses the CC field instead, which stays fully open. */
-const FIXED_RECIPIENTS_BY_SECTION_ = { "Program Pages/Landing Pages": ["lalit.rade@jaro.in","jasmeet.kaur@jaro.in"] };
-const DEFAULT_FIXED_RECIPIENT_ = ["lalit.rade@jaro.in"];
-function fixedRecipientsFor_(section){
-  return FIXED_RECIPIENTS_BY_SECTION_[section] || DEFAULT_FIXED_RECIPIENT_;
-}
-function updateSendToForSection_(){
-  const section = document.getElementById("rf_section").value;
-  if(toPicker) toPicker.reset(fixedRecipientsFor_(section));
+    NAV_ORDER.map(k=>`<option>${SECTIONS[k].label}</option>`).join("");
 }
 
 let PROGRAM_ROWS_CACHE = null;
@@ -3157,7 +3049,7 @@ function checkSubjectMatchesHistory(){
 }
 
 /* Sections where University / Program don't apply at all, or only University applies. */
-const SECTIONS_NO_UNI_PROGRAM = ["Page Library","B2B Pages","Location Pages","Blogs","Free Course Pages","Pillar Pages"];
+const SECTIONS_NO_UNI_PROGRAM = ["Unique Pages","B2B Pages","Location Pages","Blogs","Free Course Pages","Pillar Pages"];
 const SECTIONS_UNI_ONLY = ["University Pages"];
 function updateUniProgVisibility(){
   const section = document.getElementById("rf_section").value;
@@ -3191,11 +3083,8 @@ function openRequestModal(prefill){
       subjectEl.value = buildRequestSubject({ university: p.university||"", program: p.program||"", type: document.getElementById("rf_type").value });
     }
   });
-  if(!toPicker) toPicker = createChipPicker("to", ["lalit.rade@jaro.in"], true);
+  if(!toPicker) toPicker = createChipPicker("to", ["lalit.rade@jaro.in"]);
   if(!ccPicker) ccPicker = createChipPicker("cc", []);
-  updateSendToForSection_();
-  SUBJECT_HISTORY_CACHE = null; // force a fresh lookup for whoever is logged in right now
-  refreshSubjectSuggestionsFor(getCurrentUserEmail_()).then(checkSubjectMatchesHistory);
 }
 function closeRequestModal(){
   document.getElementById("requestOverlay").classList.remove("show");
@@ -3286,9 +3175,7 @@ async function submitRequest(e){
   if(!subject){ toast("Please add a subject", true); return; }
   const payload = {
     name: document.getElementById("rf_name").value.trim(),
-    // Identity now comes from the dashboard's own login session, not a typed "Work Email" field —
-    // nobody can submit a request under someone else's address.
-    email: getCurrentUserEmail_(),
+    email: document.getElementById("rf_email").value.trim(),
     team: document.getElementById("rf_team").value.trim(),
     section: document.getElementById("rf_section").value,
     university: document.getElementById("rf_university").value.trim(),
@@ -3476,22 +3363,81 @@ function requestEmailHtml_(payload){
 </div>`;
 }
 async function submitRequestDirect_(payload){
-  // Request submission now goes through the same Apps Script backend as login (see companion
-  // Code.gs) instead of calling the Gmail API directly from the browser — that's what used to
-  // trigger a personal Google OAuth consent ("Google verification") screen on every submit. The
-  // Apps Script sends the email under Jaro's own authorized Gmail account, so nobody using the
-  // dashboard needs to grant anything themselves; their identity comes from the login session.
-  if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
+  const cfg = CONFIG.sheets.requirementsLog;
+  if(!cfg || !cfg.sheetId) throw new Error("CONFIG.sheets.requirementsLog isn't set");
+  const token = await ensureGoogleAuth_();
+
+  // Lock "Requested By" to whoever is actually signed in — overrides anything typed in the form.
+  const verifiedEmail = await getSignedInEmail_(token);
+  payload.email = verifiedEmail;
   payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
-  await authApiCall_("submitRequest", { token: AUTH_SESSION.token, payload });
+
+  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
+  const headerCheck = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1:R1")}`,
+    { headers:{ Authorization:`Bearer ${token}` } });
+  const headerJson = await headerCheck.json();
+  if(!headerJson.values || !headerJson.values.length){
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1")}?valueInputOption=RAW`, {
+      method:"PUT", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+      body: JSON.stringify({ values:[REQUEST_LOG_HEADER] })
+    });
+  }
+
+  // Our own Message-ID (for later threaded replies) — generated before sending so it can be both
+  // stamped on the outgoing email AND stored in the sheet for the status-update reply to reference.
+  const messageId = `<req-${Date.now()}-${Math.random().toString(36).slice(2)}@jaro-dashboard>`;
+  const to = (payload.to && payload.to.length) ? payload.to.join(",") : CONFIG.adminEmail;
+  const cc = (payload.cc||[]).join(",");
+  const mime = [
+    `To: ${to}`, cc ? `Cc: ${cc}` : null, `Message-ID: ${messageId}`,
+    `Subject: ${encodeMimeHeader_(payload.subject)}`, `Content-Type: text/html; charset=UTF-8`, "",
+    requestEmailHtml_(payload)
+  ].filter(Boolean).join("\r\n");
+  const mailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
+    method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ raw: b64UrlEncodeUtf8_(mime) })
+  });
+  const mailJson = await mailRes.json();
+  if(!mailRes.ok) throw new Error((mailJson.error && mailJson.error.message) || "Couldn't send the email");
+
+  const row = [ new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
+    payload.name||"", payload.email||"", payload.team||"", payload.section||"", payload.link||"", payload.subject||"",
+    payload.descriptionText||"", (payload.to||[]).join(", "), (payload.cc||[]).join(", "), "Not Started", payload.threadKey||"",
+    messageId, mailJson.threadId || "" ];
+  const appendRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A:A")}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, {
+    method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ values:[row] })
+  });
+  if(!appendRes.ok){ const j = await appendRes.json(); throw new Error((j.error && j.error.message) || "Email sent, but couldn't save the request to the sheet"); }
 }
-/* ---- Status updates: same backend call — Code.gs looks up the original message/thread from the
-   sheet row itself and replies in-thread via GmailApp (far more reliable than hand-building
-   In-Reply-To/References headers client-side), with a status email styled to match the original
-   "New Request Raised" template instead of the old plain one-liner. ---- */
-async function updateRequestStatus_({sheetRow, status}){
-  if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
-  await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status });
+/* ---- Status updates: writes the new Status into the sheet + replies in the same Gmail thread ---- */
+async function updateRequestStatus_({sheetRow, status, threadId, messageId, email, subject}){
+  const cfg = CONFIG.sheets.requirementsLog;
+  const token = await ensureGoogleAuth_();
+  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
+  const statusRes = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!O"+sheetRow)}?valueInputOption=RAW`, {
+    method:"PUT", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify({ values:[[status]] })
+  });
+  if(!statusRes.ok){ const j = await statusRes.json(); throw new Error((j.error && j.error.message) || "Couldn't update the status in the sheet"); }
+  if(!email) return; // nothing to notify
+
+  const replySubject = /^re:/i.test(subject||"") ? subject : `Re: ${subject||"Your request"}`;
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:13.5px;color:#222;max-width:520px">
+    <p>Your request status has been updated to:</p>
+    <p style="font-size:17px;font-weight:800;color:#0029A6;margin:6px 0 16px">${esc(status)}</p>
+    <p style="font-size:11.5px;color:#9aa1ab">Jaro Web Pages Dashboard</p>
+  </div>`;
+  const mimeLines = [ `To: ${email}`, `Subject: ${encodeMimeHeader_(replySubject)}` ];
+  if(messageId){ mimeLines.push(`In-Reply-To: ${messageId}`, `References: ${messageId}`); }
+  mimeLines.push(`Content-Type: text/html; charset=UTF-8`, "", html);
+  const body = { raw: b64UrlEncodeUtf8_(mimeLines.join("\r\n")) };
+  if(threadId) body.threadId = threadId;
+  const mailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/send`, {
+    method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` },
+    body: JSON.stringify(body)
+  });
+  if(!mailRes.ok){ const j = await mailRes.json(); throw new Error((j.error && j.error.message) || "Status saved, but the reply email failed to send"); }
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
@@ -3962,20 +3908,8 @@ async function renderPageInsights(sec){
   }
   draw("");
   document.getElementById("sec_search").addEventListener("input", debounce(e=>draw(e.target.value), 200));
-}
-/* Core Web Vitals used to be tacked onto the bottom of Page Insights — now its own nav item and
-   its own page, since with 3000+ pages a full vitals scan is a substantial, standalone activity
-   that shouldn't be buried under GA4 traffic. Functionally unchanged: still PageSpeed Insights,
-   on demand, background-scan-survives-refresh (see wireVitalsPanel_ / resumeBackgroundScans_). */
-async function renderCoreWebVitals(sec){
-  const el = document.getElementById("content");
-  // No search bar here — this page is just the on-demand scan table, nothing to filter until a
-  // scan has actually run.
-  document.getElementById("globalSearchWrap").style.display = "none";
-  document.getElementById("refreshDataBtn").style.display = "none";
-  el.innerHTML = `
-    <div class="toolbar-only"><span class="pill" id="livePill" style="display:none">${ic("bolt")} Live from Google Sheets</span></div>
-    <div class="section-head" style="margin-top:6px">
+  el.insertAdjacentHTML("beforeend", `
+    <div class="section-head" style="margin-top:26px">
       <div><h2>Core Web Vitals</h2><div class="meta">Checked live from PageSpeed Insights, on demand — no background job, no sheet</div></div>
       <button class="btn" id="vitalsRunBtn">${ic("bolt")} Run Vitals Scan</button>
     </div>
@@ -3984,7 +3918,7 @@ async function renderCoreWebVitals(sec){
       <thead><tr><th>Page</th><th>Score</th><th>LCP (s)</th><th>CLS</th><th>INP (ms)</th></tr></thead>
       <tbody id="vitalsBody"><tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink-35)">Click "Run Vitals Scan" to check your pages live</td></tr></tbody>
     </table></div>
-  `;
+  `);
   wireVitalsPanel_();
 }
 async function renderSeoInsights(sec){
@@ -4073,37 +4007,6 @@ async function renderPageInsightsGateOrTable(sec){
     }
   };
   document.getElementById("piPasswordSubmit").addEventListener("click", submit);
-  input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
-  input.focus();
-}
-/* Core Web Vitals shares Page Insights' password gate — same trust boundary it used to live
-   inside before being split into its own nav item. */
-async function renderCoreWebVitalsGateOrTable(sec){
-  if(isPageInsightsUnlocked()){ await renderCoreWebVitals(sec); return; }
-  const el = document.getElementById("content");
-  el.innerHTML = `
-    <div style="max-width:380px;margin:70px auto;text-align:center">
-      <div style="width:52px;height:52px;border-radius:14px;background:var(--blue-tint-10);color:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-      </div>
-      <h2 style="margin-bottom:6px">Password Protected</h2>
-      <p style="color:var(--ink-50);font-size:13px;margin-bottom:22px">Enter the password to view Core Web Vitals</p>
-      <input type="password" id="cwvPasswordInput" placeholder="Password" autocomplete="off"
-        style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;text-align:center;font-size:14px;margin-bottom:12px;box-sizing:border-box">
-      <div id="cwvPasswordError" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none">Incorrect password — try again.</div>
-      <button class="btn primary" id="cwvPasswordSubmit" style="width:100%;justify-content:center">Unlock</button>
-    </div>`;
-  const input = document.getElementById("cwvPasswordInput");
-  const submit = async ()=>{
-    if(input.value.trim() === PAGE_INSIGHTS_PASSWORD){
-      sessionStorage.setItem("pageInsightsUnlocked", "1");
-      await renderCoreWebVitals(sec);
-    } else {
-      document.getElementById("cwvPasswordError").style.display = "block";
-      input.value = ""; input.focus();
-    }
-  };
-  document.getElementById("cwvPasswordSubmit").addEventListener("click", submit);
   input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
   input.focus();
 }
@@ -4268,7 +4171,11 @@ async function renderRequirementsTable(sec){
         const prevColor = sel.style.background;
         sel.disabled = true;
         try{
-          await updateRequestStatus_({ sheetRow: +sel.dataset.row, status: newStatus });
+          await updateRequestStatus_({
+            sheetRow: +sel.dataset.row, status: newStatus,
+            threadId: sel.dataset.threadid, messageId: sel.dataset.msgid,
+            email: sel.dataset.email, subject: sel.dataset.subject
+          });
           const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
           sel.style.background = c.bg; sel.style.color = c.fg;
           toast(sel.dataset.email ? `Status updated — ${sel.dataset.email} notified by email` : "Status updated");
@@ -4327,248 +4234,6 @@ function mountNewsFab(){
     </button>`);
   document.getElementById("newsFab").addEventListener("click", openNewsModal);
 }
-/* ================================================================================================
-   LOGIN / AUTH  —  Admin + Support, email+password then an emailed OTP, backed by the same Apps
-   Script Web App as the request form (see companion Code.gs). No plaintext password ever lives in
-   this file — the Apps Script backend stores only a salted hash and does the actual checking.
-   Session: a random token issued after OTP verification, cached in localStorage with an expiry
-   (SESSION_TTL_MS below) so people aren't asked to log in again every single page load.
-   ================================================================================================ */
-const AUTH_SESSION_KEY = "jaroDash_authSession_v1";
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-let AUTH_SESSION = null;
-function loadAuthSession_(){
-  try{
-    const raw = localStorage.getItem(AUTH_SESSION_KEY);
-    if(!raw) return null;
-    const s = JSON.parse(raw);
-    if(!s || !s.token || !s.expiresAt || Date.now() > s.expiresAt){ localStorage.removeItem(AUTH_SESSION_KEY); return null; }
-    return s;
-  }catch(e){ return null; }
-}
-function saveAuthSession_(s){
-  AUTH_SESSION = s;
-  try{ localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(s)); }catch(e){}
-}
-function clearAuthSession_(){
-  AUTH_SESSION = null;
-  try{ localStorage.removeItem(AUTH_SESSION_KEY); }catch(e){}
-}
-function getCurrentUserEmail_(){ return AUTH_SESSION ? AUTH_SESSION.email : ""; }
-function getCurrentUserRole_(){ return AUTH_SESSION ? AUTH_SESSION.role : ""; }
-function isAdmin_(){ return getCurrentUserRole_() === "Admin"; }
-/* Every call is a POST with a plain-text body (no custom Content-Type header) on purpose — that's
-   what keeps the browser from sending a CORS preflight OPTIONS request, which Apps Script Web
-   Apps can't answer. Apps Script reads the raw body itself (e.postData.contents) and parses it. */
-async function authApiCall_(action, data){
-  if(!CONFIG.authApiUrl) throw new Error("CONFIG.authApiUrl isn't set yet");
-  const res = await fetch(CONFIG.authApiUrl, { method:"POST", body: JSON.stringify(Object.assign({ action }, data||{})) });
-  let json;
-  try{ json = await res.json(); }catch(e){ throw new Error("Unexpected response from the login service"); }
-  if(!json || !json.ok) throw new Error((json && json.error) || "Something went wrong — try again");
-  return json;
-}
-
-/* ---- Screens ---- */
-function authCardShell_(title, sub, bodyHtml){
-  return `
-    <div class="auth-brand">
-      <img src="${JARO_J_LOGO_B64}" alt="">
-      <div>Jaro Education<span>Web Pages Command Center</span></div>
-    </div>
-    <h2>${title}</h2>
-    <div class="sub">${sub}</div>
-    ${bodyHtml}
-    <div class="auth-error" id="authError"></div>`;
-}
-function showAuthError_(msg){
-  const el = document.getElementById("authError");
-  if(!el) return;
-  el.textContent = msg;
-  el.style.display = "block";
-}
-function drawAuthLogin_(){
-  document.getElementById("authCard").innerHTML = authCardShell_(
-    "Log In", "Use your Jaro email and password",
-    `<div class="auth-field"><label>Email</label><input type="email" id="auth_email" placeholder="you@jaro.in" autocomplete="username"></div>
-     <div class="auth-field"><label>Password</label><input type="password" id="auth_password" placeholder="••••••••" autocomplete="current-password"></div>
-     <button class="auth-btn" id="authLoginBtn">Continue</button>
-     <div class="auth-note">First time as a Support user? <a id="authGoSetup">Set up your password</a></div>`
-  );
-  const emailEl = document.getElementById("auth_email");
-  const passEl = document.getElementById("auth_password");
-  const submit = async ()=>{
-    const email = emailEl.value.trim(), password = passEl.value;
-    if(!email || !password){ showAuthError_("Enter both your email and password."); return; }
-    const btn = document.getElementById("authLoginBtn"); btn.disabled = true; btn.textContent = "Sending code…";
-    try{
-      const r = await authApiCall_("login", { email, password });
-      if(r.needsSetup){ drawAuthSetupEmail_(email); return; }
-      drawAuthOtp_(email, "login");
-    }catch(e){ showAuthError_(e.message); btn.disabled = false; btn.textContent = "Continue"; }
-  };
-  document.getElementById("authLoginBtn").addEventListener("click", submit);
-  passEl.addEventListener("keydown", e=>{ if(e.key==="Enter") submit(); });
-  document.getElementById("authGoSetup").addEventListener("click", ()=> drawAuthSetupEmail_(emailEl.value.trim()));
-}
-function drawAuthOtp_(email, purpose){
-  document.getElementById("authCard").innerHTML = authCardShell_(
-    "Enter the code", `We emailed a 6-digit code to ${email}`,
-    `<div class="auth-field"><input type="text" id="auth_otp" class="auth-otp-input" maxlength="6" placeholder="000000" autocomplete="one-time-code"></div>
-     <button class="auth-btn" id="authOtpBtn">Verify</button>
-     <div class="auth-note"><a id="authResendOtp">Resend code</a> · <a id="authBackToLogin">Back</a></div>`
-  );
-  const otpEl = document.getElementById("auth_otp");
-  otpEl.focus();
-  const submit = async ()=>{
-    const otp = otpEl.value.trim();
-    if(otp.length !== 6){ showAuthError_("Enter the 6-digit code."); return; }
-    const btn = document.getElementById("authOtpBtn"); btn.disabled = true; btn.textContent = "Verifying…";
-    try{
-      const r = await authApiCall_("verifyOtp", { email, otp, purpose });
-      if(purpose === "login"){
-        saveAuthSession_({ token:r.token, email:r.email, role:r.role, name:r.name, expiresAt: Date.now() + SESSION_TTL_MS });
-        completeLogin_();
-      } else { // purpose === "setup" — proceed to choosing a password
-        drawAuthSetupPassword_(email, r.setupToken);
-      }
-    }catch(e){ showAuthError_(e.message); btn.disabled = false; btn.textContent = "Verify"; }
-  };
-  document.getElementById("authOtpBtn").addEventListener("click", submit);
-  otpEl.addEventListener("keydown", e=>{ if(e.key==="Enter") submit(); });
-  document.getElementById("authBackToLogin").addEventListener("click", drawAuthLogin_);
-  document.getElementById("authResendOtp").addEventListener("click", async ()=>{
-    try{ await authApiCall_(purpose === "login" ? "resendLoginOtp" : "requestPasswordSetup", { email }); showAuthError_("Code resent — check your inbox."); }
-    catch(e){ showAuthError_(e.message); }
-  });
-}
-function drawAuthSetupEmail_(prefillEmail){
-  document.getElementById("authCard").innerHTML = authCardShell_(
-    "Set up your password", "Enter your Jaro email — we'll send a code to verify it's you",
-    `<div class="auth-field"><label>Email</label><input type="email" id="auth_setup_email" value="${esc(prefillEmail||"")}" placeholder="you@jaro.in"></div>
-     <button class="auth-btn" id="authSetupSendBtn">Send Code</button>
-     <div class="auth-note"><a id="authBackToLogin2">Back to log in</a></div>`
-  );
-  const emailEl = document.getElementById("auth_setup_email");
-  const submit = async ()=>{
-    const email = emailEl.value.trim();
-    if(!email){ showAuthError_("Enter your email."); return; }
-    const btn = document.getElementById("authSetupSendBtn"); btn.disabled = true; btn.textContent = "Sending…";
-    try{
-      await authApiCall_("requestPasswordSetup", { email });
-      drawAuthOtp_(email, "setup");
-    }catch(e){ showAuthError_(e.message); btn.disabled = false; btn.textContent = "Send Code"; }
-  };
-  document.getElementById("authSetupSendBtn").addEventListener("click", submit);
-  document.getElementById("authBackToLogin2").addEventListener("click", drawAuthLogin_);
-}
-function drawAuthSetupPassword_(email, setupToken){
-  document.getElementById("authCard").innerHTML = authCardShell_(
-    "Choose a password", `For ${email}`,
-    `<div class="auth-field"><label>New Password</label><input type="password" id="auth_new_pw" placeholder="At least 8 characters"></div>
-     <div class="auth-field"><label>Confirm Password</label><input type="password" id="auth_new_pw2" placeholder="Retype password"></div>
-     <button class="auth-btn" id="authSetPwBtn">Set Password & Log In</button>`
-  );
-  const submit = async ()=>{
-    const pw = document.getElementById("auth_new_pw").value;
-    const pw2 = document.getElementById("auth_new_pw2").value;
-    if(pw.length < 8){ showAuthError_("Password must be at least 8 characters."); return; }
-    if(pw !== pw2){ showAuthError_("Passwords don't match."); return; }
-    const btn = document.getElementById("authSetPwBtn"); btn.disabled = true; btn.textContent = "Saving…";
-    try{
-      const r = await authApiCall_("setPassword", { email, setupToken, newPassword: pw });
-      saveAuthSession_({ token:r.token, email:r.email, role:r.role, name:r.name, expiresAt: Date.now() + SESSION_TTL_MS });
-      completeLogin_();
-    }catch(e){ showAuthError_(e.message); btn.disabled = false; btn.textContent = "Set Password & Log In"; }
-  };
-  document.getElementById("authSetPwBtn").addEventListener("click", submit);
-}
-function showAuthGate_(){
-  document.body.classList.add("auth-locked");
-  document.getElementById("authOverlay").classList.add("show");
-  drawAuthLogin_();
-}
-function completeLogin_(){
-  document.getElementById("authOverlay").classList.remove("show");
-  document.body.classList.remove("auth-locked");
-  applyRoleGating_();
-  if(!window.__dashboardBooted){ window.__dashboardBooted = true; init(); }
-  else { navigate("home"); }
-}
-function logout_(){
-  const token = AUTH_SESSION && AUTH_SESSION.token;
-  clearAuthSession_();
-  if(token) authApiCall_("logout", { token }).catch(()=>{});
-  showAuthGate_();
-}
-
-/* ---- Role gating: Support only sees the Web Page category sections + Home (Live Insights
-   hidden there too); everything else (Requirements Log, Page/SEO Insights, Core Web Vitals, and
-   the Users admin page) is Admin-only. ---- */
-const SUPPORT_HIDDEN_NAV = ["requirements","pageInsights","seoInsights","coreWebVitals"];
-function applyRoleGating_(){
-  const role = getCurrentUserRole_();
-  document.getElementById("userPill").style.display = "flex";
-  document.getElementById("userPillEmail").textContent = getCurrentUserEmail_();
-  document.getElementById("userPillRole").textContent = role || "—";
-  const admin = role === "Admin";
-  document.getElementById("usersNavItem").style.display = admin ? "" : "none";
-  document.getElementById("adminGroupLabel").style.display = admin ? "" : "none";
-  SUPPORT_HIDDEN_NAV.forEach(navKey=>{
-    const item = document.querySelector(`.navitem[data-nav="${navKey}"]`);
-    if(item) item.style.display = admin ? "" : "none";
-  });
-  const liveInsightsHead = document.getElementById("liveInsightsHead");
-  const liveInsightsGrid = document.getElementById("liveInsightsGrid");
-  if(liveInsightsHead) liveInsightsHead.style.display = admin ? "" : "none";
-  if(liveInsightsGrid) liveInsightsGrid.style.display = admin ? "" : "none";
-  // Belt-and-braces: if a Support session is ever sitting on a restricted route (e.g. a stale
-  // deep link), bounce back to Home rather than just hiding the nav item.
-  if(!admin && SUPPORT_HIDDEN_NAV.includes(currentRoute)) navigate("home");
-  if(!admin && currentRoute === "users") navigate("home");
-}
-
-/* ---- Admin: Users page — everyone who can sign in, plus a form to invite a new Support user ---- */
-async function renderUsersTable(){
-  const el = document.getElementById("content");
-  if(!isAdmin_()){ el.innerHTML = emptyStateHTML("Admins only", "This page is only visible to Admin accounts."); return; }
-  el.innerHTML = `
-    <div class="section-head"><div><h2>Add a Support User</h2><div class="meta">They'll set their own password the first time they log in</div></div></div>
-    <div class="form-grid" style="margin-bottom:22px;max-width:520px">
-      <div class="field"><label>Email</label><input type="email" id="newUserEmail" placeholder="name@jaro.in"></div>
-      <div class="field" style="align-self:end"><button class="btn primary" id="addUserBtn" style="width:100%;justify-content:center">Add Support User</button></div>
-    </div>
-    <div class="section-head"><div><h2>Everyone With Access</h2></div></div>
-    <div id="usersTableWrap"><div style="padding:40px;text-align:center;color:var(--ink-35)">Loading…</div></div>`;
-  document.getElementById("addUserBtn").addEventListener("click", async ()=>{
-    const email = document.getElementById("newUserEmail").value.trim();
-    if(!email){ toast("Enter an email", true); return; }
-    try{
-      await authApiCall_("addUser", { token: AUTH_SESSION.token, email, role:"Support" });
-      toast("Support user added — they can now set up their password");
-      document.getElementById("newUserEmail").value = "";
-      loadUsersTable_();
-    }catch(e){ toast(e.message, true); }
-  });
-  loadUsersTable_();
-}
-async function loadUsersTable_(){
-  const wrap = document.getElementById("usersTableWrap");
-  try{
-    const r = await authApiCall_("listUsers", { token: AUTH_SESSION.token });
-    const users = r.users || [];
-    wrap.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th></tr></thead>
-      <tbody>${users.map(u=>`<tr>
-        <td>${esc(u.email)}</td><td>${esc(u.role)}</td>
-        <td>${esc(u.status)}</td><td class="cell-muted">${esc(u.lastLogin||"Never")}</td>
-      </tr>`).join("") || `<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--ink-35)">No users yet</td></tr>`}</tbody>
-    </table></div>`;
-  }catch(e){
-    wrap.innerHTML = emptyStateHTML("Couldn't load users", e.message);
-  }
-}
-
 function init(){
   renderNav();
   populateSectionDropdown();
@@ -4600,7 +4265,6 @@ function init(){
   document.querySelector('.navitem[data-nav="requirements"]').addEventListener("click", ()=>navigate("requirements"));
   document.querySelector('.navitem[data-nav="pageInsights"]').addEventListener("click", ()=>navigate("pageInsights"));
   document.querySelector('.navitem[data-nav="seoInsights"]').addEventListener("click", ()=>navigate("seoInsights"));
-  document.querySelector('.navitem[data-nav="coreWebVitals"]').addEventListener("click", ()=>navigate("coreWebVitals"));
   document.getElementById("openRequestBtn").addEventListener("click", ()=>openRequestModal());
   document.getElementById("closeRequestBtn").addEventListener("click", closeRequestModal);
   document.getElementById("cancelRequestBtn").addEventListener("click", closeRequestModal);
@@ -4616,10 +4280,11 @@ function wireRequestFormDependencies(){
   const uniEl = document.getElementById("rf_university");
   const progEl = document.getElementById("rf_program");
   const typeEl = document.getElementById("rf_type");
+  const emailEl = document.getElementById("rf_email");
   const subjectEl = document.getElementById("rf_subject");
   const sectionEl = document.getElementById("rf_section");
 
-  sectionEl.addEventListener("change", ()=>{ updateUniProgVisibility(); updateSendToForSection_(); });
+  sectionEl.addEventListener("change", updateUniProgVisibility);
   uniEl.addEventListener("input", ()=>{ refreshProgramOptionsFor(uniEl.value); maybeSuggestSubject(); });
   progEl.addEventListener("input", ()=>{
     maybeSuggestSubject();
@@ -4636,6 +4301,10 @@ function wireRequestFormDependencies(){
   });
   typeEl.addEventListener("change", maybeSuggestSubject);
   subjectEl.addEventListener("input", checkSubjectMatchesHistory);
+  emailEl.addEventListener("blur", ()=>{
+    SUBJECT_HISTORY_CACHE = null; // force a fresh lookup per email
+    refreshSubjectSuggestionsFor(emailEl.value.trim()).then(checkSubjectMatchesHistory);
+  });
 
   function maybeSuggestSubject(){
     if(subjectEl.value.trim()) return; // never overwrite what the user already typed
@@ -4643,19 +4312,7 @@ function wireRequestFormDependencies(){
     if(uniEl.value.trim() || progEl.value.trim() || typeEl.value) subjectEl.value = suggestion;
   }
 }
-/* Boot behind the login gate: a valid, unexpired session skips straight to the dashboard;
-   otherwise the email+password+OTP screen shows first and init() only runs after that succeeds
-   (see completeLogin_ above). */
-document.getElementById("logoutBtn").addEventListener("click", logout_);
-AUTH_SESSION = loadAuthSession_();
-if(AUTH_SESSION){
-  document.body.classList.remove("auth-locked");
-  window.__dashboardBooted = true;
-  init();
-  applyRoleGating_();
-} else {
-  showAuthGate_();
-}
+init();
 </script>
 </body>
 </html>
