@@ -625,9 +625,12 @@ function escHtml_(s){ return (s||"").toString().replace(/[&<>"']/g, m => ({"&":"
 function friendlyGmailError_(err){
   const msg = (err && err.message) || String(err);
   if(/specified permissions/i.test(msg) || /not sufficient/i.test(msg)){
+    // TEMPORARY DIAGNOSTIC: the raw Google error is appended in [brackets] below (normally hidden
+    // behind the friendly sentence) — this exact scope list is what's pinpointing the real gap
+    // while this authorization issue is still being tracked down. Safe to remove once resolved.
     return new Error("Gmail access hasn't been authorized for this script yet. In the Apps Script editor, " +
       "select authorizeGmailAccess from the function dropdown, click Run, approve the prompts, then " +
-      "redeploy (Deploy > Manage deployments > New version). This is a one-time step.");
+      "redeploy (Deploy > Manage deployments > New version). This is a one-time step. [raw: " + msg + "]");
   }
   return err;
 }
