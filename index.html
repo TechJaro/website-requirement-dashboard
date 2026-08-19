@@ -719,7 +719,7 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .news-card-source .ncs-name{font-size:11px;font-weight:800;color:var(--ink-70)}
 .news-card-source .ncs-date{font-size:10.5px;color:var(--ink-35);margin-left:auto;white-space:nowrap}
 .news-card-title{font-size:13.5px;font-weight:800;color:var(--ink);line-height:1.35}
-.news-card-desc{font-size:12px;color:var(--ink-60);line-height:1.5;flex:1}
+.news-card-desc{font-size:12px;color:var(--ink-50);line-height:1.5;flex:1}
 .news-card-link{margin-top:6px;font-size:12px;font-weight:800;color:#fff;background:var(--blue);
   padding:8px 12px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;gap:6px;
   text-decoration:none;transition:background .15s}
@@ -755,7 +755,7 @@ body.auth-locked #app{display:none}
 .auth-note a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:none}
 .auth-note a:hover{text-decoration:underline}
 .logout-btn{display:flex;align-items:center;gap:8px;justify-content:center;width:100%;padding:10px;
-  border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink-60);font-size:12.5px;
+  border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink-70);font-size:12.5px;
   font-weight:700;cursor:pointer;margin-top:8px}
 .logout-btn:hover{background:var(--canvas);color:var(--red)}
 .user-pill{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:10px;background:var(--canvas);
@@ -819,6 +819,10 @@ body.auth-locked #app{display:none}
         <span id="userPillEmail"></span>
         <span class="role-tag" id="userPillRole"></span>
       </div>
+      <button class="logout-btn" id="viewAsToggleBtn" style="display:none;margin-top:0;margin-bottom:8px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        <span id="viewAsToggleLabel">View as Support</span>
+      </button>
       <button class="raise-btn" id="openRequestBtn">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
         Raise a Request
@@ -2976,10 +2980,14 @@ async function navigate(route){
   else if(sec.type === "blog-cards") await renderBlogCards(sec);
   else if(sec.type === "free-courses") await renderFreeCourses(sec);
   else if(sec.type === "unique") await renderUnique(sec);
-  else if(sec.type === "requirements-table") await renderRequirementsGateOrTable(sec);
-  else if(sec.type === "page-insights") await renderPageInsightsGateOrTable(sec);
-  else if(sec.type === "seo-insights") await renderSeoInsightsGateOrTable(sec);
-  else if(sec.type === "core-web-vitals") await renderCoreWebVitalsGateOrTable(sec);
+  // These four routes used to be behind their own extra "type a password" gate. They're now
+  // reachable only by logged-in Admins (SUPPORT_HIDDEN_NAV + applyRoleGating_ already keep Support
+  // users and anyone not logged in away from them), so the second password on top of the login
+  // itself was redundant — bypassing straight to the real render function per your request.
+  else if(sec.type === "requirements-table") await renderRequirementsTable(sec);
+  else if(sec.type === "page-insights") await renderPageInsights(sec);
+  else if(sec.type === "seo-insights") await renderSeoInsights(sec);
+  else if(sec.type === "core-web-vitals") await renderCoreWebVitals(sec);
 }
 
 /* ================================================================================================
@@ -3175,11 +3183,24 @@ function updateUniProgVisibility(){
     uniWrap.style.display = ""; progWrap.style.display = "";
   }
 }
+// Program Pages and Landing Pages were merged into one "Program Pages/Landing Pages" dropdown
+// option (see populateSectionDropdown) — normalize either raw label to that merged value so opening
+// "Raise a Request" from inside either of those two section pages still pre-selects correctly
+// instead of silently failing to match any <option> and leaving the dropdown blank.
+function normalizeSectionLabel_(label){
+  if(label === "Program Pages" || label === "Landing Pages") return "Program Pages/Landing Pages";
+  return label;
+}
 function openRequestModal(prefill){
   document.getElementById("requestOverlay").classList.add("show");
   const p = prefill || {};
   const pre = SECTIONS[currentRoute];
-  document.getElementById("rf_section").value = p.section || (pre ? pre.label : "");
+  const sectionEl = document.getElementById("rf_section");
+  const wantedSection = normalizeSectionLabel_(p.section || (pre ? pre.label : ""));
+  sectionEl.value = wantedSection;
+  // If that value didn't match any real <option> (e.g. a section we don't recognize), fall back to
+  // the "Select a section" placeholder instead of leaving the dropdown showing nothing selected.
+  if(sectionEl.value !== wantedSection) sectionEl.value = "";
   if(p.university) document.getElementById("rf_university").value = p.university;
   if(p.program) document.getElementById("rf_program").value = p.program;
   if(p.link) document.getElementById("rf_link").value = p.link;
@@ -4355,8 +4376,24 @@ function clearAuthSession_(){
   try{ localStorage.removeItem(AUTH_SESSION_KEY); }catch(e){}
 }
 function getCurrentUserEmail_(){ return AUTH_SESSION ? AUTH_SESSION.email : ""; }
-function getCurrentUserRole_(){ return AUTH_SESSION ? AUTH_SESSION.role : ""; }
+// VIEW_AS_SUPPORT lets an Admin flip their own panel into the Support-limited view without logging
+// out and back in as someone else — useful for checking exactly what a Support teammate sees. It's
+// purely a front-end display toggle (resets on reload); every backend call still uses the real
+// session token, so Apps Script still enforces the real Admin/Support permission on its end
+// regardless of which view is showing here.
+let VIEW_AS_SUPPORT = false;
+function isRealAdmin_(){ return !!AUTH_SESSION && AUTH_SESSION.role === "Admin"; }
+function getCurrentUserRole_(){
+  if(!AUTH_SESSION) return "";
+  if(AUTH_SESSION.role === "Admin" && VIEW_AS_SUPPORT) return "Support";
+  return AUTH_SESSION.role;
+}
 function isAdmin_(){ return getCurrentUserRole_() === "Admin"; }
+function toggleViewAsSupport_(){
+  VIEW_AS_SUPPORT = !VIEW_AS_SUPPORT;
+  applyRoleGating_();
+  navigate("home");
+}
 /* Every call is a POST with a plain-text body (no custom Content-Type header) on purpose — that's
    what keeps the browser from sending a CORS preflight OPTIONS request, which Apps Script Web
    Apps can't answer. Apps Script reads the raw body itself (e.postData.contents) and parses it. */
@@ -4557,6 +4594,13 @@ function applyRoleGating_(){
   document.getElementById("userPillEmail").textContent = getCurrentUserEmail_();
   document.getElementById("userPillRole").textContent = role || "—";
   const admin = role === "Admin";
+  // Only a REAL Admin ever sees the toggle — it lets them preview the Support-limited panel
+  // without logging out, and switch back the same way.
+  const toggleBtn = document.getElementById("viewAsToggleBtn");
+  if(toggleBtn){
+    toggleBtn.style.display = isRealAdmin_() ? "flex" : "none";
+    document.getElementById("viewAsToggleLabel").textContent = VIEW_AS_SUPPORT ? "Back to Admin View" : "View as Support";
+  }
   document.getElementById("usersNavItem").style.display = admin ? "" : "none";
   document.getElementById("adminGroupLabel").style.display = admin ? "" : "none";
   SUPPORT_HIDDEN_NAV.forEach(navKey=>{
@@ -4583,7 +4627,7 @@ async function renderUsersTable(){
       <div class="field"><label>Email</label><input type="email" id="newUserEmail" placeholder="name@jaro.in"></div>
       <div class="field" style="align-self:end"><button class="btn primary" id="addUserBtn" style="width:100%;justify-content:center">Add Support User</button></div>
     </div>
-    <div class="section-head"><div><h2>Everyone With Access</h2></div></div>
+    <div class="section-head"><div><h2>Everyone With Access</h2><div class="meta" id="usersCount">Loading…</div></div></div>
     <div id="usersTableWrap"><div style="padding:40px;text-align:center;color:var(--ink-35)">Loading…</div></div>`;
   document.getElementById("addUserBtn").addEventListener("click", async ()=>{
     const email = document.getElementById("newUserEmail").value.trim();
@@ -4599,16 +4643,31 @@ async function renderUsersTable(){
 }
 async function loadUsersTable_(){
   const wrap = document.getElementById("usersTableWrap");
+  const countEl = document.getElementById("usersCount");
   try{
     const r = await authApiCall_("listUsers", { token: AUTH_SESSION.token });
     const users = r.users || [];
+    if(countEl) countEl.textContent = users.length ? `${users.length} ${users.length === 1 ? "person" : "people"} with access` : "No records";
     wrap.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th></tr></thead>
+      <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th></th></tr></thead>
       <tbody>${users.map(u=>`<tr>
         <td>${esc(u.email)}</td><td>${esc(u.role)}</td>
         <td>${esc(u.status)}</td><td class="cell-muted">${esc(u.lastLogin||"Never")}</td>
-      </tr>`).join("") || `<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--ink-35)">No users yet</td></tr>`}</tbody>
+        <td>${u.role === "Support" ? `<button class="btn reset-pw-btn" data-email="${esc(u.email)}" style="font-size:11.5px;padding:5px 10px">Regenerate Password</button>` : ""}</td>
+      </tr>`).join("") || `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--ink-35)">No records for other members</td></tr>`}</tbody>
     </table></div>`;
+    wrap.querySelectorAll(".reset-pw-btn").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const email = btn.dataset.email;
+        if(!confirm(`Reset the password for ${email}? They'll need to set up a new one via email OTP before they can log in again.`)) return;
+        btn.disabled = true; btn.textContent = "Resetting…";
+        try{
+          await authApiCall_("resetUserPassword", { token: AUTH_SESSION.token, email });
+          toast(`Password reset for ${email} — they'll set a new one next time they log in`);
+          loadUsersTable_();
+        }catch(e){ toast(e.message, true); btn.disabled = false; btn.textContent = "Regenerate Password"; }
+      });
+    });
   }catch(e){
     wrap.innerHTML = emptyStateHTML("Couldn't load users", e.message);
   }
@@ -4646,6 +4705,7 @@ function init(){
   document.querySelector('.navitem[data-nav="pageInsights"]').addEventListener("click", ()=>navigate("pageInsights"));
   document.querySelector('.navitem[data-nav="seoInsights"]').addEventListener("click", ()=>navigate("seoInsights"));
   document.querySelector('.navitem[data-nav="coreWebVitals"]').addEventListener("click", ()=>navigate("coreWebVitals"));
+  document.querySelector('.navitem[data-nav="users"]').addEventListener("click", ()=>navigate("users"));
   document.getElementById("openRequestBtn").addEventListener("click", ()=>openRequestModal());
   document.getElementById("closeRequestBtn").addEventListener("click", closeRequestModal);
   document.getElementById("cancelRequestBtn").addEventListener("click", closeRequestModal);
@@ -4692,6 +4752,7 @@ function wireRequestFormDependencies(){
    otherwise the email+password+OTP screen shows first and init() only runs after that succeeds
    (see completeLogin_ above). */
 document.getElementById("logoutBtn").addEventListener("click", logout_);
+document.getElementById("viewAsToggleBtn").addEventListener("click", toggleViewAsSupport_);
 AUTH_SESSION = loadAuthSession_();
 if(AUTH_SESSION){
   document.body.classList.remove("auth-locked");
