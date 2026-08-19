@@ -636,25 +636,27 @@ function handleSubmitRequest_(body){
   const payload = body.payload || {};
   payload.email = session.Email; // identity always comes from the session, never the client
   payload.name = payload.name || session.Email;
+  // The exact string stored here is reused verbatim (prefixed "Re: ") for every status-update
+  // reply on this request — see sendGmailMessage_ below. That's what guarantees Gmail's own
+  // exact-Subject-match requirement for threading is met, instead of two independently-encoded
+  // Subject headers silently drifting apart and Gmail starting a new thread instead of replying.
+  const subject = payload.subject || "New Request";
+  payload.subject = subject;
   const to = (payload.to && payload.to.length) ? payload.to.join(",") : "lalit.rade@jaro.in";
   const cc = (payload.cc||[]).join(",");
   const html = requestEmailHtml_(payload, "New Request Raised");
-  const options = { htmlBody: html, name: "Jaro Web Pages Dashboard" };
-  if(cc) options.cc = cc;
-  let msg, thread;
+  let sent;
   try{
-    const draft = GmailApp.createDraft(to, payload.subject || "New Request", "This email requires HTML to view.", options);
-    msg = draft.send();
-    thread = msg.getThread();
+    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html });
   }catch(err){
-    throw friendlyGmailError_(err);
+    throw friendlyGmailApiError_(err);
   }
   const sheet = getRequestsSheet_();
   sheet.appendRow([
     new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
-    payload.name||"", payload.email||"", payload.team||"", payload.section||"", payload.link||"", payload.subject||"",
+    payload.name||"", payload.email||"", payload.team||"", payload.section||"", payload.link||"", subject,
     payload.descriptionText||"", (payload.to||[]).join(", "), (payload.cc||[]).join(", "), "Not Started", payload.threadKey||"",
-    msg.getId(), thread.getId()
+    sent.id, sent.threadId
   ]);
   return { ok:true };
 }
@@ -668,6 +670,16 @@ function handleSubmitRequest_(body){
    ourselves with EXACT To/Cc, and set threadId + In-Reply-To/References headers explicitly, which
    is what actually and reliably threads a message in Gmail (rather than relying on GmailApp's own
    opaque "figure out the right thread" heuristic).
+   sendGmailMessage_ is now used for BOTH the original "New Request Raised" email (threadId/
+   inReplyTo/references all omitted — there's no thread yet) and every "Request Status Updated"
+   reply (all three supplied). Previously the original send went through GmailApp.createDraft()
+   instead, which encodes its own Subject header internally with no visibility into exactly how —
+   any tiny difference between that and this file's own RFC 2047 encoding of "Re: " + the same
+   text (needed because auto-built subjects contain a non-ASCII em dash "—") was enough for Gmail
+   to treat a reply's Subject as non-matching and silently start a brand-new thread instead of
+   threading it, even though threadId/In-Reply-To/References were all correct. Routing both sends
+   through this one function means the exact same Subject string (down to the byte) is guaranteed
+   for both, so that failure mode can no longer happen.
    ONE-TIME SETUP REQUIRED: in the Apps Script editor, click "Services" (+ icon) in the left
    sidebar, find "Gmail API", click Add. That's it — no new OAuth consent needed beyond what's
    already authorized via authorizeGmailAccess(). Then redeploy (Deploy > Manage deployments >
@@ -692,7 +704,7 @@ function getOriginalThreadingHeaders_(messageId){
     return { inReplyTo:"", references:"" };
   }
 }
-function sendThreadedGmailReply_({threadId, to, cc, subject, htmlBody, inReplyTo, references}){
+function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, references}){
   const fromEmail = Session.getEffectiveUser().getEmail();
   const rawHeaders = [
     "MIME-Version: 1.0",
@@ -757,7 +769,7 @@ function handleUpdateStatus_(body){
       // the original thread, with full control over To/Cc that a plain GmailApp reply can't offer.
       const th = messageId ? getOriginalThreadingHeaders_(messageId) : { inReplyTo:"", references:"" };
       debugLines.push(`inReplyTo=${th.inReplyTo || "(empty — original Message-ID header lookup failed)"}`);
-      const sent = sendThreadedGmailReply_({
+      const sent = sendGmailMessage_({
         threadId: threadId, to: to, cc: cc, subject: "Re: " + (payload.subject || "Your request"),
         htmlBody: html, inReplyTo: th.inReplyTo, references: th.references
       });
