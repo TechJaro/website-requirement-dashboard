@@ -761,6 +761,12 @@ body.auth-locked #app{display:none}
   border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink-70);font-size:12.5px;
   font-weight:700;cursor:pointer;margin-top:8px}
 .logout-btn:hover{background:var(--canvas);color:var(--red)}
+/* Secondary sidebar actions (View as Support / Log Out) sit side by side as a compact, lower-key
+   row underneath the primary Raise a Request CTA, instead of stacking as separate full-width bars
+   that all look equally important. */
+.sidebar-foot-row{display:flex;gap:8px;margin-top:8px}
+.sidebar-foot-row .sidebar-foot-btn{margin-top:0;padding:8px 6px;font-size:11.5px;flex:1;min-width:0}
+.sidebar-foot-row .sidebar-foot-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .user-pill{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:10px;background:var(--canvas);
   font-size:12px;color:var(--ink-70);margin-bottom:8px}
 .user-pill .role-tag{margin-left:auto;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;
@@ -822,18 +828,20 @@ body.auth-locked #app{display:none}
         <span id="userPillEmail"></span>
         <span class="role-tag" id="userPillRole"></span>
       </div>
-      <button class="logout-btn" id="viewAsToggleBtn" style="display:none;margin-top:0;margin-bottom:8px">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        <span id="viewAsToggleLabel">View as Support</span>
-      </button>
       <button class="raise-btn" id="openRequestBtn">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
         Raise a Request
       </button>
-      <button class="logout-btn" id="logoutBtn">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      <div class="sidebar-foot-row">
+        <button class="logout-btn sidebar-foot-btn" id="viewAsToggleBtn" style="display:none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <span id="viewAsToggleLabel">View as Support</span>
+        </button>
+        <button class="logout-btn sidebar-foot-btn" id="logoutBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         Log Out
-      </button>
+        </button>
+      </div>
     </div>
   </aside>
 
@@ -888,6 +896,7 @@ body.auth-locked #app{display:none}
           <div class="field">
             <label>Related Section *</label>
             <select id="rf_section" required></select>
+            <div id="rf_section_hint" style="font-size:11px;color:var(--ink-35);margin-top:4px;display:none">Locked to the category you raised this from</div>
           </div>
         </div>
         <div class="form-grid">
@@ -3197,13 +3206,20 @@ function normalizeSectionLabel_(label){
 function openRequestModal(prefill){
   document.getElementById("requestOverlay").classList.add("show");
   const p = prefill || {};
-  const pre = SECTIONS[currentRoute];
   const sectionEl = document.getElementById("rf_section");
-  const wantedSection = normalizeSectionLabel_(p.section || (pre ? pre.label : ""));
+  const sectionHint = document.getElementById("rf_section_hint");
+  // A "Raise a Request" opened from inside a specific category's listing always passes an explicit
+  // section — that gets hardcoded (the dropdown is locked) since it's unambiguous which category
+  // the request is about. The main sidebar "Raise a Request" CTA passes no prefill at all, so it
+  // stays a fully open, editable dropdown regardless of whatever page you happen to be viewing.
+  const isLocked = !!p.section;
+  const wantedSection = normalizeSectionLabel_(p.section || "");
   sectionEl.value = wantedSection;
   // If that value didn't match any real <option> (e.g. a section we don't recognize), fall back to
   // the "Select a section" placeholder instead of leaving the dropdown showing nothing selected.
   if(sectionEl.value !== wantedSection) sectionEl.value = "";
+  sectionEl.disabled = isLocked;
+  sectionHint.style.display = isLocked ? "block" : "none";
   if(p.university) document.getElementById("rf_university").value = p.university;
   if(p.program) document.getElementById("rf_program").value = p.program;
   if(p.link) document.getElementById("rf_link").value = p.link;
@@ -4550,6 +4566,7 @@ function drawAuthLogin_(){
     try{
       const r = await authApiCall_("login", { email, password });
       if(r.needsSetup){ drawAuthSetupEmail_(email); return; }
+      toast("Code sent — check your inbox");
       drawAuthOtp_(email, "login");
     }catch(e){ showAuthError_(e.message); btn.disabled = false; btn.textContent = "Continue"; }
   };
