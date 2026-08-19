@@ -823,20 +823,20 @@ body.auth-locked #app{display:none}
       </div>
     </div>
     <div class="sidebar-foot">
-      <div class="user-pill" id="userPill" style="display:none">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
-        <span id="userPillEmail"></span>
-        <span class="role-tag" id="userPillRole"></span>
-      </div>
+      <button class="logout-btn" id="viewAsToggleBtn" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        <span id="viewAsToggleLabel">View as Support</span>
+      </button>
       <button class="raise-btn" id="openRequestBtn">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
         Raise a Request
       </button>
       <div class="sidebar-foot-row">
-        <button class="logout-btn sidebar-foot-btn" id="viewAsToggleBtn" style="display:none">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          <span id="viewAsToggleLabel">View as Support</span>
-        </button>
+        <div class="user-pill sidebar-foot-btn" id="userPill" style="display:none">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+          <span id="userPillEmail"></span>
+          <span class="role-tag" id="userPillRole" style="display:none"></span>
+        </div>
         <button class="logout-btn sidebar-foot-btn" id="logoutBtn">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         Log Out
@@ -3220,10 +3220,19 @@ function openRequestModal(prefill){
   if(sectionEl.value !== wantedSection) sectionEl.value = "";
   sectionEl.disabled = isLocked;
   sectionHint.style.display = isLocked ? "block" : "none";
-  if(p.university) document.getElementById("rf_university").value = p.university;
+  // University / Program get hardcoded the same way Related Section does — locked whenever this
+  // was raised from inside a specific category's listing (so it's unambiguous which university/
+  // program the request is about), left editable only when the field wasn't actually prefilled
+  // (e.g. categories that don't have a university/program at all) or when opened from the main
+  // sidebar CTA.
+  const uniEl = document.getElementById("rf_university");
+  const progEl = document.getElementById("rf_program");
+  if(p.university) uniEl.value = p.university;
+  uniEl.disabled = isLocked && !!p.university;
   // Some sheet cells carry the program title plus extra lines (notes, a second variant, etc.) —
   // only the first line belongs in this field.
-  if(p.program) document.getElementById("rf_program").value = p.program.split("\n")[0].trim();
+  if(p.program) progEl.value = p.program.split("\n")[0].trim();
+  progEl.disabled = isLocked && !!p.program;
   if(p.link) document.getElementById("rf_link").value = p.link;
   updateUniProgVisibility();
   populateRequestDatalists().then(()=>{
