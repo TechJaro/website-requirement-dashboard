@@ -745,7 +745,10 @@ body.auth-locked #app{display:none}
 .auth-field input{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:10px;
   font-size:13.5px;box-sizing:border-box;font-family:inherit}
 .auth-field input:focus{outline:none;border-color:var(--blue)}
-.auth-otp-input{letter-spacing:.5em;text-align:center;font-weight:800;font-size:18px !important}
+.auth-otp-input{letter-spacing:.5em;text-align:center;font-weight:800;font-size:18px !important;font-family:Verdana,Geneva,sans-serif !important}
+@keyframes btn-spin{to{transform:rotate(360deg)}}
+.btn-spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.4);
+  border-top-color:#fff;animation:btn-spin .7s linear infinite;display:inline-block;flex-shrink:0}
 .auth-btn{width:100%;padding:12px;border:none;border-radius:10px;background:var(--blue);color:#fff;
   font-weight:700;font-size:13.5px;cursor:pointer;transition:background .15s}
 .auth-btn:hover{background:var(--blue-dark)}
@@ -964,9 +967,9 @@ body.auth-locked #app{display:none}
       </div>
       <div class="modal-foot">
         <button type="button" class="btn" id="cancelRequestBtn">Cancel</button>
-        <button type="submit" class="btn primary">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m22 2-7 20-4-9-9-4 20-7Z"/></svg>
-          Submit Request
+        <button type="submit" class="btn primary" id="submitRequestBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" id="submitRequestIcon"><path d="m22 2-7 20-4-9-9-4 20-7Z"/></svg>
+          <span id="submitRequestLabel">Submit Request</span>
         </button>
       </div>
     </form>
@@ -3287,8 +3290,12 @@ function wireRichTextEditor(){
   }
 }
 
+let REQUEST_SUBMIT_IN_FLIGHT = false;
 async function submitRequest(e){
   e.preventDefault();
+  // Belt-and-braces double-submit guard on top of disabling the button below — if this somehow
+  // fires again before the DOM's disabled state takes effect, this flag stops it cold.
+  if(REQUEST_SUBMIT_IN_FLIGHT) return;
   const descHtml = document.getElementById("rf_desc").innerHTML.trim();
   const descText = document.getElementById("rf_desc").innerText.trim();
   if(!descText && !/<img/.test(descHtml)){ toast("Please describe your requirement", true); return; }
@@ -3326,8 +3333,13 @@ async function submitRequest(e){
   // Threading rule: same requester + same subject (exact match) -> same email thread
   payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
 
-  const submitBtn = document.querySelector('#requestForm button[type="submit"]');
+  REQUEST_SUBMIT_IN_FLIGHT = true;
+  const submitBtn = document.getElementById("submitRequestBtn");
+  const iconEl = document.getElementById("submitRequestIcon");
+  const labelEl = document.getElementById("submitRequestLabel");
   submitBtn.disabled = true;
+  iconEl.outerHTML = '<span class="btn-spinner" id="submitRequestIcon"></span>';
+  labelEl.textContent = "Submitting…";
   try{
     await submitRequestDirect_(payload);
     toast("Request submitted — saved to the log and emailed!");
@@ -3337,7 +3349,10 @@ async function submitRequest(e){
     toast(err.message ? `Couldn't submit automatically (${err.message}) — opening email instead` : "Couldn't submit automatically — opening email instead", true);
     mailtoFallback(payload);
   }finally{
+    REQUEST_SUBMIT_IN_FLIGHT = false;
     submitBtn.disabled = false;
+    document.getElementById("submitRequestIcon").outerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" id="submitRequestIcon"><path d="m22 2-7 20-4-9-9-4 20-7Z"/></svg>';
+    labelEl.textContent = "Submit Request";
   }
 }
 function resetRequestForm(){
@@ -3504,7 +3519,9 @@ async function submitRequestDirect_(payload){
   // dashboard needs to grant anything themselves; their identity comes from the login session.
   if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
   payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
-  await authApiCall_("submitRequest", { token: AUTH_SESSION.token, payload });
+  // Uses the POST+poll transport, not the plain JSONP one — the description can carry pasted
+  // screenshots as inline base64 images, which can easily be too large for a GET URL.
+  await authApiCallLarge_("submitRequest", { token: AUTH_SESSION.token, payload });
 }
 /* ---- Status updates: same backend call — Code.gs looks up the original message/thread from the
    sheet row itself and replies in-thread via GmailApp (far more reliable than hand-building
@@ -4220,24 +4237,16 @@ function requestStatusSelectHtml_(row){
     ${REQUEST_STATUS_OPTIONS.map(s=>`<option value="${s}" ${s===current?"selected":""}>${s}</option>`).join("")}
   </select>`;
 }
-/* ---- Reads the Requirements Log via the same Google sign-in used to write it — keeps the sheet
-   private (no "anyone with link" sharing needed) while still showing live data in the dashboard. ---- */
+/* ---- Reads the Requirements Log via the Apps Script backend (same login-session token used for
+   submitting/updating requests) instead of a separate client-side Google OAuth grant. That older
+   OAuth-based reader is what kept popping the "Choose an account" consent screen even after
+   logging in through the dashboard's own login — it was never switched over when the rest of the
+   request flow moved to the Apps Script backend. Code.gs's listRequirements action already reads
+   this same sheet under its own authorization, so no separate consent is needed here at all. ---- */
 async function fetchRequirementsLogRows_(){
-  const cfg = CONFIG.sheets.requirementsLog;
-  const token = await ensureGoogleAuth_();
-  const title = await resolveSheetTitleOAuth_(token, cfg.sheetId, cfg.gid);
-  const res = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${cfg.sheetId}/values/${encodeURIComponent(title+"!A1:R")}`,
-    { headers:{ Authorization:`Bearer ${token}` } });
-  const json = await res.json();
-  if(!res.ok) throw new Error((json.error && json.error.message) || "Couldn't load the Requirements Log");
-  const values = json.values || [];
-  if(values.length < 2) return [];
-  const headers = values[0];
-  return values.slice(1).map((r,i)=>{
-    const obj = {}; headers.forEach((h,idx)=> obj[h] = r[idx] || "");
-    obj._sheetRow = i + 2; // header is row 1
-    return obj;
-  });
+  if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
+  const r = await authApiCall_("listRequirements", { token: AUTH_SESSION.token });
+  return (r.rows || []).map(row => Object.assign({}, row, { _sheetRow: row._row }));
 }
 async function renderRequirementsTable(sec){
   const el = document.getElementById("content");
@@ -4448,6 +4457,61 @@ function authApiCall_(action, data){
 
     script.src = url;
     document.head.appendChild(script);
+  });
+}
+// authApiCallLarge_ is for calls whose payload might be too big for a URL — specifically
+// submitRequest, whose description can include pasted screenshots as inline base64 images, easily
+// well past what any browser/server will accept in a GET query string. It POSTs the payload into a
+// hidden iframe+form (no URL-length limit, and confirmed to carry the login session's Google cookie
+// through the domain-restricted auth gate — that's how the OTP email successfully sends today).
+// Apps Script's response page can't be read back directly (its CSP blocks the postMessage script
+// when framed cross-origin — the same wall authApiCall_'s comment above describes), so instead the
+// server stores the result keyed by reqId, and this function polls for it with small, fast JSONP
+// calls (authApiCall_("checkResult", ...)) until it's ready.
+function authApiCallLarge_(action, data){
+  return new Promise((resolve, reject)=>{
+    if(!CONFIG.authApiUrl){ reject(new Error("CONFIG.authApiUrl isn't set yet")); return; }
+    const reqId = "req_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+    const frameName = "authFramePost_" + reqId;
+    const iframe = document.createElement("iframe");
+    iframe.name = frameName;
+    iframe.style.display = "none";
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = CONFIG.authApiUrl;
+    form.target = frameName;
+    form.style.display = "none";
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "payload";
+    input.value = JSON.stringify(Object.assign({ action, reqId }, data||{}));
+    form.appendChild(input);
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(()=>{ form.remove(); iframe.remove(); }, 5000);
+
+    const startedAt = Date.now();
+    const POLL_MS = 900, TIMEOUT_MS = 45000;
+    let settled = false;
+    const poll = ()=>{
+      if(settled) return;
+      if(Date.now() - startedAt > TIMEOUT_MS){
+        settled = true;
+        reject(new Error("The server didn't confirm in time — check the Requirements Log before retrying, in case it actually went through"));
+        return;
+      }
+      authApiCall_("checkResult", { reqId }).then(r=>{
+        if(settled) return;
+        if(r.ready){
+          settled = true;
+          if(r.ok) resolve(r); else reject(new Error(r.error || "Something went wrong — try again"));
+        } else {
+          setTimeout(poll, POLL_MS);
+        }
+      }).catch(()=>{ if(!settled) setTimeout(poll, POLL_MS); }); // a transient poll hiccup just retries
+    };
+    setTimeout(poll, POLL_MS);
   });
 }
 
