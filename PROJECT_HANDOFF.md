@@ -83,8 +83,19 @@ Three separate Google Spreadsheet **files**, 18 tabs total.
 
 Not backed by any sheet: Page Insights and SEO Insights pull live from GA4/Search Console via the visitor's own Google sign-in.
 
-## Immediate next action — Gmail permission error mid-diagnosis (started 2026-08-19)
+## Gmail permission error — root cause found and fixed (2026-08-19), pending final re-verification
 
-After the threading fix above, submitting a new request started failing with "Gmail access hasn't been authorized for this script yet." The user has already: run `authorizeGmailAccess()` successfully, redeployed a **new version of the same deployment** (URL confirmed matching `CONFIG.authApiUrl` exactly — ruled out a stale/different deployment), and shared the `appsscript.json` manifest, which looks correct (`https://mail.google.com/` scope present, Gmail Advanced Service correctly enabled as `gmail` v1) — so the obvious causes are ruled out.
+After the threading fix above, submitting a new request started failing with "Gmail access hasn't been authorized for this script yet." Deployment URL, manifest scopes, and the Gmail Advanced Service were all checked and ruled out as the cause. The temporary raw-error diagnostic added to `friendlyGmailError_` (see below) surfaced the real error:
 
-Current step: `friendlyGmailError_` in `Code.gs` has been temporarily changed to append the **raw** underlying Google error text in `[raw: ...]` at the end of the friendly message, instead of hiding it — waiting on the user to paste this version in, redeploy, retest, and report back that bracketed raw text so the exact missing permission can be identified instead of guessed at. **Once root-caused and fixed, remove this temporary `[raw: ...]` diagnostic append** (marked with a comment in the code) so end users don't see raw Google error text again.
+```
+Specified permissions are not sufficient to call Session.getEffectiveUser.
+Required permissions: https://www.googleapis.com/auth/userinfo.email
+```
+
+This was never actually a Gmail-*sending* permission problem — `sendGmailMessage_` only used `Session.getEffectiveUser().getEmail()` to build the "From" header's display address, and that lookup needs a scope (`userinfo.email`) that isn't in the manifest's `oauthScopes`. Rather than add yet another scope (which would mean another authorize + redeploy round trip), the fix removes the dependency entirely: `fromEmail` in `sendGmailMessage_` is now hardcoded to `"lalit.rade@jaro.in"` — the same address already hardcoded elsewhere in this file (`setupAdmin()`, the `handleSubmitRequest_` fallback recipient), since this script only ever runs as that one account anyway.
+
+**The temporary `[raw: ...]` diagnostic in `friendlyGmailError_` is still in place** for one more confirmation round — remove it (comment marks the spot) once the user confirms a fresh test request actually sends successfully.
+
+## Immediate next action
+
+Waiting on the user to paste this version of `Code.gs` in, redeploy, and submit one fresh test request. If it sends successfully: confirm with the user, then remove the `[raw: ...]` diagnostic append in `friendlyGmailError_` and redeploy once more. Then move on to verifying the status-update threading fix itself (submit a request, change its status, confirm in Gmail it lands in the same thread — see "Status-update threading" above).

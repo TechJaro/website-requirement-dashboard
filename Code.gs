@@ -708,7 +708,12 @@ function getOriginalThreadingHeaders_(messageId){
   }
 }
 function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, references}){
-  const fromEmail = Session.getEffectiveUser().getEmail();
+  // Hardcoded rather than Session.getEffectiveUser().getEmail() — that call needs the
+  // https://www.googleapis.com/auth/userinfo.email OAuth scope, which isn't in this project's
+  // manifest, and adding it would mean yet another authorize-and-redeploy round trip for no real
+  // benefit: this script only ever runs as this one account (same address already hardcoded
+  // elsewhere in this file, e.g. setupAdmin() and the submitRequest fallback recipient).
+  const fromEmail = "lalit.rade@jaro.in";
   const rawHeaders = [
     "MIME-Version: 1.0",
     "From: \"Jaro Web Pages Dashboard\" <" + fromEmail + ">",
