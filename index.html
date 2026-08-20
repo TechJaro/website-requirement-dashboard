@@ -405,6 +405,14 @@ input,select,textarea{font-family:inherit}
 
 /* ---------- FLAT TABLE ---------- */
 .table-wrap{background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm);overflow:hidden}
+/* Combined Insights has 9 columns (every GA4 + every GSC column) — too wide for most screens, so
+   that one table gets a horizontal scrollbar instead of the default clip-and-hide. */
+.table-wrap.scrollable{overflow:auto}
+.table-wrap.scrollable table{min-width:920px}
+thead th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+thead th.sortable:hover{color:var(--ink)}
+thead th.sortable .sort-arrow{margin-left:4px;opacity:.5;font-size:10px}
+thead th.sortable.sort-active .sort-arrow{opacity:1;color:var(--blue)}
 table{width:100%;border-collapse:collapse}
 thead th{
   text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-50);
@@ -852,6 +860,10 @@ body.auth-locked #app{display:none}
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <span>On-Page Audit</span>
       </div>
+      <div class="navitem" data-nav="combinedInsights">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/></svg>
+        <span>Page + SEO Insights</span>
+      </div>
       <div class="nav-group-label" id="adminGroupLabel" style="display:none">Admin</div>
       <div class="navitem" data-nav="users" id="usersNavItem" style="display:none">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -1170,7 +1182,8 @@ const SECTIONS = {
   pageInsights: { key:"pageInsights", label:"Page Insights", desc:"Traffic & engagement per page, live from Google Analytics (last 28 days)", icon:"bolt", type:"page-insights" },
   seoInsights: { key:"seoInsights", label:"SEO Insights", desc:"Clicks, impressions & search ranking per page, live from Google Search Console (last 28 days)", icon:"search", type:"seo-insights" },
   coreWebVitals: { key:"coreWebVitals", label:"Core Web Vitals", desc:"LCP, CLS & INP per page, checked live from PageSpeed Insights on demand", icon:"bolt", type:"core-web-vitals" },
-  onPageAudit: { key:"onPageAudit", label:"On-Page Audit", desc:"Title/meta/alt-text/broken-link scan of every page, checked live on demand", icon:"search", type:"on-page-audit" }
+  onPageAudit: { key:"onPageAudit", label:"On-Page Audit", desc:"Title/meta/alt-text/broken-link scan of every page, checked live on demand", icon:"search", type:"on-page-audit" },
+  combinedInsights: { key:"combinedInsights", label:"Page + SEO Insights", desc:"GA4 and Search Console data for every page, side by side — sortable, filterable, exportable", icon:"bolt", type:"combined-insights" }
 };
 const NAV_ORDER = ["program","landing","unique","b2b","location","blog","university","free","pillar"];
 
@@ -1966,7 +1979,7 @@ async function renderHome(){
     </div>`;}).join("")}</div>
 
     <div class="section-head" id="liveInsightsHead"><div><h2>Live Insights</h2><div class="meta">Traffic, search performance, page vitals & on-page audit — Admins only</div></div></div>
-    <div class="stat-grid" id="liveInsightsGrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:26px">
+    <div class="stat-grid" id="liveInsightsGrid" style="grid-template-columns:repeat(5,1fr);margin-bottom:26px">
       <div class="stat-card" data-go="pageInsights" style="--glass:var(--blue-tint-10);--fg:var(--blue)">
         <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--blue)">${ic("bolt")}</div></div>
         <div><div class="val" style="font-size:19px">Page Insights</div><div class="lbl">GA4 traffic, live</div></div>
@@ -1986,6 +1999,11 @@ async function renderHome(){
         <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--blue)">${ic("search")}</div></div>
         <div><div class="val" style="font-size:19px">On-Page Audit</div><div class="lbl">Title/meta/alt-text scan, on demand</div></div>
         <button type="button" class="stat-explore-btn" style="background:var(--blue)">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+      <div class="stat-card" data-go="combinedInsights" style="--glass:var(--yellow-tint);--fg:#8a6800">
+        <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:#8a6800">${ic("bolt")}</div></div>
+        <div><div class="val" style="font-size:19px">Page + SEO Insights</div><div class="lbl">GA4 + Search Console, one table</div></div>
+        <button type="button" class="stat-explore-btn" style="background:#8a6800">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
     </div>
 
@@ -3136,6 +3154,7 @@ async function navigate(route){
   else if(sec.type === "seo-insights") await renderSeoInsights(sec);
   else if(sec.type === "core-web-vitals") await renderCoreWebVitals(sec);
   else if(sec.type === "on-page-audit") await renderOnPageAudit(sec);
+  else if(sec.type === "combined-insights") await renderCombinedInsights(sec);
 }
 
 /* ================================================================================================
@@ -3635,13 +3654,16 @@ function ensureGoogleAuth_(){
     GOOGLE_TOKEN_CLIENT.requestAccessToken();
   });
 }
-async function fetchGa4Live_(){
+// startDate/endDate: optional explicit "YYYY-MM-DD" strings — used by the Combined Insights time
+// filter. Omitted entirely by the standalone Page Insights page, which keeps its original
+// hardcoded 28-day behavior exactly as before.
+async function fetchGa4Live_(startDate, endDate){
   if(!CONFIG.oauth.clientId) throw new Error("CONFIG.oauth.clientId isn't set yet");
   if(!CONFIG.ga4PropertyId) throw new Error("CONFIG.ga4PropertyId isn't set yet");
   const token = await ensureGoogleAuth_();
   const url = `https://analyticsdata.googleapis.com/v1beta/properties/${CONFIG.ga4PropertyId}:runReport`;
   const body = {
-    dateRanges: [{ startDate: "28daysAgo", endDate: "today" }],
+    dateRanges: [{ startDate: startDate || "28daysAgo", endDate: endDate || "today" }],
     dimensions: [{ name: "pagePath" }],
     metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }, { name: "averageSessionDuration" }, { name: "engagementRate" }],
     limit: 100000
@@ -3657,17 +3679,21 @@ async function fetchGa4Live_(){
     engagementRate: Number(r.metricValues[3].value||0)
   }));
 }
-async function fetchGscLive_(){
+// Same startDate/endDate convention as fetchGa4Live_ above — omitted, defaults to the original
+// hardcoded last-28-days window (Search Console has no "daysAgo" shorthand like GA4, so the
+// default is computed explicitly instead).
+async function fetchGscLive_(startDate, endDate){
   if(!CONFIG.oauth.clientId) throw new Error("CONFIG.oauth.clientId isn't set yet");
   if(!CONFIG.gscSiteUrl) throw new Error("CONFIG.gscSiteUrl isn't set yet");
   const token = await ensureGoogleAuth_();
   const url = `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(CONFIG.gscSiteUrl)}/searchAnalytics/query`;
-  const end = new Date();
-  const start = new Date(); start.setDate(start.getDate() - 28);
-  const body = {
-    startDate: start.toISOString().slice(0,10), endDate: end.toISOString().slice(0,10),
-    dimensions: ["page"], rowLimit: 25000
-  };
+  let start = startDate, end = endDate;
+  if(!start || !end){
+    const endD = new Date();
+    const startD = new Date(); startD.setDate(startD.getDate() - 28);
+    start = startD.toISOString().slice(0,10); end = endD.toISOString().slice(0,10);
+  }
+  const body = { startDate: start, endDate: end, dimensions: ["page"], rowLimit: 25000 };
   const res = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${token}` }, body: JSON.stringify(body) });
   const json = await res.json();
   if(!res.ok) throw new Error((json.error && json.error.message) || "Search Console request failed");
@@ -3759,7 +3785,7 @@ async function submitRequestDirect_(payload){
    sheet row itself and replies in-thread via GmailApp (far more reliable than hand-building
    In-Reply-To/References headers client-side), with a status email styled to match the original
    "New Request Raised" template instead of the old plain one-liner. ---- */
-async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, cc}){
+async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, cc, appliesTo}){
   if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
   // noteHtml carries formatting/links/pasted screenshots from the status modal's rich text editor;
   // noteText is the plain-text fallback Code.gs uses if noteHtml is empty (e.g. a fresh <br>-only div).
@@ -3774,7 +3800,7 @@ async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, c
     noteHtml = noteHtml.replace(/<img[^>]*>/gi,
       "[a pasted screenshot was too large to send and was left out — please attach it separately if needed]");
   }
-  return await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml, noteText: noteText || "", to: to || [], cc: cc || [] });
+  return await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml, noteText: noteText || "", to: to || [], cc: cc || [], appliesTo: appliesTo || "" });
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
@@ -4335,6 +4361,189 @@ async function renderOnPageAudit(sec){
   wireAuditPanel_();
 }
 
+/* ================================================================================================
+   COMBINED "PAGE + SEO INSIGHTS" — GA4 (fetchGa4Live_) and Search Console (fetchGscLive_) rows
+   merged by page path into one table, with real table ergonomics neither standalone page has:
+   sortable columns, a page-size-selectable pager, a URL-path-segment filter, a day-based time
+   range (see the plan doc for why not sub-day — Search Console can't do it, GA4 only via a
+   separate Realtime API capped at ~30-60 minutes), and CSV export of the filtered+sorted set.
+   ================================================================================================ */
+function exportRowsAsCsv_(filename, columns, rows){
+  const escCsv = v=>{ const s = (v==null?"":String(v)); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
+  const lines = [columns.map(c=>escCsv(c.label)).join(",")]
+    .concat(rows.map(r=> columns.map(c=>escCsv(r[c.key])).join(",")));
+  const blob = new Blob([lines.join("\r\n")], { type:"text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+const CI_COLUMNS = [
+  { key:"page", label:"Page", fmt:v=>esc(v||"—") },
+  { key:"pageviews", label:"Pageviews", fmt:v=>v==null?"—":v.toLocaleString() },
+  { key:"activeUsers", label:"Active Users", fmt:v=>v==null?"—":v.toLocaleString() },
+  { key:"avgEngagementTime", label:"Avg. Engagement Time", fmt:v=>v==null?"—":v.toFixed(1)+"s" },
+  { key:"engagementRate", label:"Engagement Rate", fmt:v=>v==null?"—":(v*100).toFixed(1)+"%" },
+  { key:"clicks", label:"Clicks", fmt:v=>v==null?"—":v.toLocaleString() },
+  { key:"impressions", label:"Impressions", fmt:v=>v==null?"—":v.toLocaleString() },
+  { key:"ctr", label:"CTR", fmt:v=>v==null?"—":(v*100).toFixed(1)+"%" },
+  { key:"position", label:"Avg. Position", fmt:v=>v==null?"—":v.toFixed(1) }
+];
+// Outer join on normalized path — normUrlForMatch_ already strips protocol/www/trailing-slash,
+// exactly what's needed to line up GA4's relative pagePath against GSC's full page URL.
+function mergeInsightRows_(ga4Rows, gscRows){
+  const map = new Map();
+  ga4Rows.forEach(r=>{
+    map.set(normUrlForMatch_(r.pagePath), {
+      page:r.pagePath, pageviews:r.pageviews, activeUsers:r.activeUsers,
+      avgEngagementTime:r.avgEngagementTime, engagementRate:r.engagementRate,
+      clicks:null, impressions:null, ctr:null, position:null
+    });
+  });
+  gscRows.forEach(r=>{
+    const path = (r.page||"").replace(/^https?:\/\/[^/]+/,"") || "/";
+    const key = normUrlForMatch_(path);
+    const existing = map.get(key);
+    if(existing){ existing.clicks=r.clicks; existing.impressions=r.impressions; existing.ctr=r.ctr; existing.position=r.position; }
+    else map.set(key, { page:path, pageviews:null, activeUsers:null, avgEngagementTime:null, engagementRate:null,
+      clicks:r.clicks, impressions:r.impressions, ctr:r.ctr, position:r.position });
+  });
+  return [...map.values()];
+}
+async function renderCombinedInsights(sec){
+  const el = document.getElementById("content");
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  if(!CONFIG.oauth.clientId || !CONFIG.ga4PropertyId || !CONFIG.gscSiteUrl){
+    listWrap.innerHTML = emptyStateHTML(
+      "Combined Insights isn't connected yet",
+      "Needs CONFIG.oauth.clientId, CONFIG.ga4PropertyId, and CONFIG.gscSiteUrl all set — same as Page Insights and SEO Insights individually."
+    );
+    document.getElementById("resultCount").textContent = "";
+    return;
+  }
+  document.querySelector(".filterbar").insertAdjacentHTML("beforeend", `
+    <select id="ciRange" title="Time range">
+      <option value="0">Today</option>
+      <option value="7">Last 7 days</option>
+      <option value="28" selected>Last 28 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="custom">Custom range…</option>
+    </select>
+    <input type="date" id="ciCustomStart" style="display:none">
+    <input type="date" id="ciCustomEnd" style="display:none">
+    <select id="ciSegment" title="Filter by URL path"><option value="">All pages</option></select>
+    <select id="ciPageSize" title="Rows per page">
+      <option value="10">10 / page</option><option value="20">20 / page</option>
+      <option value="50">50 / page</option><option value="100">100 / page</option>
+    </select>
+    <button class="btn" id="ciExportBtn">${ic("external")} Export CSV</button>
+  `);
+  const rangeEl = document.getElementById("ciRange");
+  const customStartEl = document.getElementById("ciCustomStart");
+  const customEndEl = document.getElementById("ciCustomEnd");
+  const segmentEl = document.getElementById("ciSegment");
+  const pageSizeEl = document.getElementById("ciPageSize");
+  let allRows = [], sortCol = null, sortDir = 1, page = 1;
+
+  function computeRange(){
+    const val = rangeEl.value;
+    const toISO = d=>d.toISOString().slice(0,10);
+    if(val === "custom") return { start: customStartEl.value, end: customEndEl.value };
+    const start = new Date(); start.setDate(start.getDate() - Number(val));
+    return { start: toISO(start), end: toISO(new Date()) };
+  }
+  function populateSegments(rows){
+    const segs = new Set(rows.map(r=>{
+      const parts = (r.page||"").split("/").filter(Boolean);
+      return parts.length ? "/"+parts[0] : "/";
+    }));
+    const current = segmentEl.value;
+    segmentEl.innerHTML = `<option value="">All pages</option>` +
+      [...segs].sort().map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("");
+    segmentEl.value = [...segs].includes(current) ? current : "";
+  }
+  function draw(){
+    const q = (document.getElementById("sec_search").value||"").toLowerCase();
+    const seg = segmentEl.value;
+    let items = allRows.filter(r=>{
+      if(seg){ const parts = (r.page||"").split("/").filter(Boolean); const first = parts.length ? "/"+parts[0] : "/"; if(first !== seg) return false; }
+      return !q || (r.page||"").toLowerCase().includes(q);
+    });
+    if(sortCol){
+      items = items.slice().sort((a,b)=>{
+        const av = a[sortCol], bv = b[sortCol];
+        if(av==null && bv==null) return 0;
+        if(av==null) return 1; if(bv==null) return -1;
+        if(typeof av === "string") return av.localeCompare(bv) * sortDir;
+        return (av - bv) * sortDir;
+      });
+    }
+    const pageSize = Number(pageSizeEl.value);
+    const totalPages = Math.max(1, Math.ceil(items.length/pageSize));
+    page = Math.min(Math.max(page,1), totalPages);
+    const pageItems = items.slice((page-1)*pageSize, page*pageSize);
+    const pagerHTML = `<div class="pager">
+      <button id="ciPgFirst" ${page<=1?"disabled":""}>« First</button>
+      <button id="ciPgPrev" ${page<=1?"disabled":""}>← Prev</button>
+      <span class="pg-info">Page ${page} of ${totalPages}</span>
+      <button id="ciPgNext" ${page>=totalPages?"disabled":""}>Next →</button>
+      <button id="ciPgLast" ${page>=totalPages?"disabled":""}>Last »</button>
+    </div>`;
+    listWrap.innerHTML = `
+      ${pagerHTML}
+      <div class="table-wrap scrollable"><table>
+        <thead><tr>${CI_COLUMNS.map(c=>`<th class="sortable${sortCol===c.key?" sort-active":""}" data-col="${c.key}">${esc(c.label)}<span class="sort-arrow">${sortCol===c.key ? (sortDir===1?"▲":"▼") : "↕"}</span></th>`).join("")}</tr></thead>
+        <tbody>${pageItems.length ? pageItems.map(r=>`<tr>${CI_COLUMNS.map(c=>`<td${c.key==="page"?' class="cell-muted"':""}>${c.fmt(r[c.key])}</td>`).join("")}</tr>`).join("")
+          : `<tr><td colspan="${CI_COLUMNS.length}" style="text-align:center;padding:40px;color:var(--ink-35)">No pages match this filter</td></tr>`}</tbody>
+      </table></div>
+      ${pagerHTML}`;
+    document.getElementById("resultCount").textContent = `${items.length} pages`;
+    listWrap.querySelectorAll("th.sortable").forEach(th=> th.addEventListener("click", ()=>{
+      const col = th.dataset.col;
+      if(sortCol === col) sortDir *= -1; else { sortCol = col; sortDir = 1; }
+      draw();
+    }));
+    listWrap.querySelectorAll("#ciPgPrev").forEach(b=>b.addEventListener("click", ()=>{page--; draw(); scrollToTop();}));
+    listWrap.querySelectorAll("#ciPgNext").forEach(b=>b.addEventListener("click", ()=>{page++; draw(); scrollToTop();}));
+    listWrap.querySelectorAll("#ciPgFirst").forEach(b=>b.addEventListener("click", ()=>{page=1; draw(); scrollToTop();}));
+    listWrap.querySelectorAll("#ciPgLast").forEach(b=>b.addEventListener("click", ()=>{page=totalPages; draw(); scrollToTop();}));
+    // Export always reflects the current filter+sort, but ignores pagination — exporting "page 1
+    // of 10" only would be a confusing surprise for anyone who just wanted "everything I'm looking at".
+    document.getElementById("ciExportBtn").onclick = ()=> exportRowsAsCsv_(`page-seo-insights-${new Date().toISOString().slice(0,10)}.csv`, CI_COLUMNS, items);
+  }
+  function scrollToTop(){ document.querySelector(".content").scrollIntoView({behavior:"smooth", block:"start"}); }
+  async function loadAndDraw(){
+    listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Sign in with Google if prompted, then loading GA4 + Search Console…</div>`;
+    const {start,end} = computeRange();
+    if(!start || !end){ listWrap.innerHTML = emptyStateHTML("Pick both dates", "Choose a start and end date for the custom range."); return; }
+    try{
+      const [ga4Rows, gscRows] = await Promise.all([fetchGa4Live_(start,end), fetchGscLive_(start,end)]);
+      allRows = mergeInsightRows_(ga4Rows, gscRows);
+    }catch(e){
+      listWrap.innerHTML = emptyStateHTML("Couldn't load Combined Insights", e.message || "Check the browser console for details.");
+      document.getElementById("resultCount").textContent = "";
+      return;
+    }
+    populateSegments(allRows);
+    page = 1;
+    draw();
+  }
+  rangeEl.addEventListener("change", ()=>{
+    const isCustom = rangeEl.value === "custom";
+    customStartEl.style.display = isCustom ? "" : "none";
+    customEndEl.style.display = isCustom ? "" : "none";
+    if(!isCustom) loadAndDraw();
+  });
+  customStartEl.addEventListener("change", loadAndDraw);
+  customEndEl.addEventListener("change", loadAndDraw);
+  segmentEl.addEventListener("change", ()=>{ page=1; draw(); });
+  pageSizeEl.addEventListener("change", ()=>{ page=1; draw(); });
+  document.getElementById("sec_search").addEventListener("input", debounce(()=>{ page=1; draw(); }, 220));
+  loadAndDraw();
+}
+
 /* ---- Password gates for the two live Insights sections (same pattern as Requirements Log) ---- */
 const PAGE_INSIGHTS_PASSWORD = "Pageinsights@Jaro";
 function isPageInsightsUnlocked(){ return sessionStorage.getItem("pageInsightsUnlocked") === "1"; }
@@ -4487,9 +4696,17 @@ function requestStatusSelectHtml_(row){
   return `<select class="req-status-select" style="background:${c.bg};color:${c.fg};border:none;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer"
       data-row="${row._sheetRow}" data-threadid="${esc(row["Gmail Thread ID"]||"")}" data-msgid="${esc(row["Gmail Message ID"]||"")}"
       data-email="${esc(row["Email"]||"")}" data-subject="${esc(row["Subject"]||"")}"
-      data-to="${esc(row["To"]||"")}" data-cc="${esc(row["Cc"]||"")}">
+      data-to="${esc(row["To"]||"")}" data-cc="${esc(row["Cc"]||"")}" data-section="${esc(row["Section"]||"")}">
     ${REQUEST_STATUS_OPTIONS.map(s=>`<option value="${s}" ${s===current?"selected":""}>${s}</option>`).join("")}
   </select>`;
+}
+// Shown next to the Status badge when a request against the merged "Program Pages/Landing Pages"
+// section has recorded which target(s) its most recent status update actually covered — see
+// openStatusNoteModal_'s "Applies To" selector and Code.gs's handleUpdateStatus_.
+function appliesToTagHtml_(row){
+  const v = (row["Status Applies To"]||"").toString().trim();
+  if(!v) return "";
+  return `<span class="badge neutral" style="margin-left:6px" title="This status update applies to: ${esc(v)}">${esc(v)}</span>`;
 }
 /* Marking a status now pauses on a small popup (same .modal-overlay/.modal shell used elsewhere)
    instead of firing the notification email the instant the dropdown changes — this lets the Admin
@@ -4498,7 +4715,7 @@ function requestStatusSelectHtml_(row){
    else. Cancelling reverts the dropdown to its previous value rather than leaving it changed with
    no email sent. */
 let statusNoteToPicker, statusNoteCcPicker;
-function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, cc}){
+function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, cc, section}){
   let overlay = document.getElementById("statusNoteOverlay");
   if(!overlay){
     document.body.insertAdjacentHTML("beforeend", `
@@ -4516,6 +4733,15 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
             </button>
           </div>
           <div class="modal-body" style="display:grid;gap:14px">
+            <div class="field" id="statusNoteAppliesToField" style="display:none">
+              <label>This update applies to</label>
+              <select id="statusNoteAppliesTo">
+                <option value="">Select one…</option>
+                <option value="Program Page">Program Page</option>
+                <option value="Landing Page">Landing Page</option>
+                <option value="Both">Both</option>
+              </select>
+            </div>
             <div class="field">
               <label>Send To</label>
               <div class="chip-picker" id="statusNoteTo_picker" style="background:var(--canvas)">
@@ -4567,6 +4793,14 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
   document.getElementById("statusNoteSubtitle").textContent = email
     ? `This will email ${email} and everyone else on the original request thread — edit below if needed`
     : "This will email everyone on the original request thread — edit below if needed";
+  // A request against the merged "Program Pages/Landing Pages" section can cover either or both —
+  // a single Status shouldn't silently imply both are done, so ask which this update is actually
+  // for. Hidden entirely (and not required) for every other section.
+  const appliesToField = document.getElementById("statusNoteAppliesToField");
+  const appliesToSelect = document.getElementById("statusNoteAppliesTo");
+  const needsAppliesTo = section === "Program Pages/Landing Pages";
+  appliesToField.style.display = needsAppliesTo ? "" : "none";
+  appliesToSelect.value = "";
   // Pre-filled with whoever was on the original request's To/Cc, since that's the thread this
   // update is going into — but freely editable, so the Admin can add or drop recipients for this
   // particular update without that changing who's on the underlying request thread.
@@ -4595,10 +4829,12 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
     const toEmails = statusNoteToPicker.get().map(c=>c.email);
     const ccEmails = statusNoteCcPicker.get().map(c=>c.email);
     if(!toEmails.length){ toast("Add at least one recipient in 'Send To'", true); return; }
+    const appliesTo = needsAppliesTo ? appliesToSelect.value : "";
+    if(needsAppliesTo && !appliesTo){ toast("Select whether this applies to the Program Page, Landing Page, or Both", true); return; }
     confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
     sel.disabled = true;
     try{
-      const r = await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails });
+      const r = await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails, appliesTo });
       const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
       sel.style.background = c.bg; sel.style.color = c.fg;
       // Surfacing Code.gs's debug trail directly here — Google's own Executions/Cloud Logging
@@ -4670,7 +4906,7 @@ async function renderRequirementsTable(sec){
               <td>${esc(row["Request Type"]||"—")}</td>
               <td>${esc(row["Priority"]||"—")}</td>
               <td class="cell-muted">${esc(row["Requested By"]||row["Email"]||"—")}</td>
-              <td>${requestStatusSelectHtml_(row)}</td>
+              <td>${requestStatusSelectHtml_(row)}${appliesToTagHtml_(row)}</td>
             </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--ink-35)">No requests raised yet</td></tr>`}
           </tbody>
         </table>
@@ -4683,7 +4919,8 @@ async function renderRequirementsTable(sec){
         openStatusNoteModal_({
           sel, newStatus: sel.value, prevValue, sheetRow: +sel.dataset.row, email: sel.dataset.email,
           to: (sel.dataset.to||"").split(",").map(s=>s.trim()).filter(Boolean),
-          cc: (sel.dataset.cc||"").split(",").map(s=>s.trim()).filter(Boolean)
+          cc: (sel.dataset.cc||"").split(",").map(s=>s.trim()).filter(Boolean),
+          section: sel.dataset.section||""
         });
       });
     });
@@ -5086,7 +5323,7 @@ function logout_(){
 /* ---- Role gating: Support only sees the Web Page category sections + Home (Live Insights
    hidden there too); everything else (Requirements Log, Page/SEO Insights, Core Web Vitals, and
    the Users admin page) is Admin-only. ---- */
-const SUPPORT_HIDDEN_NAV = ["requirements","pageInsights","seoInsights","coreWebVitals","onPageAudit"];
+const SUPPORT_HIDDEN_NAV = ["requirements","pageInsights","seoInsights","coreWebVitals","onPageAudit","combinedInsights"];
 function applyRoleGating_(){
   const role = getCurrentUserRole_();
   document.getElementById("userPill").style.display = "flex";
@@ -5264,6 +5501,7 @@ function init(){
   document.querySelector('.navitem[data-nav="seoInsights"]').addEventListener("click", ()=>navigate("seoInsights"));
   document.querySelector('.navitem[data-nav="coreWebVitals"]').addEventListener("click", ()=>navigate("coreWebVitals"));
   document.querySelector('.navitem[data-nav="onPageAudit"]').addEventListener("click", ()=>navigate("onPageAudit"));
+  document.querySelector('.navitem[data-nav="combinedInsights"]').addEventListener("click", ()=>navigate("combinedInsights"));
   document.querySelector('.navitem[data-nav="users"]').addEventListener("click", ()=>navigate("users"));
   document.getElementById("openRequestBtn").addEventListener("click", ()=>openRequestModal());
   document.getElementById("closeRequestBtn").addEventListener("click", closeRequestModal);

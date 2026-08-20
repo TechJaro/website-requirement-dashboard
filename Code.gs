@@ -47,7 +47,7 @@ const SPREADSHEET_ID = "1JGsWhpTOalVOPoO0CwlAaCCgPMVv0ExSYTxrRErCVV0"; // same a
 const SESSION_TTL_HOURS = 12;
 const OTP_TTL_MINUTES = 2.5; // 2 minutes 30 seconds
 const REQUEST_LOG_HEADER = ["Timestamp","University","Program","Request Type","Priority","Requested By","Email",
-  "Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key","Gmail Message ID","Gmail Thread ID"];
+  "Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key","Gmail Message ID","Gmail Thread ID","Status Applies To"];
 const USERS_HEADER = ["Email","Role","PasswordHash","Salt","Status","CreatedAt","LastLogin"];
 const SESSIONS_HEADER = ["Token","Email","Role","Name","ExpiresAt"];
 const OTPS_HEADER = ["Email","Purpose","Code","ExpiresAt","SetupToken"];
@@ -312,6 +312,20 @@ function findRowByColumn_(sheet, colName, value){
     }
   }
   return null;
+}
+/* Ensures a column header exists on this sheet, appending it (in row 1) if it's missing, and
+   returns its 0-based index into `headers` (mutated in place to include it). Exists specifically
+   to prevent a repeat of a real bug: a column written by position (appendRow/setValue) but never
+   actually present in the sheet's own header row can't be found by a later header-name lookup —
+   it silently reads back empty even though the data is sitting right there one column over. */
+function ensureColumn_(sheet, headers, colName){
+  let idx = headers.indexOf(colName);
+  if(idx === -1){
+    idx = headers.length;
+    sheet.getRange(1, idx + 1).setValue(colName);
+    headers.push(colName);
+  }
+  return idx;
 }
 
 /* ---- Password hashing (salted SHA-256 — no plaintext password is ever stored) ---- */
@@ -614,6 +628,7 @@ function requestEmailHtml_(payload, headingText){
 function statusEmailHtml_(payload, status, noteHtml, noteText){
   const rows = [
     ["University", payload.university], ["Program", payload.program], ["Section", payload.section],
+    ...(payload.appliesTo ? [["Applies To", `<b>${escHtml_(payload.appliesTo)}</b>`]] : []),
     ["Request Type", payload.type], ["Priority", payload.priority],
     ["Related Link", payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"],
     ["Subject", payload.subject],
@@ -787,13 +802,24 @@ function handleUpdateStatus_(body){
   if(!rowData) throw new Error("That request row couldn't be found.");
   const get = (name)=> rowData[headers.indexOf(name)];
   sheet.getRange(sheetRow, headers.indexOf("Status") + 1).setValue(status);
+  // "Applies To" (Program Page / Landing Page / Both) — only meaningful for a request raised
+  // against the merged "Program Pages/Landing Pages" section, where a single request can cover
+  // either or both and one Status shouldn't silently imply both are done. Empty/omitted for every
+  // other section. ensureColumn_ self-heals the sheet's header row if this column isn't there yet
+  // (see its comment) instead of silently failing to record it.
+  const appliesTo = (body.appliesTo || "").toString().trim();
+  if(appliesTo){
+    const appliesToCol = ensureColumn_(sheet, headers, "Status Applies To");
+    sheet.getRange(sheetRow, appliesToCol + 1).setValue(appliesTo);
+  }
   const email = get("Email");
   const messageId = (get("Gmail Message ID") || "").toString().trim();
   const threadId = (get("Gmail Thread ID") || "").toString().trim();
   if(!email) return { ok:true }; // nothing to notify
   const payload = {
     university:get("University"), program:get("Program"), section:get("Section"), subject:get("Subject"),
-    type:get("Request Type"), priority:get("Priority"), link:get("Related Link"), description:get("Description")
+    type:get("Request Type"), priority:get("Priority"), link:get("Related Link"), description:get("Description"),
+    appliesTo: appliesTo
   };
   const html = statusEmailHtml_(payload, status, noteHtml, noteText);
   // Recipients: whatever the Admin picked in the status modal's own Send To/CC fields, editable

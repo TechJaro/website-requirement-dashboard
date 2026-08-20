@@ -228,13 +228,66 @@ exactly what "not visible" looks like** (nav item missing vs. blank page vs. an 
 stuck on "Loading…") and whether it's specific to newly-added Admins or affects existing ones too,
 before changing any code here. Still unresolved as of this update.
 
+## Combined "Page + SEO Insights" table (2026-08-20)
+
+New nav item (`combinedInsights` in `SECTIONS`, Admin/Super Admin only, same seam as `onPageAudit`
+— static `.navitem`, `SUPPORT_HIDDEN_NAV`, `navigate()` dispatch) merging GA4 and Search Console
+data into one table, plus real table ergonomics this dashboard didn't have anywhere before:
+sortable columns (click a `<th>`, click again to reverse), a page-size-selectable pager (10/20/50/
+100, modeled on `renderBlogCards`'s pagination), a URL-path-segment filter (dropdown populated
+dynamically from whatever first-path-segments actually occur — e.g. `/blog`, not hardcoded), a
+day-based time range (Today/7/28/90/Custom — see below for why not sub-day), and CSV export
+(`exportRowsAsCsv_`, client-side Blob + temporary `<a download>`, exports the filtered+sorted set,
+not just the visible page). `fetchGa4Live_`/`fetchGscLive_` gained optional `(startDate, endDate)`
+params — omitted by the standalone Page Insights/SEO Insights pages, which keep their original
+hardcoded 28-day behavior exactly as before. Rows are merged by normalized path
+(`mergeInsightRows_`, reusing `normUrlForMatch_`) as a full outer join — a page present in only one
+source shows blanks for the other source's columns rather than being dropped.
+
+**Time filter is day-based only (Today/7/28/90/Custom), not sub-day** — this was a real technical
+finding, not a simplification of convenience: Search Console's API only ever reports in whole days
+(and the data is itself 2-3 days delayed) — it cannot do 5-minute/hourly windows at all. GA4 has a
+separate Realtime API for that, but it only covers the last ~30-60 minutes and doesn't extend
+further back — there's a hard wall between "realtime" and "historical" data, not a smooth dial
+from 1 minute to 90 days. If sub-day GA4-only data is wanted later, it would need a genuinely
+separate "Realtime" mode (different API, different available metrics) rather than an extension of
+this time-range control.
+
+## "Applies To" on status updates for combined Program/Landing requests (2026-08-20)
+
+When a request's Related Section is the merged `"Program Pages/Landing Pages"` value (see
+`normalizeSectionLabel_`), marking its status used to imply one Status covered both, even though
+in practice often only one of the two actually got done. `openStatusNoteModal_` now shows a
+required "This update applies to" selector (Program Page / Landing Page / Both) — shown *only*
+when the row's Section is exactly that merged value, hidden for every other section. Stored in a
+new `Code.gs`-side sheet column, `"Status Applies To"` (appended to `REQUEST_LOG_HEADER`), written
+by `handleUpdateStatus_` and shown next to the Status badge in the Requirements Log
+(`appliesToTagHtml_`) and as an extra row in the status-update email (`statusEmailHtml_`).
+
+**Note on scope (my clarifying question about this went unanswered, so I went with the simpler,
+lower-risk option — flag it if you actually wanted the fuller version):** this only *labels* which
+target a status update covers — the underlying Status column is still one shared value, not two
+independently-tracked statuses. You cannot currently mark Program Page "Completed" while Landing
+Page stays "Not Started" as two distinct, separately-progressing states — the row's Status is
+still singular, just now annotated with which target the latest update was about. If you want true
+independent per-target statuses (two separate status badges progressing separately over time),
+that's a bigger, schema-changing follow-up — say so and it can be built.
+
+**New robustness fix that also applies to old columns:** added `ensureColumn_(sheet, headers,
+colName)` in `Code.gs` — self-heals a sheet's header row by appending a missing column name
+automatically the first time it's needed, instead of silently writing/reading a column that was
+never actually labeled in row 1 (exactly the bug that caused the very first Gmail-threading
+mystery a few rounds ago, where `Gmail Message ID`/`Gmail Thread ID` had data but no header text).
+`"Status Applies To"` is the first column that uses this — no manual sheet edit needed for it.
+
 ## Immediate next action
 
-Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy (adds
-the Super Admin role actions AND the `listTrending`/`setTrending` actions from two rounds ago —
-no `Code.gs` changes this round, everything above is front-end only). Then: (1) get exact
-symptoms for the Insights visibility issue above; (2) decide whether to build the proposed
-shared-cache proxy for scaling; (3) confirm whether the old
-`C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D:
-copy is confirmed working; (4) verify the new Request Type options, the fixed email subjects for
-non-Program/Landing categories, and the new "Requests by Requester" Home panel.
+Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy — this
+round adds `REQUEST_LOG_HEADER`'s new column, `ensureColumn_`, and `handleUpdateStatus_`/
+`statusEmailHtml_`'s "Applies To" handling (no header needs to be added by hand this time, see
+`ensureColumn_` above). Then: (1) get exact symptoms for the Insights visibility issue above;
+(2) decide whether to build the proposed shared-cache proxy for scaling; (3) confirm whether the
+old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D:
+copy is confirmed working; (4) verify Combined Insights (sorting, pagination, segment filter, time
+range, CSV export) and the new "Applies To" selector on a Program Pages/Landing Pages request's
+status update.
