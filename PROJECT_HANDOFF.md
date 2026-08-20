@@ -179,11 +179,62 @@ exactly what "not visible" looks like** (nav item missing vs. blank page vs. an 
 stuck on "Loading…") and whether it's specific to newly-added Admins or affects existing ones too,
 before changing any code here.
 
+## Request Type options + email subject fix + [Jaro Dashboard] prefix (2026-08-20)
+
+- Added **"Open Admissions"** / **"Close Admissions"** to the Request Type dropdown (`rf_type`),
+  right before "Other".
+- **Email subject for every category except Program/Landing Pages** used to be just the bare
+  Request Type ("[Dashboard] Content / Meta Change") because `raiseBtn()` calls in
+  `renderFlatCards` (University/B2B/Pillar), `renderLocations`, `renderFreeCourses`,
+  `renderBlogCards`, and `renderUnique` never passed a `program` field at all — there was no title
+  for `buildRequestSubject()` to include. Now each of those passes that card's own title (e.g. the
+  blog's `Title`, the location's `Area Name`, the pillar/university/B2B card's `title` var) through
+  as `program`. `buildRequestSubject()` now branches: Program/Landing Pages (has `payload.university`)
+  keep the original unchanged format; everything else now reads `"<title> - <Request Type>"`
+  instead of just the type. Note this still only fires for a request raised from a specific card's
+  "+" button — a request raised generically from the sidebar CTA with no card selected still has no
+  title to include, which is correct (there genuinely isn't one).
+- `[Dashboard]` → **`[Jaro Dashboard]`** in that same subject builder (the only place this literal
+  string existed).
+
+## "Requests by Requester" — Home insight for Admins/Super Admin (2026-08-20)
+
+Per the user noticing the dashboard has no way to tell if one person is raising an unusual number
+of requests, added a `renderRequesterActivity()` panel to Home ("Request Activity" section, gated
+identically to "Live Insights" — `admin`-only via `applyRoleGating_`, toggling the new
+`#requestActivityWrap`). Reuses the existing Quick-Insights segmented-bar-plus-legend pattern
+(`.status-bar`/`.status-legend`, new `data-req` attribute added to the shared CSS selector lists
+alongside `data-type`/`data-status`/etc.) rather than introducing a new charting approach — no new
+library, consistent look. Fetches the Requirements Log via the already-existing `listRequirements`
+action (no new backend action needed), groups by Email, sorts descending, shows the top 8
+individually and folds the rest into one "N others" slice, and — since a disproportionately wide
+bar is the whole point — clicking any slice opens the existing `openInsightListModal` drill-down
+listing that person's actual requests (subject/status/date, linking to `Related Link`).
+
+## Insights not visible to Admins — under investigation, needs more detail from the user (2026-08-20)
+
+User reports Page Insights/SEO Insights/Core Web Vitals/On-Page Audit "not visible" to Admin
+users. Checked `applyRoleGating_`/`SUPPORT_HIDDEN_NAV` directly — the nav-item visibility logic
+looks correct (`admin = role === "Admin"` correctly shows all four for any Admin, Super Admin
+included). Two real candidate causes that don't require a code bug: (1) Page/SEO Insights need
+each person's own Google sign-in with GA4/Search Console **view access already granted on those
+specific properties** — a newly-invited Admin's Jaro account may not have that access yet, which
+would fail silently-ish per-person even though the nav item itself shows fine; (2) general
+connectivity/cold-start flakiness already documented elsewhere in this file. Core Web Vitals and
+On-Page Audit don't depend on personal Google access at all (PageSpeed API key / Apps Script
+relay respectively), so if literally all four are failing identically for someone, that argues
+against cause (1) and toward something more fundamental — **next session should ask the user
+exactly what "not visible" looks like** (nav item missing vs. blank page vs. an error message vs.
+stuck on "Loading…") and whether it's specific to newly-added Admins or affects existing ones too,
+before changing any code here. Still unresolved as of this update.
+
 ## Immediate next action
 
 Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy (adds
-the Super Admin role actions AND the `listTrending`/`setTrending` actions from the previous
-round — no further `Code.gs` changes this round). Then: (1) get exact symptoms for the Insights
-visibility issue above; (2) decide whether to build the proposed shared-cache proxy for scaling;
-(3) confirm whether the old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be
-deleted now that the D: copy is confirmed working.
+the Super Admin role actions AND the `listTrending`/`setTrending` actions from two rounds ago —
+no `Code.gs` changes this round, everything above is front-end only). Then: (1) get exact
+symptoms for the Insights visibility issue above; (2) decide whether to build the proposed
+shared-cache proxy for scaling; (3) confirm whether the old
+`C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D:
+copy is confirmed working; (4) verify the new Request Type options, the fixed email subjects for
+non-Program/Landing categories, and the new "Requests by Requester" Home panel.

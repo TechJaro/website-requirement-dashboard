@@ -661,7 +661,8 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .status-legend-item[data-status],
 .status-legend-item[data-source],
 .status-legend-item[data-linkcat],
-.status-legend-item[data-maprow]{
+.status-legend-item[data-maprow],
+.status-legend-item[data-req]{
   border:1px solid var(--line);border-radius:100px;padding:5px 10px 5px 6px;
   background:var(--canvas);transition:background .15s,border-color .15s,transform .15s;
 }
@@ -669,14 +670,16 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .status-legend-item[data-status]:hover,
 .status-legend-item[data-source]:hover,
 .status-legend-item[data-linkcat]:hover,
-.status-legend-item[data-maprow]:hover{
+.status-legend-item[data-maprow]:hover,
+.status-legend-item[data-req]:hover{
   background:var(--blue-tint-10);border-color:var(--blue);transform:translateY(-1px);
 }
 .status-legend-item[data-type]::after,
 .status-legend-item[data-status]::after,
 .status-legend-item[data-source]::after,
 .status-legend-item[data-linkcat]::after,
-.status-legend-item[data-maprow]::after{
+.status-legend-item[data-maprow]::after,
+.status-legend-item[data-req]::after{
   content:"›";margin-left:2px;font-weight:800;color:var(--ink-35);
 }
 .insight-panel .click-hint{font-size:11px;color:var(--ink-35);font-weight:600;margin:-10px 0 12px}
@@ -684,12 +687,14 @@ input:checked + .pchip, .pchip:has(input:checked){box-shadow:0 0 0 1.5px current
 .status-bar > div[data-status],
 .status-bar > div[data-source],
 .status-bar > div[data-linkcat],
-.status-bar > div[data-maprow]{outline:2px solid transparent;outline-offset:1px}
+.status-bar > div[data-maprow],
+.status-bar > div[data-req]{outline:2px solid transparent;outline-offset:1px}
 .status-bar > div[data-type]:hover,
 .status-bar > div[data-status]:hover,
 .status-bar > div[data-source]:hover,
 .status-bar > div[data-linkcat]:hover,
-.status-bar > div[data-maprow]:hover{outline-color:var(--blue)}
+.status-bar > div[data-maprow]:hover,
+.status-bar > div[data-req]:hover{outline-color:var(--blue)}
 .insight-list-item{padding:10px 2px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:10px}
 .insight-list-item:last-child{border-bottom:none}
 .insight-list-item .ili-title{font-weight:700;font-size:13px}
@@ -972,6 +977,8 @@ body.auth-locked #app{display:none}
               <option>Content / Meta Change</option>
               <option>Broken Link / Bug</option>
               <option>Data Correction in Tracker</option>
+              <option>Open Admissions</option>
+              <option>Close Admissions</option>
               <option>Other</option>
             </select>
           </div>
@@ -1982,6 +1989,17 @@ async function renderHome(){
       </div>
     </div>
 
+    <div id="requestActivityWrap" style="display:none">
+      <div class="section-head"><div><h2>Request Activity</h2><div class="meta">Who's raising requests, live from the Requirements Log — Admins only</div></div></div>
+      <div class="insights-grid" style="margin-bottom:26px">
+        <div class="insight-panel" style="grid-column:1 / -1">
+          <h4>Requests by Requester</h4>
+          <div class="click-hint">Click any slice to see their requests — a tall bar for one person is worth a look ›</div>
+          <div id="requesterBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+
     <div class="section-head"><div><h2>Quick Insights</h2><div class="meta">A live snapshot of your program portfolio</div></div></div>
     <div class="insights-grid">
       <div class="insight-panel">
@@ -2067,6 +2085,7 @@ async function renderHome(){
   }
   loadLandingInsights();
   loadUrlMappingCoverage_();
+  if(isAdmin_()) renderRequesterActivity();
 }
 const STATUS_COLORS = { open:"#1b9c58", soon:"#8a6800", closed:"var(--red)", draft:"var(--blue)", other:"var(--ink-35)" };
 const TYPE_COLORS = ["var(--blue)","var(--yellow)","var(--red)","#7c5cff","#1b9c58","#8a6800","#0aa5a0"];
@@ -2184,6 +2203,57 @@ function renderQuickInsights(rawData){
       });
     });
   }
+}
+/* "Requests by Requester" (Home, Admin/Super Admin only) — the same segmented-bar-plus-legend
+   pattern as the Quick Insights breakdowns above, but built from the Requirements Log rather than
+   Program Pages: it's specifically meant to surface a person raising an unusually large share of
+   requests (per the user's request — "if the same person raises multiple requests, it should be
+   noticed"), which is exactly what a disproportionately wide/tall segment makes obvious at a
+   glance. Top 8 requesters shown individually, everyone else folded into one "N others" slice so
+   this stays readable regardless of how many different people have ever raised a request. */
+async function renderRequesterActivity(){
+  const el = document.getElementById("requesterBreakdown");
+  if(!el) return;
+  let rows;
+  try{
+    const r = await authApiCall_("listRequirements", { token: AUTH_SESSION.token });
+    rows = r.rows || [];
+  }catch(e){ el.innerHTML = `<div class="insight-loading">Couldn't load request activity.</div>`; return; }
+  if(!el.isConnected) return; // navigated away while the fetch was in flight
+  if(!rows.length){ el.innerHTML = `<div class="insight-loading">No requests raised yet.</div>`; return; }
+  const byRequester = new Map(); // email -> { name, rows:[] }
+  rows.forEach(row=>{
+    const email = (row["Email"]||"").toString().trim().toLowerCase() || "unknown";
+    if(!byRequester.has(email)) byRequester.set(email, { name: row["Requested By"] || email, rows: [] });
+    byRequester.get(email).rows.push(row);
+  });
+  let entries = [...byRequester.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
+  const TOP_N = 8;
+  const shown = entries.slice(0, TOP_N);
+  const rest = entries.slice(TOP_N);
+  if(rest.length){
+    shown.push(["__others__", { name: `${rest.length} other${rest.length===1?"":"s"}`, rows: rest.flatMap(([,v])=>v.rows) }]);
+  }
+  const total = rows.length || 1;
+  const mapRow = row => ({
+    title: row["Subject"] || "Untitled request",
+    sub: `${row["Status"]||"Not Started"} · ${(row["Timestamp"]||"").toString().slice(0,10)}`,
+    link: firstLink(row["Related Link"]),
+  });
+  el.innerHTML = `
+    <div class="status-bar">${shown.map(([key,v],i)=>
+      `<div data-req="${esc(key)}" style="width:${(v.rows.length/total)*100}%;background:${TYPE_COLORS[i%TYPE_COLORS.length]};cursor:pointer" title="${esc(v.name)}: ${v.rows.length} — click to view"></div>`
+    ).join("")}</div>
+    <div class="status-legend">${shown.map(([key,v],i)=>`
+      <div class="status-legend-item" data-req="${esc(key)}" style="cursor:pointer">
+        <span class="status-dot" style="background:${TYPE_COLORS[i%TYPE_COLORS.length]}"></span>${esc(v.name)} <b>${v.rows.length}</b>
+      </div>`).join("")}</div>`;
+  el.querySelectorAll("[data-req]").forEach(node=>{
+    node.addEventListener("click", ()=>{
+      const found = shown.find(([key])=>key===node.dataset.req);
+      if(found) openInsightListModal(`Requests — ${found[1].name}`, found[1].rows, mapRow);
+    });
+  });
 }
 /* Generic click-to-drill-down popup used by the Quick Insights breakdowns (Program AND Landing
    Page) above — lists the actual rows behind whichever slice was clicked, so a number in the chart
@@ -2724,7 +2794,7 @@ async function renderFlatCards(sec){
         ${mapRec ? `<div class="badge" style="align-self:flex-start;margin-bottom:8px;background:var(--blue-tint-10);color:var(--blue)">${ic("link")}Tap card for mapping info</div>` : ""}
         <div class="foot">
           ${link ? `<a class="link-chip" href="${esc(link)}" target="_blank" rel="noopener">${ic("external")}Visit Page</a>` : `<span class="link-chip disabled">${ic("link")}No link yet</span>`}
-          ${raiseBtn({ university: sec.key==="university" ? title : "", section: sec.label, link: link||"" })}
+          ${raiseBtn({ program: title, section: sec.label, link: link||"" })}
         </div>
       </div>`;
     }).join("")}</div>` : emptyStateHTML("No results", "Try a different search term.");
@@ -2776,7 +2846,7 @@ async function renderLocations(sec){
               <div class="linkrow" style="width:auto">
                 ${firstLink(row["Location Webpage"]) ? `<a class="link-chip" href="${esc(firstLink(row["Location Webpage"]))}" target="_blank" rel="noopener">${ic("external")}Contact Page</a>` : ""}
                 ${row["Latitude"] && row["Longitude"] ? `<a class="link-chip" href="https://www.google.com/maps?q=${row["Latitude"]},${row["Longitude"]}" target="_blank" rel="noopener">${ic("map")}Map</a>` : ""}
-                ${raiseBtn({ section: "Location Pages", link: firstLink(row["Location Webpage"])||"" })}
+                ${raiseBtn({ program: `${city} — ${row["Area Name"]||row["Centre Type"]||"Centre"}`, section: "Location Pages", link: firstLink(row["Location Webpage"])||"" })}
               </div>
             </div>`).join("")}
         </div></div>
@@ -2820,7 +2890,7 @@ async function renderFreeCourses(sec){
         ${mapRec ? `<div class="badge" style="align-self:flex-start;margin-bottom:8px;background:var(--blue-tint-10);color:var(--blue)">${ic("link")}Tap card for mapping info</div>` : ""}
         <div class="foot">
           ${link ? `<a class="link-chip" href="${esc(link)}" target="_blank" rel="noopener">${ic("external")}View Course</a>` : `<span class="link-chip disabled">${ic("link")}No link yet</span>`}
-          ${raiseBtn({ section: "Free Course Pages", link: link })}
+          ${raiseBtn({ program: row["Title"]||"Untitled Course", section: "Free Course Pages", link: link })}
         </div>
       </div>`;
     }).join("")}</div>` : emptyStateHTML("No courses found","Try a different search term.");
@@ -2879,7 +2949,7 @@ async function renderBlogCards(sec){
           <div class="foot">
             <span class="cell-muted" style="font-size:11.5px">${esc((row["Published Date"]||"").toString().slice(0,10))}</span>
             ${link ? `<a class="link-chip" href="${esc(link)}" target="_blank" rel="noopener">${ic("external")}Read Article</a>` : `<span class="link-chip disabled">${ic("link")}No link yet</span>`}
-            ${raiseBtn({ section: "Blogs", link: link||"" })}
+            ${raiseBtn({ program: row["Title"]||"Untitled Article", section: "Blogs", link: link||"" })}
           </div>
         </div>`;
       }).join("")}</div>
@@ -2942,7 +3012,7 @@ async function renderUnique(sec){
         ${row.notes ? `<p>${esc(row.notes)}</p>` : ""}
         <div class="foot">
           <a class="link-chip" href="${esc(firstLink(row.link))}" target="_blank" rel="noopener">${ic("external")}Open Page</a>
-          ${raiseBtn({ section: "Page Library", link: firstLink(row.link)||"" })}
+          ${raiseBtn({ program: row.name, section: "Page Library", link: firstLink(row.link)||"" })}
         </div>
       </div>`).join("")}</div>` : emptyStateHTML("No unique pages found", "Try a different search term.");
     document.getElementById("resultCount").textContent = `${items.length} pages`;
@@ -3380,8 +3450,19 @@ function shortProgramName(program, university){
 }
 function buildRequestSubject(payload){
   const shortProg = shortProgramName(payload.program, payload.university);
-  const bits = [payload.type||"Requirement", payload.university, shortProg].filter(Boolean);
-  return `[Dashboard] ${bits.join(" — ")}`;
+  // Program/Landing Pages (payload.university set) keep the original University-scoped format.
+  // Every other category has no university — those used to fall back to just the Request Type
+  // with nothing else ("[Dashboard] Content / Meta Change"), which read as bare-generic on the
+  // resulting emails. Now leads with whatever page/item title was passed through (see the
+  // raiseBtn() calls in renderFlatCards/renderLocations/renderFreeCourses/renderBlogCards/
+  // renderUnique — each now supplies its own title as `program`), falling back to just the type
+  // when a request was raised generically with no specific page selected.
+  if(payload.university){
+    const bits = [payload.type||"Requirement", payload.university, shortProg].filter(Boolean);
+    return `[Jaro Dashboard] ${bits.join(" — ")}`;
+  }
+  const bits = [shortProg, payload.type||"Requirement"].filter(Boolean);
+  return `[Jaro Dashboard] ${bits.join(" - ")}`;
 }
 
 /* ---- Rich text editor (bold / italic / hyperlink / pasted or attached images) ----
@@ -5042,6 +5123,8 @@ function applyRoleGating_(){
   const liveInsightsGrid = document.getElementById("liveInsightsGrid");
   if(liveInsightsHead) liveInsightsHead.style.display = admin ? "" : "none";
   if(liveInsightsGrid) liveInsightsGrid.style.display = admin ? "" : "none";
+  const requestActivityWrap = document.getElementById("requestActivityWrap");
+  if(requestActivityWrap) requestActivityWrap.style.display = admin ? "" : "none";
   // Belt-and-braces: if a Support session is ever sitting on a restricted route (e.g. a stale
   // deep link), bounce back to Home rather than just hiding the nav item.
   if(!admin && SUPPORT_HIDDEN_NAV.includes(currentRoute)) navigate("home");
