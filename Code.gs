@@ -861,10 +861,16 @@ function handleUpdateStatus_(body){
   }
   return { ok:true, debug: debugLines.join(" | ") };
 }
+// Support sees the Requirements Log, but only the rows they themselves raised — Admin/Super Admin
+// see everything. Filtered server-side (not just hidden in the UI) so a Support session genuinely
+// never receives anyone else's request data, regardless of what the client does with it.
 function handleListRequirements_(body){
-  requireSession_(body.token);
+  const session = requireSession_(body.token);
   const sheet = getRequestsSheet_();
-  return { ok:true, rows: sheetRowsAsObjects_(sheet) };
+  const rows = sheetRowsAsObjects_(sheet);
+  if(session.Role === "Admin") return { ok:true, rows: rows };
+  const mine = rows.filter(r => (r.Email||"").toString().trim().toLowerCase() === session.Email.toLowerCase());
+  return { ok:true, rows: mine };
 }
 
 /* ---- "What's Trending" (Home page) — any logged-in role can read it (Support sees Home too),

@@ -280,14 +280,118 @@ never actually labeled in row 1 (exactly the bug that caused the very first Gmai
 mystery a few rounds ago, where `Gmail Message ID`/`Gmail Thread ID` had data but no header text).
 `"Status Applies To"` is the first column that uses this — no manual sheet edit needed for it.
 
+## Real bug fixed: request Subject went stale mid-typing (2026-08-20)
+
+User reported the email subject for a Program/Landing request came out as just
+`[Jaro Dashboard] Requirement — IIM Mumbai` — missing the program name entirely — and thought this
+was a regression in the subject-content change from the round before. It wasn't category-specific;
+root cause was in the auto-suggest wiring itself (`wireRequestFormDependencies`,
+`maybeSuggestSubject`): the guard was "only suggest while the Subject field is empty". Typing
+University fires an `input` event on *every keystroke* — the very first keystroke (before Program
+had been typed at all) locked in a suggestion with no program name, and because the field was no
+longer "empty" after that, it silently never recalculated again as the rest of the form got filled
+in. Fixed by tracking the module-level `LAST_SUBJECT_SUGGESTION` and only skipping regeneration
+when the field's current value diverges from our own last suggestion (i.e. the user actually typed
+something themselves) — reset on every form open/reset. Verified in the browser: typing University
+then Program character-by-character now correctly ends with both in the subject.
+
+**"Related Link" showing "—" — investigated, no code bug found.** Checked how `payload.link` is
+read (`submitRequest`, straight from the `#rf_link` input's live value at submit time) and whether
+anything clears that field on Section change (`updateUniProgVisibility` — it doesn't touch
+`rf_link`). Nothing in the code path loses or clears a typed link. Most likely explanation: that
+specific request (raised generically, not from a card, per the same missing-Related-Link
+screenshot) genuinely had the optional link field left blank. If there's a reproducible case where
+a link *was* typed and still didn't show up, that needs a fresh screenshot — not enough evidence
+yet to change any code here.
+
+## File attachments now go through Google Drive, not inline base64 (2026-08-20)
+
+Old approach embedded pasted images as `<img src="data:...">` directly in the request/note HTML,
+which is why they were capped at a few KB — the whole request/note rides through a URL-length-
+limited request to Apps Script (JSONP GET is the *only* transport that's ever reliably worked for
+this domain-restricted deployment; a previous session already tried a plain POST specifically to
+dodge this limit and found the login cookie gets silently dropped on cross-site POSTs here). Per
+the user's decision (35MB cap, using the person's own Google sign-in — same trade-off already
+accepted for Page/SEO Insights), `wireRichTextEditor` (shared by both the request form's
+description and the status-update note — this fix applies to both automatically) now uploads any
+attached/pasted file straight to Google Drive via `uploadFileToDrive_()` (multipart upload using
+the existing `ensureGoogleAuth_` token — `CONFIG.oauth.scopes` gained `drive.file`), sets it
+"anyone with the link can view", and inserts a plain link (`🖼️`/`📎` + filename + size) instead of
+the file's actual bytes. Only a short link now ever rides through the size-limited request,
+regardless of the original file's size. `RTE_MAX_FILE_BYTES` (35MB) is enforced client-side before
+upload even starts. File type is no longer restricted to images — the `accept="image/*"` attribute
+was removed from both file inputs; paste-from-clipboard still only works for images (a browser
+limitation, not this app's), but the attach button now takes anything.
+
+**Trade-off worth remembering:** this reintroduces a personal Google sign-in popup — specifically
+the one thing request submission was originally re-architected *away* from needing. It only
+appears when someone actually attaches/pastes a file (not on every submission), and reuses the
+same cached token Page/SEO Insights already establish within the same browser session.
+
+## Combined Insights: full URL + standalone Page/SEO Insights removed (2026-08-20)
+
+Per the user, now that Combined Insights exists: removed the standalone `pageInsights`/
+`seoInsights` `SECTIONS` entries, their sidebar nav items, click-wiring, `navigate()` dispatch
+branches, and their two individual Home "Live Insights" cards (grid now 3 cards: Core Web Vitals,
+On-Page Audit, Page + SEO Insights). `renderPageInsights`/`renderSeoInsights` themselves are left
+in place as dead code (same precedent as `authApiCallLarge_`) since nothing routes to them anymore
+but `fetchGa4Live_`/`fetchGscLive_` — which they're built on — are still very much alive, used by
+Combined Insights. Also fixed: the "Page" column was showing GA4's relative path (e.g.
+`/thankyou`) instead of a full URL — `mergeInsightRows_` now keeps `page` (full URL, used for
+display/CSV/the column being a clickable link) separate from `path` (relative, used only for the
+URL-segment filter's "first path segment" logic, which would otherwise have parsed a full URL's
+`https:` as if it were a path segment).
+
+## Requirements Log: Support sees only their own requests (2026-08-20)
+
+`requirements` removed from `SUPPORT_HIDDEN_NAV` — Support can now reach the Requirements Log nav
+item at all (previously hidden entirely). What they see is filtered **server-side**, not just in
+the UI: `Code.gs`'s `handleListRequirements_` now checks `session.Role` and returns every row for
+Admin/Super Admin, or only rows whose `Email` matches the requester's own session email for
+Support — so a Support session's own API responses never contain anyone else's request data,
+regardless of what the client does with it. Also: Support sees a read-only status badge
+(`requestStatusBadgeHtml_`, new) instead of the editable dropdown (`requestStatusSelectHtml_`) —
+changing status was already Admin-only server-side (`handleUpdateStatus_`'s `requireAdmin_`), but
+showing Support an interactive control that would just fail was pointless and confusing.
+
+## Mapping info restricted to Admin/Super Admin except Program/Landing Pages (2026-08-20)
+
+Per the user, Support should only ever see "University Mapped"/"Product Mapped" info on Program
+Pages and Landing Pages — University Pages, Free Course Pages, and Pillar Pages' mapping
+popups/badges are now Admin/Super Admin only. Gated at the data-loading level (`urlMappings_ =
+isAdmin_() ? await loadUrlMappings_() : null`, in `renderFlatCards` and `renderFreeCourses`) rather
+than just hiding the badge, so Support never even fetches that data. Program Pages
+(`renderGroupedSection`) is unchanged — still shown to everyone, as before. (Landing Pages has no
+mapping-badge integration at all currently — `categoryBucketFor_` has no "landing" bucket — so
+there was nothing to restrict there; if that gets built later, it should stay visible to Support
+per this same rule.) Also: Home's "Form Mappings Coverage" Quick Insight panel
+(`formMappingsCoveragePanel`) is now Admin/Super Admin only (`applyRoleGating_`), and
+`loadUrlMappingCoverage_()` is no longer even called for a Support session.
+
+## Request Activity: dropdowns instead of a bar chart, plus a "same page" view (2026-08-20)
+
+`renderRequesterActivity` no longer draws the bar-and-legend visual — replaced with two toggleable
+`<select>` dropdowns ("By Requester" / "By Page"), each option showing a count and, on selection,
+opening the existing drill-down modal (`openInsightListModal`) for that slice. "By Page" is new:
+groups by University+Program (skipping requests with no page context, e.g. Blogs) so a page that
+keeps getting re-requested — regardless of who by — is just as visible as a person raising an
+unusual number of requests.
+
+## Trending crown — reconfirmed already Admin/Super Admin only, no change needed (2026-08-20)
+
+User asked to restrict the 👑 toggle to Admin/Super Admin. Checked both layers: client
+(`trendBtn` only renders when `isAdmin_()`, in `renderGroupedSection`) and server
+(`handleSetTrending_` calls `requireAdmin_`) were already correctly gated from when this feature
+was first built — nothing to change here.
+
 ## Immediate next action
 
 Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy — this
-round adds `REQUEST_LOG_HEADER`'s new column, `ensureColumn_`, and `handleUpdateStatus_`/
-`statusEmailHtml_`'s "Applies To" handling (no header needs to be added by hand this time, see
-`ensureColumn_` above). Then: (1) get exact symptoms for the Insights visibility issue above;
-(2) decide whether to build the proposed shared-cache proxy for scaling; (3) confirm whether the
+round's backend change is `handleListRequirements_`'s per-role filtering (no header/column changes
+this time). Then: (1) confirm the file-attachment Drive upload actually works end-to-end with a
+real Google sign-in (only tested structurally here — the OAuth popup can't complete in this
+environment); (2) get exact symptoms for the still-open Insights-visibility issue further above;
+(3) decide whether to build the proposed shared-cache proxy for scaling; (4) confirm whether the
 old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D:
-copy is confirmed working; (4) verify Combined Insights (sorting, pagination, segment filter, time
-range, CSV export) and the new "Applies To" selector on a Program Pages/Landing Pages request's
-status update.
+copy is confirmed working; (5) spot-check Requirements Log as a Support user (own rows only,
+read-only status) and as an Admin (everything, editable).

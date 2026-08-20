@@ -844,14 +844,6 @@ body.auth-locked #app{display:none}
         <span>Requirements Log</span>
       </div>
       <div class="nav-group-label">Insights</div>
-      <div class="navitem" data-nav="pageInsights">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/></svg>
-        <span>Page Insights</span>
-      </div>
-      <div class="navitem" data-nav="seoInsights">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <span>SEO Insights</span>
-      </div>
       <div class="navitem" data-nav="coreWebVitals">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/></svg>
         <span>Core Web Vitals</span>
@@ -1017,9 +1009,9 @@ body.auth-locked #app{display:none}
             <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/></svg></button>
             <button type="button" class="rte-btn" data-cmd="italic" title="Italic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4h-9M14 20H5M15 4 9 20"/></svg></button>
             <button type="button" class="rte-btn" id="rteLinkBtn" title="Insert hyperlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></svg></button>
-            <button type="button" class="rte-btn" id="rteImageBtn" title="Attach a screenshot / image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
-            <input type="file" id="rteImageInput" accept="image/*" multiple hidden>
-            <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V) — just like an email body</span>
+            <button type="button" class="rte-btn" id="rteImageBtn" title="Attach a file (image, PDF, etc. — up to 35MB)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
+            <input type="file" id="rteImageInput" multiple hidden>
+            <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V), or attach any file up to 35MB</span>
           </div>
           <div class="rte-body" id="rf_desc" contenteditable="true" data-placeholder="What needs to be added, changed, or fixed? Include as much detail as possible — paste screenshots straight in…"></div>
         </div>
@@ -1109,7 +1101,7 @@ const CONFIG = {
   // session (token lasts ~1hr). See the procedure notes for how to create the OAuth Client ID.
   oauth: {
     clientId: "169035673500-5rjm58tf5n27qlfaajbr553ie3th8q5s.apps.googleusercontent.com", // paste the OAuth 2.0 Client ID (Web application type) here
-    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email"
+    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.file"
   },
   ga4PropertyId: "281070911", // same GA4 Property ID you put in Code.gs's CONFIG.GA4_PROPERTY_ID
   gscSiteUrl: "https://www.jaroeducation.com/",    // same Search Console property URL you put in Code.gs's CONFIG.GSC_SITE_URL
@@ -1179,8 +1171,6 @@ const SECTIONS = {
   pillar: { key:"pillar", label:"Pillar Pages", desc:"Evergreen pillar & trending-topic pages", icon:"pillar", type:"flat-cards",
     titleField:"Page", linkField:"Webpage Link", tagField:"Column 4", tagFallback:"Pillar Page" },
   requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" },
-  pageInsights: { key:"pageInsights", label:"Page Insights", desc:"Traffic & engagement per page, live from Google Analytics (last 28 days)", icon:"bolt", type:"page-insights" },
-  seoInsights: { key:"seoInsights", label:"SEO Insights", desc:"Clicks, impressions & search ranking per page, live from Google Search Console (last 28 days)", icon:"search", type:"seo-insights" },
   coreWebVitals: { key:"coreWebVitals", label:"Core Web Vitals", desc:"LCP, CLS & INP per page, checked live from PageSpeed Insights on demand", icon:"bolt", type:"core-web-vitals" },
   onPageAudit: { key:"onPageAudit", label:"On-Page Audit", desc:"Title/meta/alt-text/broken-link scan of every page, checked live on demand", icon:"search", type:"on-page-audit" },
   combinedInsights: { key:"combinedInsights", label:"Page + SEO Insights", desc:"GA4 and Search Console data for every page, side by side — sortable, filterable, exportable", icon:"bolt", type:"combined-insights" }
@@ -1979,17 +1969,7 @@ async function renderHome(){
     </div>`;}).join("")}</div>
 
     <div class="section-head" id="liveInsightsHead"><div><h2>Live Insights</h2><div class="meta">Traffic, search performance, page vitals & on-page audit — Admins only</div></div></div>
-    <div class="stat-grid" id="liveInsightsGrid" style="grid-template-columns:repeat(5,1fr);margin-bottom:26px">
-      <div class="stat-card" data-go="pageInsights" style="--glass:var(--blue-tint-10);--fg:var(--blue)">
-        <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--blue)">${ic("bolt")}</div></div>
-        <div><div class="val" style="font-size:19px">Page Insights</div><div class="lbl">GA4 traffic, live</div></div>
-        <button type="button" class="stat-explore-btn" style="background:var(--blue)">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-      </div>
-      <div class="stat-card" data-go="seoInsights" style="--glass:var(--red-tint);--fg:var(--red)">
-        <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--red)">${ic("search")}</div></div>
-        <div><div class="val" style="font-size:19px">SEO Insights</div><div class="lbl">Search Console, live</div></div>
-        <button type="button" class="stat-explore-btn" style="background:var(--red)">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-      </div>
+    <div class="stat-grid" id="liveInsightsGrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:26px">
       <div class="stat-card" data-go="coreWebVitals" style="--glass:var(--yellow-tint);--fg:#8a6800">
         <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:#8a6800">${ic("bolt")}</div></div>
         <div><div class="val" style="font-size:19px">Core Web Vitals</div><div class="lbl">PageSpeed Insights, on demand</div></div>
@@ -2040,7 +2020,7 @@ async function renderHome(){
         <div class="click-hint">Click any slice to see the list ›</div>
         <div id="landingLinkBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
       </div>
-      <div class="insight-panel">
+      <div class="insight-panel" id="formMappingsCoveragePanel" style="display:none">
         <h4>Form Mappings Coverage</h4>
         <div class="click-hint">Click any slice to see the list ›</div>
         <div id="urlMappingBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
@@ -2102,7 +2082,7 @@ async function renderHome(){
     });
   }
   loadLandingInsights();
-  loadUrlMappingCoverage_();
+  if(isAdmin_()) loadUrlMappingCoverage_();
   if(isAdmin_()) renderRequesterActivity();
 }
 const STATUS_COLORS = { open:"#1b9c58", soon:"#8a6800", closed:"var(--red)", draft:"var(--blue)", other:"var(--ink-35)" };
@@ -2229,6 +2209,11 @@ function renderQuickInsights(rawData){
    noticed"), which is exactly what a disproportionately wide/tall segment makes obvious at a
    glance. Top 8 requesters shown individually, everyone else folded into one "N others" slice so
    this stays readable regardless of how many different people have ever raised a request. */
+// Two switchable breakdowns, each a plain <select> (per the user's request for "dropdown
+// format" rather than the bar-chart-and-legend visual used elsewhere on Quick Insights) —
+// picking an option immediately opens the existing drill-down modal for that slice. "By Page"
+// groups by University+Program so a page that keeps getting re-requested (regardless of who by)
+// stands out just as easily as a person who raises an unusual number of requests.
 async function renderRequesterActivity(){
   const el = document.getElementById("requesterBreakdown");
   if(!el) return;
@@ -2245,32 +2230,52 @@ async function renderRequesterActivity(){
     if(!byRequester.has(email)) byRequester.set(email, { name: row["Requested By"] || email, rows: [] });
     byRequester.get(email).rows.push(row);
   });
-  let entries = [...byRequester.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
-  const TOP_N = 8;
-  const shown = entries.slice(0, TOP_N);
-  const rest = entries.slice(TOP_N);
-  if(rest.length){
-    shown.push(["__others__", { name: `${rest.length} other${rest.length===1?"":"s"}`, rows: rest.flatMap(([,v])=>v.rows) }]);
-  }
-  const total = rows.length || 1;
+  const byPage = new Map(); // "university|||program" -> { label, rows:[] }
+  rows.forEach(row=>{
+    const uni = (row["University"]||"").toString().trim();
+    const prog = (row["Program"]||"").toString().trim();
+    if(!uni && !prog) return; // no page context to group by (e.g. a Blogs/generic request)
+    const key = (uni+"|||"+prog).toLowerCase();
+    if(!byPage.has(key)) byPage.set(key, { label: [uni,prog].filter(Boolean).join(" — "), rows: [] });
+    byPage.get(key).rows.push(row);
+  });
+  const requesterEntries = [...byRequester.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
+  const pageEntries = [...byPage.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
   const mapRow = row => ({
     title: row["Subject"] || "Untitled request",
     sub: `${row["Status"]||"Not Started"} · ${(row["Timestamp"]||"").toString().slice(0,10)}`,
     link: firstLink(row["Related Link"]),
   });
   el.innerHTML = `
-    <div class="status-bar">${shown.map(([key,v],i)=>
-      `<div data-req="${esc(key)}" style="width:${(v.rows.length/total)*100}%;background:${TYPE_COLORS[i%TYPE_COLORS.length]};cursor:pointer" title="${esc(v.name)}: ${v.rows.length} — click to view"></div>`
-    ).join("")}</div>
-    <div class="status-legend">${shown.map(([key,v],i)=>`
-      <div class="status-legend-item" data-req="${esc(key)}" style="cursor:pointer">
-        <span class="status-dot" style="background:${TYPE_COLORS[i%TYPE_COLORS.length]}"></span>${esc(v.name)} <b>${v.rows.length}</b>
-      </div>`).join("")}</div>`;
-  el.querySelectorAll("[data-req]").forEach(node=>{
-    node.addEventListener("click", ()=>{
-      const found = shown.find(([key])=>key===node.dataset.req);
-      if(found) openInsightListModal(`Requests — ${found[1].name}`, found[1].rows, mapRow);
-    });
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button type="button" class="btn primary" id="raByRequesterBtn" style="font-size:12px;padding:6px 12px">By Requester</button>
+      <button type="button" class="btn" id="raByPageBtn" style="font-size:12px;padding:6px 12px">By Page</button>
+    </div>
+    <select id="raRequesterSelect" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:13px">
+      ${requesterEntries.map(([key,v])=>`<option value="${esc(key)}">${esc(v.name)} — ${v.rows.length} request${v.rows.length!==1?"s":""}</option>`).join("")}
+    </select>
+    <select id="raPageSelect" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:13px;display:none">
+      ${pageEntries.length ? pageEntries.map(([key,v])=>`<option value="${esc(key)}">${esc(v.label)} — ${v.rows.length} request${v.rows.length!==1?"s":""}</option>`).join("") : `<option value="">No page-specific requests yet</option>`}
+    </select>`;
+  const requesterSelect = document.getElementById("raRequesterSelect");
+  const pageSelect = document.getElementById("raPageSelect");
+  const byRequesterBtn = document.getElementById("raByRequesterBtn");
+  const byPageBtn = document.getElementById("raByPageBtn");
+  requesterSelect.addEventListener("change", ()=>{
+    const found = byRequester.get(requesterSelect.value);
+    if(found) openInsightListModal(`Requests — ${found.name}`, found.rows, mapRow);
+  });
+  pageSelect.addEventListener("change", ()=>{
+    const found = byPage.get(pageSelect.value);
+    if(found) openInsightListModal(`Requests — ${found.label}`, found.rows, mapRow);
+  });
+  byRequesterBtn.addEventListener("click", ()=>{
+    byRequesterBtn.classList.add("primary"); byPageBtn.classList.remove("primary");
+    requesterSelect.style.display = ""; pageSelect.style.display = "none";
+  });
+  byPageBtn.addEventListener("click", ()=>{
+    byPageBtn.classList.add("primary"); byRequesterBtn.classList.remove("primary");
+    pageSelect.style.display = ""; requesterSelect.style.display = "none";
   });
 }
 /* Generic click-to-drill-down popup used by the Quick Insights breakdowns (Program AND Landing
@@ -2774,7 +2779,9 @@ async function renderFlatCards(sec){
   setLivePill(isLive);
   // Additive: URL Mappings tab lookup — applies to University and Pillar Pages only (not B2B,
   // which isn't one of the categories mentioned for this mapping).
-  const urlMappings_ = (sec.key === "university" || sec.key === "pillar") ? await loadUrlMappings_() : null;
+  // Mapping info is Admin/Super Admin only everywhere except Program Pages and Landing Pages —
+  // Support never gets it loaded at all here, not just visually hidden.
+  const urlMappings_ = (isAdmin_() && (sec.key === "university" || sec.key === "pillar")) ? await loadUrlMappings_() : null;
 
   function titleize(slug){
     const ACRONYMS = ["Bfil","Dtdc","Hcl","Hdfc","Iifl","Rsb","Wns","Pnb","Au"];
@@ -2888,8 +2895,9 @@ async function renderFreeCourses(sec){
   listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
   const {data, isLive} = await getData("freeCoursePages", ["Title","Duration","Webpage Link"]);
   setLivePill(isLive);
-  // Additive: URL Mappings tab lookup for Free Course Pages.
-  const urlMappings_ = await loadUrlMappings_();
+  // Additive: URL Mappings tab lookup for Free Course Pages — Admin/Super Admin only (same
+  // restriction as University/Pillar Pages; Support only ever gets this on Program/Landing Pages).
+  const urlMappings_ = isAdmin_() ? await loadUrlMappings_() : null;
 
   function draw(q){
     q=(q||"").toLowerCase();
@@ -3150,8 +3158,6 @@ async function navigate(route){
   // users and anyone not logged in away from them), so the second password on top of the login
   // itself was redundant — bypassing straight to the real render function per your request.
   else if(sec.type === "requirements-table") await renderRequirementsTable(sec);
-  else if(sec.type === "page-insights") await renderPageInsights(sec);
-  else if(sec.type === "seo-insights") await renderSeoInsights(sec);
   else if(sec.type === "core-web-vitals") await renderCoreWebVitals(sec);
   else if(sec.type === "on-page-audit") await renderOnPageAudit(sec);
   else if(sec.type === "combined-insights") await renderCombinedInsights(sec);
@@ -3269,6 +3275,7 @@ function createChipPicker(ids, defaultEmails, locked){
   };
 }
 let toPicker, ccPicker;
+let LAST_SUBJECT_SUGGESTION = ""; // see maybeSuggestSubject() in wireRequestFormDependencies
 
 function populateSectionDropdown(){
   const sel = document.getElementById("rf_section");
@@ -3401,7 +3408,7 @@ function openRequestModal(prefill){
     if(p.university) refreshProgramOptionsFor(p.university);
     const subjectEl = document.getElementById("rf_subject");
     if(subjectEl && !subjectEl.value.trim() && (p.university || p.program)){
-      subjectEl.value = buildRequestSubject({ university: p.university||"", program: p.program||"", type: document.getElementById("rf_type").value });
+      subjectEl.value = LAST_SUBJECT_SUGGESTION = buildRequestSubject({ university: p.university||"", program: p.program||"", type: document.getElementById("rf_type").value });
     }
   });
   if(!toPicker) toPicker = createChipPicker("to", ["lalit.rade@jaro.in"], true);
@@ -3491,6 +3498,38 @@ function buildRequestSubject(payload){
    of hardcoding the request form's ids. scopeEl bounds the "[data-cmd]" button lookup to just this
    editor's own toolbar, so two editors on the page at once don't wire each other's bold/italic
    buttons to the wrong body. */
+// Uploads straight to Google Drive with the person's own Google sign-in (same ensureGoogleAuth_
+// token flow Page/SEO Insights already use — the combined scope list means any token already
+// covers Drive too, no separate consent screen beyond the one popup) instead of embedding the
+// file inline as base64. Inline embedding is what capped attachments at a few KB in the first
+// place: the whole request/note rides through a URL-length-limited request to Apps Script (the
+// only transport that's ever reliably worked for this domain-restricted deployment — a plain POST
+// upload was tried before specifically to dodge this limit and found the login cookie gets
+// silently dropped). Routing the actual bytes through Drive instead means only a short link travels
+// through that size-limited request, so the real ceiling becomes Drive's, not a URL's — capped here
+// at 35MB per file by choice, not by any technical limit lower than that.
+const RTE_MAX_FILE_BYTES = 35 * 1024 * 1024;
+async function uploadFileToDrive_(file){
+  const token = await ensureGoogleAuth_();
+  const boundary = "jarodash-" + Date.now();
+  const metaPart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: file.name || "attachment" })}\r\n`;
+  const filePartHeader = `--${boundary}\r\nContent-Type: ${file.type || "application/octet-stream"}\r\n\r\n`;
+  const body = new Blob([metaPart, filePartHeader, await file.arrayBuffer(), `\r\n--${boundary}--`]);
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+    body
+  });
+  const json = await res.json();
+  if(!res.ok) throw new Error((json.error && json.error.message) || "Drive upload failed");
+  // Anyone-with-the-link viewable — needed since email recipients won't otherwise have access to a
+  // file sitting in the uploader's own Drive.
+  await fetch(`https://www.googleapis.com/drive/v3/files/${json.id}/permissions`, {
+    method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ role: "reader", type: "anyone" })
+  }).catch(()=>{}); // the file still uploaded even if this secondary call fails
+  return json.webViewLink || `https://drive.google.com/file/d/${json.id}/view`;
+}
 function wireRichTextEditor(ids){
   const cfg = Object.assign({
     bodyId:"rf_desc", scopeEl:document, linkBtnId:"rteLinkBtn", imageBtnId:"rteImageBtn", imageInputId:"rteImageInput"
@@ -3506,7 +3545,7 @@ function wireRichTextEditor(ids){
   const imgInput = document.getElementById(cfg.imageInputId);
   document.getElementById(cfg.imageBtnId).addEventListener("click", ()=> imgInput.click());
   imgInput.addEventListener("change", ()=>{
-    [...imgInput.files].forEach(insertImageFile);
+    [...imgInput.files].forEach(insertAttachedFile);
     imgInput.value = "";
   });
   body.addEventListener("paste", (e)=>{
@@ -3514,18 +3553,24 @@ function wireRichTextEditor(ids){
     for(const item of items){
       if(item.type.startsWith("image/")){
         e.preventDefault();
-        insertImageFile(item.getAsFile());
+        insertAttachedFile(item.getAsFile());
       }
     }
   });
-  function insertImageFile(file){
+  async function insertAttachedFile(file){
     if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ()=>{
+    if(file.size > RTE_MAX_FILE_BYTES){ toast(`"${file.name}" is over the 35MB attachment limit — not attached`, true); return; }
+    const isImage = file.type.startsWith("image/");
+    const sizeLabel = (file.size/1024/1024).toFixed(file.size < 1024*1024 ? 2 : 1) + " MB";
+    toast(`Uploading ${file.name}…`);
+    try{
+      const link = await uploadFileToDrive_(file);
       body.focus();
-      document.execCommand("insertHTML", false, `<img src="${reader.result}" alt="attached screenshot">`);
-    };
-    reader.readAsDataURL(file);
+      document.execCommand("insertHTML", false,
+        `<a href="${esc(link)}" target="_blank" rel="noopener">${isImage?"🖼️":"📎"} ${esc(file.name||"attachment")} (${sizeLabel})</a>&nbsp;`);
+    }catch(err){
+      toast(`Couldn't attach "${file.name}" — ${err.message}`, true);
+    }
   }
 }
 
@@ -3600,6 +3645,7 @@ function resetRequestForm(){
   document.getElementById("rf_subject_hint").style.display = "none";
   if(toPicker) toPicker.reset(["lalit.rade@jaro.in"]);
   if(ccPicker) ccPicker.reset([]);
+  LAST_SUBJECT_SUGGESTION = "";
 }
 function mailtoFallback(payload){
   const body =
@@ -4380,7 +4426,7 @@ function exportRowsAsCsv_(filename, columns, rows){
   URL.revokeObjectURL(url);
 }
 const CI_COLUMNS = [
-  { key:"page", label:"Page", fmt:v=>esc(v||"—") },
+  { key:"page", label:"Page", fmt:v=>v?`<a href="${esc(v)}" target="_blank" rel="noopener">${esc(v)}</a>`:"—" },
   { key:"pageviews", label:"Pageviews", fmt:v=>v==null?"—":v.toLocaleString() },
   { key:"activeUsers", label:"Active Users", fmt:v=>v==null?"—":v.toLocaleString() },
   { key:"avgEngagementTime", label:"Avg. Engagement Time", fmt:v=>v==null?"—":v.toFixed(1)+"s" },
@@ -4392,11 +4438,16 @@ const CI_COLUMNS = [
 ];
 // Outer join on normalized path — normUrlForMatch_ already strips protocol/www/trailing-slash,
 // exactly what's needed to line up GA4's relative pagePath against GSC's full page URL.
+// `page` is always the full, clickable URL (what's shown/exported); `path` is the site-relative
+// path used only internally for merging and the URL-segment filter — kept separate so reissuing
+// the full domain doesn't break "first path segment" parsing (a full URL's own first "/"-part is
+// "https:", not a real segment).
 function mergeInsightRows_(ga4Rows, gscRows){
   const map = new Map();
+  const base = (CONFIG.gscSiteUrl||"").replace(/\/+$/,"");
   ga4Rows.forEach(r=>{
     map.set(normUrlForMatch_(r.pagePath), {
-      page:r.pagePath, pageviews:r.pageviews, activeUsers:r.activeUsers,
+      page: base + r.pagePath, path: r.pagePath, pageviews:r.pageviews, activeUsers:r.activeUsers,
       avgEngagementTime:r.avgEngagementTime, engagementRate:r.engagementRate,
       clicks:null, impressions:null, ctr:null, position:null
     });
@@ -4405,8 +4456,10 @@ function mergeInsightRows_(ga4Rows, gscRows){
     const path = (r.page||"").replace(/^https?:\/\/[^/]+/,"") || "/";
     const key = normUrlForMatch_(path);
     const existing = map.get(key);
-    if(existing){ existing.clicks=r.clicks; existing.impressions=r.impressions; existing.ctr=r.ctr; existing.position=r.position; }
-    else map.set(key, { page:path, pageviews:null, activeUsers:null, avgEngagementTime:null, engagementRate:null,
+    // GSC's own `page` is an authoritative full URL straight from Google — prefer it over the
+    // GA4-reconstructed one (base + path) when both exist, in case of http/https or subdomain drift.
+    if(existing){ existing.page = r.page || existing.page; existing.clicks=r.clicks; existing.impressions=r.impressions; existing.ctr=r.ctr; existing.position=r.position; }
+    else map.set(key, { page: r.page || (base + path), path, pageviews:null, activeUsers:null, avgEngagementTime:null, engagementRate:null,
       clicks:r.clicks, impressions:r.impressions, ctr:r.ctr, position:r.position });
   });
   return [...map.values()];
@@ -4456,7 +4509,7 @@ async function renderCombinedInsights(sec){
   }
   function populateSegments(rows){
     const segs = new Set(rows.map(r=>{
-      const parts = (r.page||"").split("/").filter(Boolean);
+      const parts = (r.path||"").split("/").filter(Boolean);
       return parts.length ? "/"+parts[0] : "/";
     }));
     const current = segmentEl.value;
@@ -4468,7 +4521,7 @@ async function renderCombinedInsights(sec){
     const q = (document.getElementById("sec_search").value||"").toLowerCase();
     const seg = segmentEl.value;
     let items = allRows.filter(r=>{
-      if(seg){ const parts = (r.page||"").split("/").filter(Boolean); const first = parts.length ? "/"+parts[0] : "/"; if(first !== seg) return false; }
+      if(seg){ const parts = (r.path||"").split("/").filter(Boolean); const first = parts.length ? "/"+parts[0] : "/"; if(first !== seg) return false; }
       return !q || (r.page||"").toLowerCase().includes(q);
     });
     if(sortCol){
@@ -4700,6 +4753,14 @@ function requestStatusSelectHtml_(row){
     ${REQUEST_STATUS_OPTIONS.map(s=>`<option value="${s}" ${s===current?"selected":""}>${s}</option>`).join("")}
   </select>`;
 }
+// Read-only counterpart for Support — they can see their own requests' status, but changing it
+// (which fires a notification email + Gmail thread reply) is an Admin action. Same colors as the
+// editable dropdown so the two read as the same underlying status, just not interactive here.
+function requestStatusBadgeHtml_(row){
+  const current = REQUEST_STATUS_OPTIONS.includes(row["Status"]) ? row["Status"] : "Not Started";
+  const c = REQUEST_STATUS_COLORS[current] || REQUEST_STATUS_COLORS["Not Started"];
+  return `<span style="display:inline-block;background:${c.bg};color:${c.fg};border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700">${esc(current)}</span>`;
+}
 // Shown next to the Status badge when a request against the merged "Program Pages/Landing Pages"
 // section has recorded which target(s) its most recent status update actually covered — see
 // openStatusNoteModal_'s "Applies To" selector and Code.gs's handleUpdateStatus_.
@@ -4764,9 +4825,9 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
                 <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/></svg></button>
                 <button type="button" class="rte-btn" data-cmd="italic" title="Italic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4h-9M14 20H5M15 4 9 20"/></svg></button>
                 <button type="button" class="rte-btn" id="statusNoteLinkBtn" title="Insert hyperlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></svg></button>
-                <button type="button" class="rte-btn" id="statusNoteImageBtn" title="Attach a screenshot / image"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
-                <input type="file" id="statusNoteImageInput" accept="image/*" multiple hidden>
-                <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V)</span>
+                <button type="button" class="rte-btn" id="statusNoteImageBtn" title="Attach a file (image, PDF, etc. — up to 35MB)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
+                <input type="file" id="statusNoteImageInput" multiple hidden>
+                <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V), or attach any file up to 35MB</span>
               </div>
               <div class="rte-body" id="statusNoteText" contenteditable="true" data-placeholder="Add any details, links, or screenshots you want included in this update email…" style="min-height:110px"></div>
             </div>
@@ -4906,7 +4967,7 @@ async function renderRequirementsTable(sec){
               <td>${esc(row["Request Type"]||"—")}</td>
               <td>${esc(row["Priority"]||"—")}</td>
               <td class="cell-muted">${esc(row["Requested By"]||row["Email"]||"—")}</td>
-              <td>${requestStatusSelectHtml_(row)}${appliesToTagHtml_(row)}</td>
+              <td>${isAdmin_() ? requestStatusSelectHtml_(row) : requestStatusBadgeHtml_(row)}${appliesToTagHtml_(row)}</td>
             </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--ink-35)">No requests raised yet</td></tr>`}
           </tbody>
         </table>
@@ -5323,7 +5384,7 @@ function logout_(){
 /* ---- Role gating: Support only sees the Web Page category sections + Home (Live Insights
    hidden there too); everything else (Requirements Log, Page/SEO Insights, Core Web Vitals, and
    the Users admin page) is Admin-only. ---- */
-const SUPPORT_HIDDEN_NAV = ["requirements","pageInsights","seoInsights","coreWebVitals","onPageAudit","combinedInsights"];
+const SUPPORT_HIDDEN_NAV = ["coreWebVitals","onPageAudit","combinedInsights"];
 function applyRoleGating_(){
   const role = getCurrentUserRole_();
   document.getElementById("userPill").style.display = "flex";
@@ -5362,6 +5423,8 @@ function applyRoleGating_(){
   if(liveInsightsGrid) liveInsightsGrid.style.display = admin ? "" : "none";
   const requestActivityWrap = document.getElementById("requestActivityWrap");
   if(requestActivityWrap) requestActivityWrap.style.display = admin ? "" : "none";
+  const formMappingsCoveragePanel = document.getElementById("formMappingsCoveragePanel");
+  if(formMappingsCoveragePanel) formMappingsCoveragePanel.style.display = admin ? "" : "none";
   // Belt-and-braces: if a Support session is ever sitting on a restricted route (e.g. a stale
   // deep link), bounce back to Home rather than just hiding the nav item.
   if(!admin && SUPPORT_HIDDEN_NAV.includes(currentRoute)) navigate("home");
@@ -5497,8 +5560,6 @@ function init(){
   });
   document.querySelector('.navitem[data-nav="home"]').addEventListener("click", ()=>navigate("home"));
   document.querySelector('.navitem[data-nav="requirements"]').addEventListener("click", ()=>navigate("requirements"));
-  document.querySelector('.navitem[data-nav="pageInsights"]').addEventListener("click", ()=>navigate("pageInsights"));
-  document.querySelector('.navitem[data-nav="seoInsights"]').addEventListener("click", ()=>navigate("seoInsights"));
   document.querySelector('.navitem[data-nav="coreWebVitals"]').addEventListener("click", ()=>navigate("coreWebVitals"));
   document.querySelector('.navitem[data-nav="onPageAudit"]').addEventListener("click", ()=>navigate("onPageAudit"));
   document.querySelector('.navitem[data-nav="combinedInsights"]').addEventListener("click", ()=>navigate("combinedInsights"));
@@ -5539,10 +5600,20 @@ function wireRequestFormDependencies(){
   typeEl.addEventListener("change", maybeSuggestSubject);
   subjectEl.addEventListener("input", checkSubjectMatchesHistory);
 
+  // Real bug this fixed: the guard used to be "only suggest while the field is empty", which
+  // meant the very first keystroke in University (before Program had been typed at all) locked in
+  // a suggestion missing the program name — and it silently never updated again as the rest of the
+  // form got filled in, because by then the field was no longer "empty". Tracking our own last
+  // suggestion (module-level LAST_SUBJECT_SUGGESTION, reset on open/reset of the form) instead of
+  // just "is it non-empty" means it keeps refreshing as long as nothing but our own suggestion has
+  // ever been in that field — and stops the instant the user actually edits it by hand.
   function maybeSuggestSubject(){
-    if(subjectEl.value.trim()) return; // never overwrite what the user already typed
+    if(subjectEl.value.trim() && subjectEl.value !== LAST_SUBJECT_SUGGESTION) return;
     const suggestion = buildRequestSubject({ university: uniEl.value.trim(), program: progEl.value.trim(), type: typeEl.value });
-    if(uniEl.value.trim() || progEl.value.trim() || typeEl.value) subjectEl.value = suggestion;
+    if(uniEl.value.trim() || progEl.value.trim() || typeEl.value){
+      subjectEl.value = suggestion;
+      LAST_SUBJECT_SUGGESTION = suggestion;
+    }
   }
 }
 /* Boot behind the login gate: a valid, unexpired session skips straight to the dashboard;
