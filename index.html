@@ -764,6 +764,7 @@ body.auth-locked #app{display:none}
 .auth-btn:hover{background:var(--blue-dark)}
 .auth-btn:disabled{opacity:.6;cursor:default}
 .auth-error{color:var(--red);font-size:12px;margin:-6px 0 12px;display:none}
+.auth-field-error{color:var(--red);font-size:12px;margin-top:6px;display:none}
 .auth-note{font-size:12px;color:var(--ink-50);margin-top:16px;text-align:center}
 .auth-note a{color:var(--blue);font-weight:700;cursor:pointer;text-decoration:none}
 .auth-note a:hover{text-decoration:underline}
@@ -1194,7 +1195,11 @@ DEMO.landingPagesChannel = [{"University/Institute": "Amrita Vishwa Vidyapeetham
 
 /* live cache + session-only additions for Unique Pages */
 const LIVE = {};
-const LIVE_CACHE_TTL_MS = 5 * 60 * 1000; // re-fetch from Google Sheets at most every 5 minutes per section
+// Widened from 5 to 10 minutes (2026-08-20) as one of the response-time fixes for growing from a
+// handful of users to ~20-30: this sheet data doesn't change minute-to-minute, and every extra
+// minute of cache life is that many fewer redundant Google Sheets API calls across everyone's
+// browser tabs combined (there's no cross-user cache yet — each tab still fetches independently).
+const LIVE_CACHE_TTL_MS = 10 * 60 * 1000;
 const uniquePagesSession = [];
 
 /* ================================================================================================
@@ -4872,22 +4877,35 @@ function drawAuthLogin_(){
   document.getElementById("authCard").innerHTML = authCardShell_(
     "Log In", "Use your Jaro email and password",
     `<div class="auth-field"><label>Email</label><input type="email" id="auth_email" placeholder="you@jaro.in" autocomplete="username"></div>
-     <div class="auth-field"><label>Password</label><input type="password" id="auth_password" placeholder="••••••••" autocomplete="current-password"></div>
+     <div class="auth-field">
+       <label>Password</label>
+       <input type="password" id="auth_password" placeholder="••••••••" autocomplete="current-password">
+       <div class="auth-field-error" id="authPasswordError"></div>
+     </div>
      <button class="auth-btn" id="authLoginBtn">Continue</button>
      <div class="auth-note">First time as a Support user? <a id="authGoSetup">Set up your password</a></div>`
   );
   const emailEl = document.getElementById("auth_email");
   const passEl = document.getElementById("auth_password");
+  const pwErrorEl = document.getElementById("authPasswordError");
+  // Login errors (missing fields, incorrect password, no account) show right under the Password
+  // field instead of at the bottom of the card — that's the field the person is actually looking
+  // at when the error appears. Clears as soon as they start correcting either field.
+  const showLoginError_ = (msg)=>{ pwErrorEl.textContent = msg; pwErrorEl.style.display = "block"; };
+  const clearLoginError_ = ()=>{ pwErrorEl.style.display = "none"; };
+  emailEl.addEventListener("input", clearLoginError_);
+  passEl.addEventListener("input", clearLoginError_);
   const submit = async ()=>{
     const email = emailEl.value.trim(), password = passEl.value;
-    if(!email || !password){ showAuthError_("Enter both your email and password."); return; }
+    if(!email || !password){ showLoginError_("Enter both your email and password."); return; }
+    clearLoginError_();
     const btn = document.getElementById("authLoginBtn"); btn.disabled = true; btn.textContent = "Sending code…";
     try{
       const r = await authApiCall_("login", { email, password });
       if(r.needsSetup){ drawAuthSetupEmail_(email); return; }
       toast("Code sent — check your inbox");
       drawAuthOtp_(email, "login");
-    }catch(e){ showAuthError_(e.message); btn.disabled = false; btn.textContent = "Continue"; }
+    }catch(e){ showLoginError_(e.message); btn.disabled = false; btn.textContent = "Continue"; }
   };
   document.getElementById("authLoginBtn").addEventListener("click", submit);
   passEl.addEventListener("keydown", e=>{ if(e.key==="Enter") submit(); });
@@ -5119,22 +5137,40 @@ function init(){
   loadHomeExtras();
   resumeBackgroundScans_(); // pick back up any Vitals/Audit scan that was running before this load
   document.getElementById("refreshDataBtn").addEventListener("click", forceRefreshCurrentSection);
-  // Gentle background auto-refresh: checks once a minute, but each section's own 5-minute TTL
-  // (see getData) decides whether that actually triggers a real re-fetch. Skipped while someone
+  // Gentle background auto-refresh: checks every 3 minutes (widened from 1 minute 2026-08-20 —
+  // one minute was firing far more often than the data actually changes, and multiplied across
+  // everyone's open tabs it added up to a lot of avoidable Google Sheets API traffic), but each
+  // section's own cache TTL (see getData/LIVE_CACHE_TTL_MS) decides whether that actually triggers
+  // a real re-fetch. Skipped while someone
   // is actively typing or the request form is open, so it never disrupts what they're doing.
   // Also skipped entirely while a Core Web Vitals / On-Page Audit scan is running — those scans
   // can take many minutes over 3000+ pages, and re-running navigate() rebuilds #content from
   // scratch, orphaning the scan's DOM references (vitalsBody/auditBody) so results silently stop
   // appearing even though the scan is technically still running in the background. This was the
   // "runs for a bit then stops" bug: the interval just happened to land mid-scan.
-  setInterval(()=>{
+  setInterval(async ()=>{
     if(document.getElementById("requestOverlay").classList.contains("show")) return;
     if(VITALS_SCAN_RUNNING || AUDIT_SCAN_RUNNING) return;
     const active = document.activeElement;
     const isTyping = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable);
     if(isTyping) return;
-    if(currentRoute && currentRoute !== "search") navigate(currentRoute);
-  }, 60*1000);
+    if(currentRoute && currentRoute !== "search"){
+      // navigate() rebuilds the whole section from scratch, which used to silently collapse any
+      // expanded university/city card every single minute — "open" is just a runtime CSS class,
+      // not something the rebuilt HTML remembers on its own. Titles are stable across a redraw
+      // (unlike DOM nodes), so capture which ones were open and re-open the matching cards after.
+      const openTitles = new Set([...document.querySelectorAll(".uni-card.open .uni-title")].map(el=>el.textContent));
+      const scrollY = window.scrollY;
+      await navigate(currentRoute);
+      if(openTitles.size){
+        document.querySelectorAll(".uni-card").forEach(card=>{
+          const title = card.querySelector(".uni-title");
+          if(title && openTitles.has(title.textContent)) card.classList.add("open");
+        });
+      }
+      window.scrollTo(0, scrollY);
+    }
+  }, 3*60*1000);
   document.getElementById("navItems").addEventListener("click", (e)=>{
     const item = e.target.closest(".navitem");
     if(item) navigate(item.dataset.nav);

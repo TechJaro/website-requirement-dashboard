@@ -117,6 +117,73 @@ Previously a hardcoded `TRENDING_COURSES` array in the dashboard file that had t
 - **Toggle UX:** clicking the crown updates just that button + its card's highlight locally (`is-trending` class) and reverts on failure, rather than re-drawing the whole Program Pages section — preserves scroll position and which university cards are expanded.
 - **Card highlight:** `.prog-row.is-trending` (yellow tint, matches the crown's active-state color) — CSS lives right next to `.raise-mini-btn`'s block since they're visually paired.
 
+## Auto-collapsing university cards — fixed (2026-08-20)
+
+Program Pages / Landing Pages / Location Pages cards were silently collapsing back to closed a
+while after being expanded. Root cause: `init()`'s background auto-refresh (`setInterval`, was
+every 60s) calls `navigate(currentRoute)` to keep sheet data fresh, which rebuilds the whole
+section's HTML from scratch — "open" was only ever a runtime CSS class on the old DOM node, so a
+fresh render always came back closed. Fixed by capturing which `.uni-title` texts were open (and
+the scroll position) before the refresh's `navigate()` call, then re-applying `.open` to the
+matching cards afterward — titles are stable across a redraw even though the DOM nodes aren't.
+Same interval also widened from 60s to 3 minutes as a response-time fix (see below).
+
+## Login error placement — fixed (2026-08-20)
+
+Login-screen errors (incorrect password, missing fields, no account found) now show in a
+dedicated `#authPasswordError` div directly under the Password field (`drawAuthLogin_`), instead
+of the generic `#authError` at the bottom of the auth card. Clears automatically as soon as the
+person edits either field. `#authError` is unchanged and still used by the other auth screens
+(OTP, password setup) — this change only touches the login screen.
+
+## Response-time / scaling for ~20-30 concurrent users (2026-08-20)
+
+User is inviting many more people (from ~5 total, ~2 active, to ~20-30) and reports slow loading
+across sections. Root cause: every category page (Program/Landing/Blog/etc.) fetches its sheet
+directly from the browser via the Sheets API/gviz (`getData`/`loadSheet`), cached only **in that
+one browser tab's memory** for `LIVE_CACHE_TTL_MS` — there is no cache shared across users, so N
+concurrent people each independently re-fetch the same large sheets (Blogs alone is 2500+ rows)
+against the same shared `CONFIG.googleApiKey`, and the 60s background auto-refresh (see above)
+multiplied that further. Two tiers of fix:
+
+- **Done now (low-risk tuning, no architecture change):** `LIVE_CACHE_TTL_MS` widened from 5 to
+  10 minutes; the background auto-refresh interval widened from 60s to 3 minutes. Cuts a large
+  fraction of redundant Sheets API traffic immediately, at the cost of data feeling "live" within
+  a slightly larger window (sheet content here doesn't change minute-to-minute anyway).
+- **Proposed, not yet built — needs the user's go-ahead:** a shared server-side cache in front of
+  the Sheets reads (a small Vercel serverless function proxying + caching each sheet's response
+  for ~1-2 minutes, since this repo is already on Vercel) so N concurrent users produce roughly
+  ONE real Google Sheets request per cache window instead of N — faster for everyone and far
+  safer against Sheets API quota limits as the user base grows. This is a genuine new moving part
+  (first serverless code in an otherwise-static site) so it wasn't built without asking first.
+
+Separately, Apps Script (login, requests, Trending, Users) all execute under one shared identity
+("Execute as: Me") — Google's simultaneous-execution quota is shared across every concurrent user
+hitting it, not per-user. Not urgent at 20-30 users, but worth knowing if slowness concentrates
+around login/submit/status-update specifically rather than category browsing.
+
+## Insights not visible to Admins — under investigation, needs more detail from the user (2026-08-20)
+
+User reports Page Insights/SEO Insights/Core Web Vitals/On-Page Audit "not visible" to Admin
+users. Checked `applyRoleGating_`/`SUPPORT_HIDDEN_NAV` directly — the nav-item visibility logic
+looks correct (`admin = role === "Admin"` correctly shows all four for any Admin, Super Admin
+included). Two real candidate causes that don't require a code bug: (1) Page/SEO Insights need
+each person's own Google sign-in with GA4/Search Console **view access already granted on those
+specific properties** — a newly-invited Admin's Jaro account may not have that access yet, which
+would fail silently-ish per-person even though the nav item itself shows fine; (2) general
+connectivity/cold-start flakiness already documented elsewhere in this file. Core Web Vitals and
+On-Page Audit don't depend on personal Google access at all (PageSpeed API key / Apps Script
+relay respectively), so if literally all four are failing identically for someone, that argues
+against cause (1) and toward something more fundamial — **next session should ask the user
+exactly what "not visible" looks like** (nav item missing vs. blank page vs. an error message vs.
+stuck on "Loading…") and whether it's specific to newly-added Admins or affects existing ones too,
+before changing any code here.
+
 ## Immediate next action
 
-Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy (adds the Super Admin role actions AND the new `listTrending`/`setTrending` actions), then verify end-to-end: (1) Super Admin role tier — log in as `lalit.rade@jaro.in`, confirm the 3-way view cycle, "Regenerate Password"/"Make Admin" visible on Users and hidden while previewing as Admin, regular Admin's add-user form has no role choice; (2) On-Page Audit renders as its own sidebar item and Home's Live Insights grid now shows 4 cards; (3) the redesigned sidebar buttons; (4) the 👑 crown toggle on a Program Pages card actually persists after a page reload and shows up on Home's "What's Trending" strip. Also confirm whether the old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy is confirmed working.
+Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy (adds
+the Super Admin role actions AND the `listTrending`/`setTrending` actions from the previous
+round — no further `Code.gs` changes this round). Then: (1) get exact symptoms for the Insights
+visibility issue above; (2) decide whether to build the proposed shared-cache proxy for scaling;
+(3) confirm whether the old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be
+deleted now that the D: copy is confirmed working.
