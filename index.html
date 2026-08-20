@@ -498,6 +498,15 @@ td.link-cell a:hover{text-decoration:underline}
 }
 .raise-mini-btn:hover{background:var(--yellow);border-color:var(--yellow);color:var(--black)}
 .raise-mini-btn svg{width:12px;height:12px}
+/* ---------- PER-ITEM "MARK AS TRENDING" CROWN TOGGLE (Program Pages, Admin only) ---------- */
+.trend-btn{
+  display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;
+  border:1px solid var(--line);background:#fff;font-size:13px;line-height:1;cursor:pointer;flex-shrink:0;
+  filter:grayscale(1) opacity(.55);transition:filter .15s,background .15s,border-color .15s,transform .15s;
+}
+.trend-btn:hover{filter:none;border-color:var(--yellow);transform:translateY(-1px)}
+.trend-btn.active{filter:none;background:var(--yellow-tint);border-color:var(--yellow)}
+.prog-row.is-trending{background:var(--yellow-tint);border-color:#f0d98c}
 .draft-preview-note{
   display:inline-block;font-size:11.5px;font-weight:600;color:var(--red);
   text-decoration:underline;text-decoration-style:dotted;text-underline-offset:2px;
@@ -1326,6 +1335,18 @@ function raiseBtn(prefill){
     data-university="${esc(p.university||"")}" data-program="${esc(p.program||"")}"
     data-section="${esc(p.section||"")}" data-link="${esc(p.link||"")}">${ic("plus")}</button>`;
 }
+/* "Mark as Trending" toggle — a crown icon on each Program Pages card (Admin-only). Clicking it
+   flips that program's row in Code.gs's "TrendingPrograms" tab, which is what feeds the Home
+   page's "What's Trending" strip. No sheet for anyone to hand-maintain — this click is the only
+   way that list ever changes. key is a normalized "university|||program" string computed once
+   here and reused verbatim by the click handler below, so it never needs to be recomputed. */
+function trendingKeyFor_(university, program){
+  return (university||"").toString().toLowerCase().trim() + "|||" + (program||"").toString().toLowerCase().trim();
+}
+function trendBtn({key, university, program, active}){
+  return `<button type="button" class="trend-btn${active?" active":""}" title="${active?"Remove from What's Trending":"Mark as Trending"}"
+    data-key="${esc(key)}" data-university="${esc(university)}" data-program="${esc(program)}">👑</button>`;
+}
 /* Shown on Draft rows so the requester can ask for a preview link instead of a live one. */
 function draftNote(prefill){
   const p = prefill || {};
@@ -1876,7 +1897,7 @@ async function renderHome(){
       <div class="hero-inner">
         <div>
           <div class="hero-eyebrow">${dateStr}</div>
-          <h2 class="hero-title">${greeting}, team 👋</h2>
+          <h2 class="hero-title">${greeting} 👋</h2>
         </div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
           <span class="hero-live-pill" id="heroLivePill" style="display:none">
@@ -1932,8 +1953,8 @@ async function renderHome(){
       </button>
     </div>`;}).join("")}</div>
 
-    <div class="section-head" id="liveInsightsHead"><div><h2>Live Insights</h2><div class="meta">Traffic, search performance, page vitals & audit — password protected</div></div></div>
-    <div class="stat-grid" id="liveInsightsGrid" style="grid-template-columns:repeat(3,1fr);margin-bottom:26px">
+    <div class="section-head" id="liveInsightsHead"><div><h2>Live Insights</h2><div class="meta">Traffic, search performance, page vitals & on-page audit — Admins only</div></div></div>
+    <div class="stat-grid" id="liveInsightsGrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:26px">
       <div class="stat-card" data-go="pageInsights" style="--glass:var(--blue-tint-10);--fg:var(--blue)">
         <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--blue)">${ic("bolt")}</div></div>
         <div><div class="val" style="font-size:19px">Page Insights</div><div class="lbl">GA4 traffic, live</div></div>
@@ -1941,13 +1962,18 @@ async function renderHome(){
       </div>
       <div class="stat-card" data-go="seoInsights" style="--glass:var(--red-tint);--fg:var(--red)">
         <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--red)">${ic("search")}</div></div>
-        <div><div class="val" style="font-size:19px">SEO Insights</div><div class="lbl">Search Console + On-Page Audit, live</div></div>
+        <div><div class="val" style="font-size:19px">SEO Insights</div><div class="lbl">Search Console, live</div></div>
         <button type="button" class="stat-explore-btn" style="background:var(--red)">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
       <div class="stat-card" data-go="coreWebVitals" style="--glass:var(--yellow-tint);--fg:#8a6800">
         <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:#8a6800">${ic("bolt")}</div></div>
         <div><div class="val" style="font-size:19px">Core Web Vitals</div><div class="lbl">PageSpeed Insights, on demand</div></div>
         <button type="button" class="stat-explore-btn" style="background:#8a6800">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      </div>
+      <div class="stat-card" data-go="onPageAudit" style="--glass:var(--blue-tint-10);--fg:var(--blue)">
+        <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--blue)">${ic("search")}</div></div>
+        <div><div class="val" style="font-size:19px">On-Page Audit</div><div class="lbl">Title/meta/alt-text scan, on demand</div></div>
+        <button type="button" class="stat-explore-btn" style="background:var(--blue)">Open<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       </div>
     </div>
 
@@ -2050,44 +2076,52 @@ function statusKeyFor(row){
   if(s.includes("closed")) return "closed";
   return "other";
 }
-/* "What's Trending" strip (below Website Stats on Home) — a curated, fixed list of 13 currently-
-   live programs on jaroeducation.com (checked against the site directly; the earlier version of
-   this section, auto-pulled from Program Pages "Open"/"Closing Soon" rows, didn't match what's
-   actually live). Just a title + offering institute, no CTA — this is a name-recognition strip,
-   not a click-through. Order is reshuffled on every load so it doesn't always read the same way.
-   "org" is the full institute text (used for logo matching); "orgShort" is what's shown on the
-   small card. */
-const TRENDING_COURSES = [
-  { title:"Executive Programme in Business Finance", org:"IIM Ahmedabad", orgShort:"IIM Ahmedabad" },
-  { title:"Executive Programme in Brand Management", org:"Programme offered by Continuing Education Programme (CEP), IIT Delhi", orgShort:"CEP, IIT Delhi" },
-  { title:"Professional Certificate Programme in Investment Banking, Risk & Capital Markets", org:"IIM Kozhikode", orgShort:"IIM Kozhikode" },
-  { title:"Professional Certificate Programme in AI-Powered Digital Marketing for Performance & Growth", org:"IIM Kozhikode", orgShort:"IIM Kozhikode" },
-  { title:"Blended MBA for Working Professionals", org:"IIM Nagpur", orgShort:"IIM Nagpur" },
-  { title:"Post Graduate Certificate Programme in Strategic Human Resource Management with AI & Analytics", org:"IIM Tiruchirappalli", orgShort:"IIM Tiruchirappalli" },
-  { title:"Chief Technology Officer Programme", org:"IIT Bombay", orgShort:"IIT Bombay" },
-  { title:"Advanced Programme in Electric Vehicle (EV) Technology", org:"Programme offered by Continuing Education Programme (CEP), IIT Delhi", orgShort:"CEP, IIT Delhi" },
-  { title:"Executive Programme in Autonomous Robotics & AI", org:"Programme offered by Continuing Education Programme (CEP), IIT Delhi", orgShort:"CEP, IIT Delhi" },
-  { title:"Post Graduate Certificate Programme in Applied Data Science & AI", org:"IIT Roorkee", orgShort:"IIT Roorkee" },
-  { title:"Chief Technology & AI Officer Post Graduate (PG) Certificate Program", org:"Program by CEC, IIT Roorkee", orgShort:"CEC, IIT Roorkee" },
-  { title:"Online MBA", org:"Symbiosis School for Online and Digital Learning (SSODL)", orgShort:"SSODL" },
-];
+/* "What's Trending" strip (below Website Stats on Home) — used to be a hardcoded list that had to
+   be hand-edited in this file every time it changed. Now it's manually curated by clicking a crown
+   (👑) icon on any Program Pages card (see TREND_BTN_HTML_ / trendingKeyFor_ / the trend-btn click
+   handler below) — no separate sheet for anyone to maintain, Code.gs's "TrendingPrograms" tab is
+   written to only by that click, never by hand. Just a title + offering institute, no CTA — this
+   is a name-recognition strip, not a click-through. Order is reshuffled on every load. */
+let TRENDING_CACHE = null; // Set<key> — cached per session, invalidated by toggleTrending_
+async function loadTrendingKeys_(force){
+  if(TRENDING_CACHE && !force) return TRENDING_CACHE;
+  try{
+    const r = await authApiCall_("listTrending", { token: AUTH_SESSION.token });
+    TRENDING_CACHE = new Set((r.items||[]).map(i=>i.key));
+  }catch(e){ TRENDING_CACHE = TRENDING_CACHE || new Set(); }
+  return TRENDING_CACHE;
+}
 function shuffledCopy(arr){
   const a = arr.slice();
   for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; }
   return a;
 }
-function renderTrendingCourses(){
+async function renderTrendingCourses(){
   const track = document.getElementById("trendingCoursesTrack");
   if(!track) return; // user has already navigated away from Home before this resolved
-  const list = shuffledCopy(TRENDING_COURSES);
+  let items;
+  try{
+    const r = await authApiCall_("listTrending", { token: AUTH_SESSION.token });
+    items = r.items || [];
+  }catch(e){ items = []; }
+  if(!track.isConnected) return; // navigated away while the fetch was in flight
+  if(!items.length){
+    const strip = track.closest(".tc-strip");
+    if(strip) strip.innerHTML = `<div class="tc-empty">${isAdmin_()
+      ? "No programs marked as Trending yet — click the 👑 on any Program Pages card to feature it here."
+      : "No trending programs right now — check back soon."}</div>`;
+    return;
+  }
+  const list = shuffledCopy(items);
   const twice = list.concat(list); // duplicated so the auto-scroll marquee loops seamlessly
   track.innerHTML = twice.map(c=>{
-    const logo = findUniversityLogo(c.org);
-    return `<div class="tc-card" title="${esc(c.title)} — ${esc(c.orgShort)}">
+    const logo = findUniversityLogo(c.university);
+    const orgShort = displayNameFor(c.university);
+    return `<div class="tc-card" title="${esc(c.program)} — ${esc(orgShort)}">
       <div class="ic-badge">${logo ? `<img src="${logo}" alt="">` : ic("university")}</div>
       <div class="tc-card-body">
-        <div class="tc-title">${esc(c.title)}</div>
-        <div class="tc-uni">${esc(c.orgShort)}</div>
+        <div class="tc-title">${esc(c.program)}</div>
+        <div class="tc-uni">${esc(orgShort)}</div>
       </div>
     </div>`;
   }).join("");
@@ -2414,6 +2448,8 @@ async function renderGroupedSection(sec){
   // Additive: URL Mappings tab lookup, keyed by this row's own Webpage Link. Only applies when
   // this section is Program Pages ("program") — University/Free Course/Pillar are wired separately.
   const urlMappings_ = sec.key === "program" ? await loadUrlMappings_() : null;
+  // Same restriction: the 👑 "Mark as Trending" toggle only applies to Program Pages.
+  const trendingKeys_ = sec.key === "program" ? await loadTrendingKeys_() : null;
 
   function draw(filterText, statusFilter){
     const q = (filterText||"").toLowerCase();
@@ -2440,18 +2476,20 @@ async function renderGroupedSection(sec){
         <div class="uni-body"><div class="prog-list">
           ${items.map(row=>{
             const isDraft = sec.statusField && (row[sec.statusField]||"").toLowerCase().includes("draft");
+            const lines = (row[sec.itemField]||"Untitled Program").toString().split(/\n+/).map(s=>s.trim()).filter(Boolean);
+            const progName = lines[0] || "Untitled Program";
+            const trendKey = trendingKeys_ ? trendingKeyFor_(uni, progName) : null;
+            const isTrending = !!(trendKey && trendingKeys_.has(trendKey));
             return `
-            <div class="prog-row${isDraft?" is-draft":""}">
-              ${(()=>{
-                const lines = (row[sec.itemField]||"Untitled Program").toString().split(/\n+/).map(s=>s.trim()).filter(Boolean);
-                return lines.length > 1
+            <div class="prog-row${isDraft?" is-draft":""}${isTrending?" is-trending":""}">
+              ${lines.length > 1
                   ? `<div class="prog-name"><div style="font-weight:700">${esc(lines[0])}</div><div style="font-weight:400;color:var(--ink-50);font-size:12px;margin-top:2px">${esc(lines.slice(1).join(" "))}</div></div>`
-                  : `<div class="prog-name">${esc(lines[0]||"Untitled Program")}</div>`;
-              })()}
+                  : `<div class="prog-name">${esc(progName)}</div>`}
               ${statusBadge(row[sec.statusField])}
               ${row["Category / Domain"] ? `<span class="badge neutral">${esc(row["Category / Domain"])}</span>` : ""}
               ${isValidLink(row["Application Closure Date"]) ? `<span class="badge" style="background:var(--yellow-tint);color:#8a6800">Admission Closure Date: ${esc(formatClosureDate_(row["Application Closure Date"]))}</span>` : ""}
               ${raiseBtn({ university: uni, program: row[sec.itemField]||"", section: "Program Pages", link: row["Webpage Link"]||"" })}
+              ${trendKey && isAdmin_() ? trendBtn({ key:trendKey, university:uni, program:progName, active:isTrending }) : ""}
               ${urlMappings_ ? mappingBadgeHTML_(urlMappingFor_(urlMappings_.buckets.program, row["Webpage Link"])) : ""}
               <div class="linkrow">${buildLinkChips(row, isDraft ? [["Preview Link","Preview Page"], ...sec.linkFields.slice(1)] : sec.linkFields)}</div>
               ${(isValidLink(row["Meta Title"])||isValidLink(row["Meta Description"])) ? `
@@ -3297,6 +3335,31 @@ document.addEventListener("click", (e)=>{
     section: btn.dataset.section || "",
     link: btn.dataset.link || ""
   });
+});
+/* Trend-toggle click — updates just this button/card locally (no full section redraw, so open/
+   closed university cards and scroll position don't reset) and reverts on failure. */
+document.addEventListener("click", async (e)=>{
+  const btn = e.target.closest(".trend-btn");
+  if(!btn) return;
+  e.preventDefault(); e.stopPropagation();
+  const key = btn.dataset.key, university = btn.dataset.university, program = btn.dataset.program;
+  const wasActive = btn.classList.contains("active");
+  const nowActive = !wasActive;
+  const setState = (active)=>{
+    btn.classList.toggle("active", active);
+    btn.title = active ? "Remove from What's Trending" : "Mark as Trending";
+    const row = btn.closest(".prog-row");
+    if(row) row.classList.toggle("is-trending", active);
+    if(TRENDING_CACHE){ if(active) TRENDING_CACHE.add(key); else TRENDING_CACHE.delete(key); }
+  };
+  setState(nowActive);
+  try{
+    await authApiCall_("setTrending", { token: AUTH_SESSION.token, key, university, program, trending: nowActive });
+    toast(nowActive ? "Marked as Trending" : "Removed from Trending");
+  }catch(err){
+    setState(wasActive);
+    toast(err.message || "Couldn't update Trending", true);
+  }
 });
 
 /* Strip a trailing university name from a program string, e.g.

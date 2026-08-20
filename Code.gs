@@ -51,6 +51,11 @@ const REQUEST_LOG_HEADER = ["Timestamp","University","Program","Request Type","P
 const USERS_HEADER = ["Email","Role","PasswordHash","Salt","Status","CreatedAt","LastLogin"];
 const SESSIONS_HEADER = ["Token","Email","Role","Name","ExpiresAt"];
 const OTPS_HEADER = ["Email","Purpose","Code","ExpiresAt","SetupToken"];
+// Manually-curated "What's Trending" list, maintained entirely by clicking a crown icon on a
+// Program Pages card — never a sheet the user has to edit by hand. Key is a client-computed
+// "university|||program" string used only for exact-match lookups; University/Program are kept
+// too so the Home page can render a card without needing to cross-reference Program Pages again.
+const TRENDING_HEADER = ["Key","University","Program","MarkedAt"];
 
 /* ---- One-time setup: run this once from the Apps Script editor ---- */
 function setupAdmin(){
@@ -212,6 +217,8 @@ function dispatchAction_(body){
     case "submitRequest": return handleSubmitRequest_(body);
     case "updateStatus": return handleUpdateStatus_(body);
     case "listRequirements": return handleListRequirements_(body);
+    case "listTrending": return handleListTrending_(body);
+    case "setTrending": return handleSetTrending_(body);
     case "checkResult": return handleCheckResult_(body);
     default: return { ok:false, error:"Unknown action" };
   }
@@ -832,4 +839,29 @@ function handleListRequirements_(body){
   requireSession_(body.token);
   const sheet = getRequestsSheet_();
   return { ok:true, rows: sheetRowsAsObjects_(sheet) };
+}
+
+/* ---- "What's Trending" (Home page) — any logged-in role can read it (Support sees Home too),
+   only an Admin can mark/unmark a program, done by clicking a crown icon on its Program Pages
+   card rather than editing a sheet by hand. ---- */
+function handleListTrending_(body){
+  requireSession_(body.token);
+  const sheet = getOrCreateSheet_("TrendingPrograms", TRENDING_HEADER);
+  const rows = sheetRowsAsObjects_(sheet);
+  return { ok:true, items: rows.map(r => ({ key:r.Key, university:r.University, program:r.Program })) };
+}
+function handleSetTrending_(body){
+  requireAdmin_(body.token);
+  const key = (body.key||"").toString().trim();
+  if(!key) throw new Error("Missing key.");
+  const sheet = getOrCreateSheet_("TrendingPrograms", TRENDING_HEADER);
+  const found = findRowByColumn_(sheet, "Key", key);
+  if(body.trending){
+    const row = [key, body.university||"", body.program||"", new Date().toISOString()];
+    if(found) sheet.getRange(found.row, 1, 1, row.length).setValues([row]);
+    else sheet.appendRow(row);
+  } else if(found){
+    sheet.deleteRow(found.row);
+  }
+  return { ok:true };
 }
