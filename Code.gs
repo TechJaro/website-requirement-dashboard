@@ -285,13 +285,25 @@ function handleUploadChunk_(body){
   // on every one of a file's potentially 50-100+ chunk calls — quadratic work that made later files
   // in the same session (with earlier files' still-unsent rows already sitting there) visibly crawl.
   if(chunkIndex === 0){
-    const values = sheet.getDataRange().getValues();
     const cutoff = Date.now() - 30*60000;
-    for(let i = values.length - 1; i >= 1; i--){
-      if(new Date(values[i][5]).getTime() < cutoff) sheet.deleteRow(i + 1);
-    }
+    keepRowsWhere_(sheet, r => new Date(r[5]).getTime() >= cutoff);
   }
   return { ok:true };
+}
+// Bulk-rewrites a sheet's data rows to keep only what the predicate returns true for — one read,
+// one clear, one write, regardless of how many rows are removed. Used instead of calling
+// sheet.deleteRow() once per matching row, which was a real bug: for a file with 50+ chunks, that
+// meant 50+ separate structural spreadsheet operations running one after another, synchronously,
+// as part of handleSubmitRequest_/handleUpdateStatus_ itself — the email had already sent, but the
+// user's Submit/Send Update button stayed stuck on "Sending…" until all of that finished.
+function keepRowsWhere_(sheet, keepFn){
+  const values = sheet.getDataRange().getValues();
+  if(values.length < 2) return;
+  const header = values[0];
+  const kept = values.slice(1).filter(keepFn);
+  if(kept.length === values.length - 1) return; // nothing to remove
+  sheet.getRange(2, 1, values.length - 1, header.length).clearContent();
+  if(kept.length) sheet.getRange(2, 1, kept.length, header.length).setValues(kept);
 }
 // base64url (URL-safe, no padding) -> standard base64 (+, /, = padding). Chunks travel as base64url
 // to avoid percent-encoding overhead over the GET transport; a MIME attachment's own
@@ -323,11 +335,7 @@ function assembleUploadedFile_(uploadId){
 }
 function deleteUploadChunks_(uploadId){
   const sheet = getOrCreateSheet_("UploadChunks", UPLOAD_CHUNKS_HEADER);
-  const values = sheet.getDataRange().getValues();
-  const idCol = values[0].indexOf("UploadId");
-  for(let i = values.length - 1; i >= 1; i--){
-    if((values[i][idCol]||"").toString() === uploadId) sheet.deleteRow(i + 1);
-  }
+  keepRowsWhere_(sheet, r => (r[0]||"").toString() !== uploadId);
 }
 // Assembles every uploadId in order; deliberately lets a failure (missing/expired/oversized)
 // propagate rather than silently sending without it, so the caller can surface a clear error

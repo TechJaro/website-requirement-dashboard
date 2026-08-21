@@ -417,25 +417,18 @@ switching needed. "By Page" (new) groups by University+Program, exactly surfacin
 keeps getting requested" regardless of who by. Both use the same click-a-slice-to-drill-down
 behavior as before (`openInsightListModal`).
 
-## CEO Dashboard — built local-only (2026-08-20), deployed live (2026-08-21)
+## CEO Dashboard — built (2026-08-20), briefly deployed, then removed entirely (2026-08-21)
 
-User wants a new password-protected ("CEO@Jaro") executive-summary nav item, and a second Super
-Admin (`rr@jaro.in`, the CEO) added to `Code.gs`. Originally held back from `index.html`/the repo
-per the user's explicit "keep it local until I say deploy" instruction (2026-08-20) — the user gave
-that explicit go-ahead on 2026-08-21 ("please deploy it here only"), so the exact same front-end
-code that was already built and verified locally was copied into `index.html` (diffed the two files
-first to confirm the *only* differences were the CEO Dashboard additions — sidebar nav item,
-`SECTIONS.ceoDashboard`, the `navigate()` dispatch branch, `SUPPORT_HIDDEN_NAV`, click-wiring, and
-the `renderCeoDashboardGateOrTable`/`renderCeoDashboard`/`renderSimpleBars_` functions themselves —
-then applied that exact block, nothing more, nothing less) and committed/pushed. Verified in the
-browser after copying: wrong password correctly rejected and stays locked; correct password
-(`CEO@Jaro`) unlocks it and the KPI grid/admission-status breakdown/request-status breakdown all
-render with accurate numbers (mocked `getData`/`authApiCall_`/`loadTrendingKeys_` to check the math
-without needing a real login). It's reachable from the sidebar's Admin group, right below Users —
-same as it always would have been once deployed. No Dashboard Users row exists for `rr@jaro.in` yet
-— she can't log in until an Admin explicitly uses "Add a User" for her; the `SUPER_ADMIN_EMAILS`
-constant alone is inert until then, and no notification email is sent to her as a side effect of
-any of this.
+Built local-only per the user's original instruction, deployed live once they gave the go-ahead,
+then removed completely a short time later in the same day per a follow-up message ("Remove the
+CEO Dashboard from the dashboard. nothing special in it."). Taken as a decision to drop the feature
+outright, not to re-hide it — removed every trace from both `index.html` and `Unified Dashboard.txt`
+(sidebar nav item, `SECTIONS.ceoDashboard`, the `navigate()` dispatch branch, `SUPPORT_HIDDEN_NAV`
+entry, click-wiring, and the `renderCeoDashboardGateOrTable`/`renderCeoDashboard`/`renderSimpleBars_`
+functions themselves), verified nothing else referenced any of it, and confirmed the two files are
+byte-identical again. `SUPER_ADMIN_EMAILS` in `Code.gs` still has `rr@jaro.in` — that's a separate,
+unrelated permission grant the user never asked to undo, and no Dashboard Users row exists for her
+regardless, so it stays inert either way.
 
 ## File attachments: Google Drive approach dropped, replaced with chunked upload (2026-08-21)
 
@@ -531,22 +524,80 @@ to keep a connection warm across separate JSONP requests), so some per-chunk lat
 this transport, but the sweep fix removes the part that was making it actively worse over a
 session rather than just "as slow as one round trip per chunk should be."
 
+## Real bug fixed: deleteUploadChunks_ ran one deleteRow() per chunk (2026-08-21)
+
+User's follow-up complaint after the sweep fix above ("last time now... please understand only
+this is the obstacle before going live") meant there had to be a second real cost still hiding
+somewhere. Found it: `deleteUploadChunks_` (called from `handleSubmitRequest_`/`handleUpdateStatus_`
+right after the email successfully sends) looped over every matching row and called
+`sheet.deleteRow()` on each one individually — for a 50-chunk file that's 50 separate structural
+spreadsheet mutations, run one after another, *synchronously, inside the same request the user's
+Submit/Send Update button is waiting on*. The email had already gone out by that point, but the UI
+stayed on "Submitting…"/"Sending…" until all of that finished. Fixed by extracting a
+`keepRowsWhere_(sheet, predicate)` helper that does the removal as one read + one `clearContent()` +
+one bulk `setValues()` of only the surviving rows — three operations total regardless of how many
+rows are being removed, instead of N. Reused for both `deleteUploadChunks_` (keep rows whose
+UploadId doesn't match) and the `handleUploadChunk_` stale-upload sweep (keep rows newer than the
+30-minute cutoff), replacing their old delete-loops too.
+
+## New: client-side image compression before chunking (2026-08-21)
+
+The single biggest lever on upload time for the most common attachment type — a screenshot or
+phone photo — isn't the transport, it's just how many bytes have to cross it. Images over 400KB
+(`IMAGE_COMPRESS_MIN_BYTES`) are now downscaled to at most 1920px on the long edge and re-encoded
+as JPEG at 0.82 quality (`maybeCompressImage_`, via `createImageBitmap` + a `<canvas>`) before
+`uploadFileChunked_` ever sees them — cutting typical screenshot/certificate/photo sizes by 70-95%,
+which cuts the number of chunks (and therefore round trips) by the same proportion. Falls back to
+the untouched original if compression fails, doesn't actually shrink the file, or the type is
+GIF (re-encoding would drop the animation) or already small. Non-image attachments (PDFs, docs,
+zips) aren't touched — there's no general-purpose compression available client-side for those, so
+their upload time still scales with their real size; the sweep and bulk-delete fixes above are what
+help them.
+
+**A real bug caught by testing this, before it shipped:** the first version called
+`await maybeCompressImage_(file)` in `insertAttachedFile` *before* the upload got added to
+`pendingUploads`. `insertAttachedFile` is invoked fire-and-forget (from the file input's `change`
+handler and the paste handler, neither of which await it), so the very first `await` inside it is
+also the point where control returns to that caller — if `pendingUploads.add(task)` hasn't run by
+then, `submitRequest`/the status modal's `onConfirm` calling `waitForUploads()` right after can see
+an empty set and resolve instantly, before compression (let alone the actual upload) has even
+started. That's the exact race this whole tracking mechanism was built to prevent, reintroduced by
+the compression feature. Caught in the browser (a mock upload counted zero chunk calls and the
+placeholder never left "0%") before it ever reached `index.html`. Fixed by moving compression
+*inside* the already-tracked async task, so the synchronous prefix up to `pendingUploads.add(task)`
+has no `await` in it again, exactly like before this feature existed. Non-image files are still
+gated against the 10MB limit synchronously up front (unchanged); images are gated *after*
+compression, inside the task, so an oversized original still gets a fair chance to shrink under the
+limit first. Re-verified after the fix: the task is provably in `pendingUploads` the instant the
+file-input's `change` event is dispatched, not just eventually.
+
 ## Immediate next action
 
-Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy — this
-round's backend changes are: (1) `SUPER_ADMIN_EMAILS` gaining `rr@jaro.in`; (2) the entire chunked
-file-attachment system (`UPLOAD_CHUNKS_HEADER`, `MAX_ATTACHMENT_BYTES`,
-`handleUploadChunk_`/`assembleUploadedFile_`/`assembleAttachments_`/`deleteUploadChunks_`,
-`base64UrlToStandard_`, `sendGmailMessage_`'s new `attachments` support, `wrapBase64Lines_`, the
-`uploadChunk` dispatch case, and `handleSubmitRequest_`/`handleUpdateStatus_` now assembling and
-attaching before sending); (3) the per-chunk-sweep performance fix just above. Also requires the
-one-time Apps Script setup already documented above `sendGmailMessage_`'s own comment (Gmail API
-service added via Services (+) — should already be done from the earlier threading fix, nothing new
-needed there). After redeploying: (1) raise a test request with a real attached file (a few hundred
-KB is enough to exercise several chunks) and confirm it lands in the inbox as a real attachment,
-reasonably quickly, not missing and not as a broken email; (2) confirm the CEO Dashboard (now live,
-see above) actually works for a real logged-in Admin/Super Admin session, not just the mocked
-browser test; (3) get exact symptoms for the still-open Insights-visibility issue further above;
-(4) decide whether to build the proposed shared-cache proxy for scaling; (5) confirm whether the old
-`C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy
-is confirmed working.
+Two things needed from the user:
+1. Paste the latest `Code.gs` into the Apps Script editor and redeploy — this round's backend
+   changes are the `keepRowsWhere_` bulk-delete fix above (`deleteUploadChunks_` and the
+   `handleUploadChunk_` sweep both use it now) on top of everything from the chunked-upload build
+   itself (`UPLOAD_CHUNKS_HEADER`, `MAX_ATTACHMENT_BYTES`,
+   `handleUploadChunk_`/`assembleUploadedFile_`/`assembleAttachments_`/`deleteUploadChunks_`,
+   `base64UrlToStandard_`, `sendGmailMessage_`'s `attachments` support, `wrapBase64Lines_`, the
+   `uploadChunk` dispatch case, `SUPER_ADMIN_EMAILS` gaining `rr@jaro.in`). Also needs the one-time
+   Gmail API Apps Script service (Services (+) in the editor) — should already be enabled from the
+   earlier mail-threading work, nothing new there.
+2. Confirm whether they'd already redeployed the *previous* Code.gs (the chunkIndex===0 sweep-
+   frequency fix) before reporting this round's "still too slow" complaint — unclear from their
+   message, and materially changes how much of the reported slowness this round's fix accounts for
+   versus how much was still-undeployed. Either way, this round's `Code.gs` supersedes it.
+
+After redeploying: raise a test request with a real attached image (something a few hundred KB to a
+few MB, to see compression kick in) and confirm it (a) uploads noticeably faster than before, (b)
+the email arrives with a real attachment, and (c) the Submit/Send Update button returns control
+promptly rather than hanging after the email's already sent. If a large PDF/non-image attachment
+still feels slow, that's expected given the current transport (each chunk is a real Apps Script
+round trip) — the compression fix doesn't apply to it and there isn't a further safe lever left
+within "no Drive, no access-setting change" without a genuinely different architecture (e.g. an
+embedded Google Form with a file-upload question, landing in the user's own Drive without any
+custom OAuth popup) — worth a real conversation before attempting, not a unilateral rebuild. Other
+still-open items, unchanged: (1) exact symptoms for the still-open Insights-visibility issue further
+above; (2) decide whether to build the proposed shared-cache proxy for scaling; (3) confirm whether
+the old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the
+D: copy is confirmed working.
