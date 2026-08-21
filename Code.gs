@@ -226,7 +226,8 @@ function dispatchAction_(body){
     case "setUserRole": return handleSetUserRole_(body);
     case "submitRequest": return handleSubmitRequest_(body);
     case "updateStatus": return handleUpdateStatus_(body);
-    case "uploadChunk": return handleUploadChunk_(body);
+    case "uploadChunk": return handleUploadChunk_(body); // unused by the current front end — see the "Attachments v2" comment above assembleAttachments_
+    case "checkFormUpload": return handleCheckFormUpload_(body);
     case "listRequirements": return handleListRequirements_(body);
     case "listTrending": return handleListTrending_(body);
     case "setTrending": return handleSetTrending_(body);
@@ -337,12 +338,86 @@ function deleteUploadChunks_(uploadId){
   const sheet = getOrCreateSheet_("UploadChunks", UPLOAD_CHUNKS_HEADER);
   keepRowsWhere_(sheet, r => (r[0]||"").toString() !== uploadId);
 }
-// Assembles every uploadId in order; deliberately lets a failure (missing/expired/oversized)
-// propagate rather than silently sending without it, so the caller can surface a clear error
-// instead of a status update or request that quietly went out missing its attachment.
+/* ---- Attachments v2: Google Form file-upload, replacing the chunked system above as the active
+   path (handleUploadChunk_/assembleUploadedFile_/deleteUploadChunks_ above are kept, unused, as a
+   fallback — same precedent as authApiCallLarge_ elsewhere in this file: already tried, worked, but
+   slow, kept in case this needs reverting). The chunked system's real limit was structural: every
+   piece of a file is a full Apps Script execution, so a large PDF meant hundreds of them, each
+   paying its own ~1s startup cost. This instead embeds a real Google Form (with a File Upload
+   question) directly in the dashboard — the browser hands the file straight to Google's own upload
+   infrastructure, one real stream, no chunking, no per-piece tax.
+   The Form's own responses are linked to THIS spreadsheet (same SPREADSHEET_ID, configured once by
+   the user in the Form editor: Responses tab > Sheets icon > Select existing spreadsheet) — each
+   response row carries a "Request Reference" the dashboard generates per attachment attempt and
+   pre-fills into the embedded Form's URL, plus a File Upload column Google fills with a Drive link
+   to the uploaded file. handleCheckFormUpload_ is polled by the dashboard (every ~2.5s while its
+   attach modal is open) to find out once a given reference's file has actually landed.
+   ONE-TIME SETUP NOTE: DriveApp is a new service to this script — the first real call may need this
+   project re-authorized (same one-time "authorize and redeploy" step as when the Gmail API service
+   was first added). ---- */
+function findFormResponsesSheet_(){
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheets().find(sh => {
+    const lastCol = sh.getLastColumn();
+    if(lastCol < 1) return false;
+    const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+    return headers.some(h => (h||"").toString().trim() === "Request Reference");
+  });
+  if(!sheet) throw new Error("Couldn't find the attachment form's responses sheet — make sure its responses are linked to this spreadsheet (Form editor > Responses tab > Sheets icon > Select existing spreadsheet).");
+  return sheet;
+}
+// A linked-sheet File Upload response cell holds one or more Drive URLs (e.g.
+// https://drive.google.com/open?id=FILE_ID) — matched by column NAME on purpose here, since the
+// Form question's own label text could be edited later and would silently break a name-based
+// lookup; a Drive file ID is a long alphanumeric/-/_ string, distinctive enough to just find
+// directly in whichever column it's actually in.
+function extractDriveFileIdFromCell_(cellValue){
+  const match = (cellValue || "").toString().match(/[-\w]{25,}/);
+  return match ? match[0] : "";
+}
+function handleCheckFormUpload_(body){
+  requireSession_(body.token);
+  const reference = (body.reference || "").toString().trim();
+  if(!reference) throw new Error("Missing reference.");
+  const sheet = findFormResponsesSheet_();
+  const rows = sheetRowsAsObjects_(sheet);
+  const match = rows.find(r => (r["Request Reference"]||"").toString().trim() === reference);
+  if(!match) return { ok:true, found:false };
+  let fileId = "";
+  Object.keys(match).forEach(key=>{
+    if(fileId || key === "_row" || key === "Request Reference") return;
+    fileId = fileId || extractDriveFileIdFromCell_(match[key]);
+  });
+  if(!fileId) return { ok:true, found:false }; // response row landed but no file in it yet — keep polling
+  let file;
+  try{ file = DriveApp.getFileById(fileId); }
+  catch(err){ throw new Error("Found the form response but couldn't open its attached file in Drive."); }
+  const sizeBytes = file.getSize();
+  if(sizeBytes > MAX_ATTACHMENT_BYTES){
+    throw new Error(`"${file.getName()}" is too large (${(sizeBytes/1024/1024).toFixed(1)}MB) — attachments are limited to ${MAX_ATTACHMENT_BYTES/1024/1024}MB.`);
+  }
+  return { ok:true, found:true, fileId, filename: file.getName(), mimeType: file.getBlob().getContentType(), sizeBytes };
+}
+function assembleFormFile_(fileId){
+  let file;
+  try{ file = DriveApp.getFileById(fileId); }
+  catch(err){ throw new Error("An attached file couldn't be found in Drive (it may have been removed) — please re-attach it and try again."); }
+  const blob = file.getBlob();
+  const bytes = blob.getBytes();
+  if(bytes.length > MAX_ATTACHMENT_BYTES){
+    throw new Error(`"${file.getName()}" is too large (${(bytes.length/1024/1024).toFixed(1)}MB) — attachments are limited to ${MAX_ATTACHMENT_BYTES/1024/1024}MB.`);
+  }
+  return { filename: file.getName(), mimeType: blob.getContentType(), base64: Utilities.base64Encode(bytes) };
+}
+function deleteFormFile_(fileId){
+  try{ DriveApp.getFileById(fileId).setTrashed(true); }catch(err){ /* already gone or inaccessible — nothing more to do */ }
+}
+// Assembles every id in order; deliberately lets a failure (missing/expired/oversized) propagate
+// rather than silently sending without it, so the caller can surface a clear error instead of a
+// status update or request that quietly went out missing its attachment.
 function assembleAttachments_(uploadIds){
   if(!Array.isArray(uploadIds) || !uploadIds.length) return [];
-  return uploadIds.map(assembleUploadedFile_);
+  return uploadIds.map(assembleFormFile_);
 }
 function respond_(result, viaForm, reqId){
   if(viaForm){
@@ -807,7 +882,7 @@ function handleSubmitRequest_(body){
   }catch(err){
     throw friendlyGmailApiError_(err);
   }
-  uploadIds.forEach(deleteUploadChunks_); // only after a confirmed send, so a failed send can be retried without re-uploading
+  uploadIds.forEach(deleteFormFile_); // only after a confirmed send, so a failed send can be retried without re-uploading
   const sheet = getRequestsSheet_();
   sheet.appendRow([
     new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
@@ -998,7 +1073,7 @@ function handleUpdateStatus_(body){
     const friendly = friendlyGmailApiError_(err);
     throw new Error("Status saved, but the notification email failed: " + friendly.message + " [" + debugLines.join(" | ") + "]");
   }
-  uploadIds.forEach(deleteUploadChunks_); // only after a confirmed send, so a failed send can be retried without re-uploading
+  uploadIds.forEach(deleteFormFile_); // only after a confirmed send, so a failed send can be retried without re-uploading
   return { ok:true, debug: debugLines.join(" | ") };
 }
 // Support sees the Requirements Log, but only the rows they themselves raised — Admin/Super Admin

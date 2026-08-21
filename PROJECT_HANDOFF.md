@@ -571,33 +571,99 @@ compression, inside the task, so an oversized original still gets a fair chance 
 limit first. Re-verified after the fix: the task is provably in `pendingUploads` the instant the
 file-input's `change` event is dispatched, not just eventually.
 
+## Attachments v3: real Google Form upload replaces chunking as the active path (2026-08-21)
+
+Even after the sweep fix and the bulk-delete fix, the user did the actual math with them on a call:
+an 8MB PDF becomes ~10.7MB of base64, split into ~2,140 pieces at 5000 chars each — at 8-way
+concurrency and ~1.2s per Apps Script round trip, that's genuinely ~5 minutes, matching exactly what
+they reported. That's not a bug to fix, it's the structural cost of "many small Apps Script
+executions" for a file that size — no further tuning within that architecture closes a gap that
+large. Explained this plainly to the user (Gmail's own attach is one continuous stream at real
+network speed; this dashboard can't do that directly because the browser drops the login cookie on
+a real cross-site POST — the actual root cause established earlier this session). They asked
+whether a custom domain would help (no — the cookie restriction is about registrable-domain
+matching with google.com, unrelated to which domain hosts the dashboard itself; the round-trip cost
+is entirely in the browser <-> Apps Script leg, which a custom domain doesn't touch either) and then
+asked for the Google Form idea to actually be built.
+
+**What changed:** the user created a real Google Form ("Jaro Unified Requirement Dashboard Form")
+with a File Upload question ("Please upload the file you want") and a short-answer "Request
+Reference" question, restricted to sign-in (Google enforces this automatically for any form with a
+File Upload question), and linked its responses to the *same* spreadsheet Code.gs already uses (new
+tab: "Form Responses 1" — Timestamp / Please upload the file you want / Request Reference columns,
+confirmed via screenshot). The attach button (in both the request form and the status-update modal)
+now opens this Form embedded in a modal (`ensureFormAttachModal_`/`openFormAttachModal_`,
+`FORM_ATTACH_URL`/`FORM_ATTACH_REF_ENTRY` = the exact form + entry ID the user provided), pre-filled
+with a fresh per-attempt "Request Reference" via a pre-filled-link URL parameter. The dashboard
+polls `checkFormUpload` every 2.5s while the modal is open; `Code.gs`'s `handleCheckFormUpload_`
+finds the response row by that reference (searching every sheet in the spreadsheet for one with a
+"Request Reference" header, so it doesn't matter what Google names the tab), extracts the Drive file
+ID out of whichever column holds a Drive-link-shaped string (matched by pattern, not by the Form
+question's own label text, so a later label edit can't silently break it), and returns the file's
+real name/type/size straight from `DriveApp` once found. `assembleAttachments_` (used by both
+`handleSubmitRequest_` and `handleUpdateStatus_`, unchanged at that call-site level) now resolves
+each id through `assembleFormFile_` (fetch bytes from Drive, base64-encode, attach exactly as
+before) instead of `assembleUploadedFile_`; cleanup after a successful send calls `deleteFormFile_`
+(trash the Drive file) instead of `deleteUploadChunks_`.
+
+**Why this should actually be fast:** the browser hands the file to Google's own upload
+infrastructure as one real stream — the same mechanism as attaching a file to any Google Form on
+the web — instead of cutting it into hundreds of pieces. No chunking, no per-piece Apps Script tax.
+
+**What's deliberately kept, unused, as a fallback:** the entire chunked-upload system
+(`uploadFileChunked_`, `maybeCompressImage_`, `handleUploadChunk_`, `assembleUploadedFile_`,
+`deleteUploadChunks_`, `keepRowsWhere_`, the `uploadChunk` dispatch case) is still there, just not
+wired to the attach button anymore — same precedent as `authApiCallLarge_` elsewhere in this file
+(already tried, worked, superseded, kept in case of a revert). **Pasting a screenshot directly
+(Ctrl/Cmd+V) still uses the old chunked path** (`insertAttachedFile`, unchanged) rather than the new
+Form modal — deliberate, not an oversight: a pasted clipboard image is always small and already fast
+post-compression, and there's no sane way to pre-fill a clipboard paste into an embedded Form, so
+there was nothing to gain and a worse experience (a modal popping up over a paste) to lose. Only the
+explicit "attach a file" button switched to the Form-based flow (`insertAttachedFileViaForm`,
+new) — the two mechanisms share the same `pendingUploads`/`uploadCounter`/`getAttachmentIds()` state
+inside `wireRichTextEditor`, so `submitRequest`/the status modal's `onConfirm` don't need to know or
+care which path a given attachment came from.
+
+**A real design constraint worth remembering:** the embedded Form is a genuine cross-origin page —
+there is no callback, event, or postMessage from it when the person hits its own internal Submit
+button. Polling `checkFormUpload` is the only way the dashboard can find out a file has actually
+arrived, which is why this needs the person to notice their own Google Form said "response
+recorded" and the dashboard to catch up within one poll interval after that (up to ~2.5s lag, not
+noticeable in practice).
+
+**Verified in the browser** (mocking `authApiCall_`, since a real Google sign-in and Drive round
+trip can't be exercised here): the iframe's `src` is built with the exact correct `embedded=true` +
+pre-filled-reference URL; polling continues with the same reference on every tick, and correctly
+stops the moment `checkFormUpload` reports `found:true` *and* stops equally cleanly on Cancel (no
+zombie timers still firing after cancel, confirmed by waiting past several more poll intervals with
+a call counter); the full button-click -> modal-open -> poll -> resolve -> chip-insertion path
+works end to end with `getAttachmentIds()` returning the right Drive file id and the button's own
+`pendingUploads` tracking having zero race window (confirmed the task registers synchronously,
+before any await, exactly like the existing paste-path already did). **What's still unverified is
+the one thing that genuinely can't be tested outside a real Google session:** whether the embedded
+Form's own file-upload widget behaves smoothly inside the iframe (versus, say, needing a separate
+popup window for the actual Drive/upload picker) — that needs the user's real first attempt.
+
 ## Immediate next action
 
-Two things needed from the user:
-1. Paste the latest `Code.gs` into the Apps Script editor and redeploy — this round's backend
-   changes are the `keepRowsWhere_` bulk-delete fix above (`deleteUploadChunks_` and the
-   `handleUploadChunk_` sweep both use it now) on top of everything from the chunked-upload build
-   itself (`UPLOAD_CHUNKS_HEADER`, `MAX_ATTACHMENT_BYTES`,
-   `handleUploadChunk_`/`assembleUploadedFile_`/`assembleAttachments_`/`deleteUploadChunks_`,
-   `base64UrlToStandard_`, `sendGmailMessage_`'s `attachments` support, `wrapBase64Lines_`, the
-   `uploadChunk` dispatch case, `SUPER_ADMIN_EMAILS` gaining `rr@jaro.in`). Also needs the one-time
-   Gmail API Apps Script service (Services (+) in the editor) — should already be enabled from the
-   earlier mail-threading work, nothing new there.
-2. Confirm whether they'd already redeployed the *previous* Code.gs (the chunkIndex===0 sweep-
-   frequency fix) before reporting this round's "still too slow" complaint — unclear from their
-   message, and materially changes how much of the reported slowness this round's fix accounts for
-   versus how much was still-undeployed. Either way, this round's `Code.gs` supersedes it.
+Paste the latest `Code.gs` into the Apps Script editor and redeploy — this round adds the entire
+"Attachments v3" system above (`findFormResponsesSheet_`, `extractDriveFileIdFromCell_`,
+`handleCheckFormUpload_`, `assembleFormFile_`, `deleteFormFile_`, the `checkFormUpload` dispatch
+case, and `assembleAttachments_`/the two post-send cleanup call-sites now pointing at the Form-based
+functions instead of the chunked ones). **New one-time setup step this round:** `DriveApp` is a
+service this script has never called before — the very first real `checkFormUpload`/attach attempt
+after redeploying may trigger a fresh authorization prompt (same shape as the one-time Gmail API
+authorization done earlier this project) rather than working silently; if so, just approve it and
+try again, no code change needed.
 
-After redeploying: raise a test request with a real attached image (something a few hundred KB to a
-few MB, to see compression kick in) and confirm it (a) uploads noticeably faster than before, (b)
-the email arrives with a real attachment, and (c) the Submit/Send Update button returns control
-promptly rather than hanging after the email's already sent. If a large PDF/non-image attachment
-still feels slow, that's expected given the current transport (each chunk is a real Apps Script
-round trip) — the compression fix doesn't apply to it and there isn't a further safe lever left
-within "no Drive, no access-setting change" without a genuinely different architecture (e.g. an
-embedded Google Form with a file-upload question, landing in the user's own Drive without any
-custom OAuth popup) — worth a real conversation before attempting, not a unilateral rebuild. Other
-still-open items, unchanged: (1) exact symptoms for the still-open Insights-visibility issue further
-above; (2) decide whether to build the proposed shared-cache proxy for scaling; (3) confirm whether
-the old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the
-D: copy is confirmed working.
+After redeploying: raise a real test request, click "attach a file," confirm the embedded Form
+modal opens and looks reasonable, pick a real file (try something a few MB, ideally a PDF, since
+that's the exact case that was unacceptably slow before) and submit it inside the Form, and confirm
+the dashboard's modal closes on its own within a few seconds and the email arrives with a real
+attachment. If the embedded Form's file-picker behaves oddly inside the iframe (doesn't fit, opens
+a stray window, etc.), that's the one genuinely untested part — get the exact symptom and it can be
+adjusted (e.g. opening the Form in a new tab instead of an iframe) without touching the rest of the
+mechanism. Other still-open items, unchanged: (1) exact symptoms for the still-open
+Insights-visibility issue further above; (2) decide whether to build the proposed shared-cache proxy
+for scaling; (3) confirm whether the old `C:\Users\user\Downloads\Website Requirement Dashboard`
+folder can be deleted now that the D: copy is confirmed working.
