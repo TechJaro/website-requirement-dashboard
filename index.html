@@ -2281,8 +2281,36 @@ async function renderRequesterActivity(){
   }
   if(pageEl){
     const entries = [...byPage.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
+    // The bar chart only ever shows the top 8 (+ "others") — with potentially hundreds of distinct
+    // pages, that's not enough to look up any one specific page. This search box (backed by a
+    // <datalist> of every page, not just the top 8) sits above the same bars so both are visible:
+    // the bars for an at-a-glance view, the search for "does THIS specific page get requested a lot".
+    // Order matters: renderBreakdownBars_ sets innerHTML (replacing everything), so it must run
+    // BEFORE wirePageSearch_ prepends the search box, not after — otherwise the search box gets
+    // wiped out the instant it's added.
     renderBreakdownBars_(pageEl, entries, "No page-specific requests yet.", "Requests", mapRow);
+    wirePageSearch_(pageEl, entries, mapRow);
   }
+}
+function wirePageSearch_(container, entries, mapRow){
+  if(!entries.length) return;
+  const listId = "pageSearchList_" + Math.random().toString(36).slice(2);
+  const byLabel = new Map();
+  const options = entries.map(([,v])=>{
+    const label = `${v.name} (${v.rows.length} request${v.rows.length!==1?"s":""})`;
+    byLabel.set(label, v);
+    return `<option value="${esc(label)}">`;
+  }).join("");
+  container.insertAdjacentHTML("afterbegin", `
+    <div style="margin-bottom:12px">
+      <input type="text" id="pageSearchInput_${listId}" list="${listId}" placeholder="Search any of the ${entries.length} pages…"
+        style="width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:9px;font-size:12.5px;box-sizing:border-box">
+      <datalist id="${listId}">${options}</datalist>
+    </div>`);
+  document.getElementById(`pageSearchInput_${listId}`).addEventListener("input", (e)=>{
+    const found = byLabel.get(e.target.value);
+    if(found) openInsightListModal(`Requests — ${found.name}`, found.rows, mapRow);
+  });
 }
 /* Generic click-to-drill-down popup used by the Quick Insights breakdowns (Program AND Landing
    Page) above — lists the actual rows behind whichever slice was clicked, so a number in the chart
