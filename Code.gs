@@ -279,11 +279,17 @@ function handleUploadChunk_(body){
   const sheet = getOrCreateSheet_("UploadChunks", UPLOAD_CHUNKS_HEADER);
   sheet.appendRow([uploadId, chunkIndex, (body.filename||"").toString(), (body.mimeType||"").toString(), data, new Date().toISOString()]);
   // Opportunistic sweep of anything left behind by an abandoned upload (tab closed mid-upload,
-  // Submit never clicked) — same pattern as storePendingResult_ above.
-  const values = sheet.getDataRange().getValues();
-  const cutoff = Date.now() - 30*60000;
-  for(let i = values.length - 1; i >= 1; i--){
-    if(new Date(values[i][5]).getTime() < cutoff) sheet.deleteRow(i + 1);
+  // Submit never clicked) — same pattern as storePendingResult_ above, but only on a file's FIRST
+  // chunk rather than every single one. A real bug this fixed: doing it on every chunk meant
+  // sheet.getDataRange().getValues() re-read and rescanned the WHOLE (constantly growing) sheet
+  // on every one of a file's potentially 50-100+ chunk calls — quadratic work that made later files
+  // in the same session (with earlier files' still-unsent rows already sitting there) visibly crawl.
+  if(chunkIndex === 0){
+    const values = sheet.getDataRange().getValues();
+    const cutoff = Date.now() - 30*60000;
+    for(let i = values.length - 1; i >= 1; i--){
+      if(new Date(values[i][5]).getTime() < cutoff) sheet.deleteRow(i + 1);
+    }
   }
   return { ok:true };
 }

@@ -863,6 +863,10 @@ body.auth-locked #app{display:none}
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Users</span>
       </div>
+      <div class="navitem" data-nav="ceoDashboard">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/></svg>
+        <span>CEO Dashboard</span>
+      </div>
     </div>
     <div class="sidebar-foot">
       <button class="logout-btn" id="viewAsToggleBtn" style="display:none">
@@ -1175,7 +1179,8 @@ const SECTIONS = {
   requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" },
   coreWebVitals: { key:"coreWebVitals", label:"Core Web Vitals", desc:"LCP, CLS & INP per page, checked live from PageSpeed Insights on demand", icon:"bolt", type:"core-web-vitals" },
   onPageAudit: { key:"onPageAudit", label:"On-Page Audit", desc:"Title/meta/alt-text/broken-link scan of every page, checked live on demand", icon:"search", type:"on-page-audit" },
-  combinedInsights: { key:"combinedInsights", label:"Page + SEO Insights", desc:"GA4 and Search Console data for every page, side by side — sortable, filterable, exportable", icon:"bolt", type:"combined-insights" }
+  combinedInsights: { key:"combinedInsights", label:"Page + SEO Insights", desc:"GA4 and Search Console data for every page, side by side — sortable, filterable, exportable", icon:"bolt", type:"combined-insights" },
+  ceoDashboard: { key:"ceoDashboard", label:"CEO Dashboard", desc:"A quick, at-a-glance executive summary — password protected", icon:"bolt", type:"ceo-dashboard" }
 };
 const NAV_ORDER = ["program","landing","unique","b2b","location","blog","university","free","pillar"];
 
@@ -3196,6 +3201,7 @@ async function navigate(route){
   else if(sec.type === "core-web-vitals") await renderCoreWebVitals(sec);
   else if(sec.type === "on-page-audit") await renderOnPageAudit(sec);
   else if(sec.type === "combined-insights") await renderCombinedInsights(sec);
+  else if(sec.type === "ceo-dashboard") await renderCeoDashboardGateOrTable(sec);
 }
 
 /* ================================================================================================
@@ -3547,9 +3553,12 @@ function buildRequestSubject(payload){
 const RTE_MAX_FILE_BYTES = 10 * 1024 * 1024;
 // Chars of base64url per chunk — keeps each uploadChunk GET well under the ~6000-char practical
 // URL-length ceiling already established for this deployment's JSONP transport (see
-// submitRequestDirect_'s own threshold check), even after JSON/idemKey/token overhead.
-const UPLOAD_CHUNK_CHARS = 3500;
-const UPLOAD_CONCURRENCY = 6;
+// submitRequestDirect_'s own threshold check), even after JSON/idemKey/token overhead (token alone
+// is 72 chars). Sized as large as that margin comfortably allows, since every chunk costs a full
+// Apps Script round trip (each one opens the spreadsheet fresh — there's no way to keep it open
+// across separate JSONP requests) — fewer, bigger chunks means fewer of those round trips.
+const UPLOAD_CHUNK_CHARS = 5000;
+const UPLOAD_CONCURRENCY = 8;
 function fileToBase64Url_(file){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
@@ -4502,6 +4511,131 @@ async function renderOnPageAudit(sec){
     </table></div>
   `;
   wireAuditPanel_();
+}
+
+/* ================================================================================================
+   CEO DASHBOARD — a single-glance executive summary, built for presenting to leadership: a handful
+   of big numbers plus two simple breakdowns, nothing that needs explaining. Password-protected
+   (separate from the Admin/Super Admin role check — the password is what actually gates this one,
+   per the user's request) so it's not just another item any Admin stumbles into.
+   ================================================================================================ */
+const CEO_DASHBOARD_PASSWORD = "CEO@Jaro";
+function isCeoDashboardUnlocked(){ return sessionStorage.getItem("ceoDashboardUnlocked") === "1"; }
+async function renderCeoDashboardGateOrTable(sec){
+  if(isCeoDashboardUnlocked()){ await renderCeoDashboard(sec); return; }
+  const el = document.getElementById("content");
+  el.innerHTML = `
+    <div style="max-width:380px;margin:70px auto;text-align:center">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--blue-tint-10);color:var(--blue);display:flex;align-items:center;justify-content:center;margin:0 auto 18px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <h2 style="margin-bottom:6px">Password Protected</h2>
+      <p style="color:var(--ink-50);font-size:13px;margin-bottom:22px">Enter the password to view the CEO Dashboard</p>
+      <input type="password" id="ceoPasswordInput" placeholder="Password" autocomplete="off"
+        style="width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;text-align:center;font-size:14px;margin-bottom:12px;box-sizing:border-box">
+      <div id="ceoPasswordError" style="color:var(--red);font-size:12px;margin-bottom:12px;display:none">Incorrect password — try again.</div>
+      <button class="btn primary" id="ceoPasswordSubmit" style="width:100%;justify-content:center">Unlock</button>
+    </div>`;
+  const input = document.getElementById("ceoPasswordInput");
+  const submit = async ()=>{
+    if(input.value === CEO_DASHBOARD_PASSWORD){
+      sessionStorage.setItem("ceoDashboardUnlocked", "1");
+      await renderCeoDashboard(sec);
+    } else {
+      document.getElementById("ceoPasswordError").style.display = "block";
+      input.value = ""; input.focus();
+    }
+  };
+  document.getElementById("ceoPasswordSubmit").addEventListener("click", submit);
+  input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
+  input.focus();
+}
+// Shared by both breakdown panels below — same visual language as Quick Insights' status-bar/
+// status-legend, just without a click-to-drill-down (kept intentionally simple for this page).
+function renderSimpleBars_(el, entries){
+  if(!el) return;
+  if(!entries.length){ el.innerHTML = `<div class="insight-loading">No data yet.</div>`; return; }
+  const total = entries.reduce((s,[,c])=>s+c,0) || 1;
+  el.innerHTML = `
+    <div class="status-bar">${entries.map(([label,c],i)=>`<div style="width:${(c/total)*100}%;background:${TYPE_COLORS[i%TYPE_COLORS.length]}" title="${esc(label)}: ${c}"></div>`).join("")}</div>
+    <div class="status-legend">${entries.map(([label,c],i)=>`<div class="status-legend-item"><span class="status-dot" style="background:${TYPE_COLORS[i%TYPE_COLORS.length]}"></span>${esc(label)} <b>${c}</b></div>`).join("")}</div>`;
+}
+async function renderCeoDashboard(sec){
+  const el = document.getElementById("content");
+  document.getElementById("globalSearchWrap").style.display = "none";
+  document.getElementById("refreshDataBtn").style.display = "none";
+  const dateStr = new Date().toLocaleDateString("en-IN", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  el.innerHTML = `
+    <div class="toolbar-only"><span class="pill" id="livePill" style="display:none">${ic("bolt")} Live from Google Sheets</span></div>
+    <div class="section-head" style="margin-top:6px">
+      <div><h2>Executive Summary</h2><div class="meta">A quick, at-a-glance view of the web pages program — ${esc(dateStr)}</div></div>
+    </div>
+    <div id="ceoKpiGrid" class="stat-grid" style="margin-bottom:26px"><div style="padding:60px;text-align:center;color:var(--ink-35);grid-column:1/-1">Loading…</div></div>
+    <div class="insights-grid">
+      <div class="insight-panel">
+        <h4>Admission Status</h4>
+        <div class="click-hint">Across every program page</div>
+        <div id="ceoAdmissionBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+      </div>
+      <div class="insight-panel">
+        <h4>Requests by Status</h4>
+        <div class="click-hint">Every request raised on this dashboard</div>
+        <div id="ceoRequestBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+      </div>
+    </div>`;
+  const pageCounts = {};
+  await Promise.all(NAV_ORDER.map(async k=>{
+    try{ const {data} = await getData(sheetKeyFor(k)); pageCounts[k] = data.length; }
+    catch(e){ pageCounts[k] = 0; }
+  }));
+  const totalPages = Object.values(pageCounts).reduce((s,n)=>s+n, 0);
+  let programRows = [];
+  try{
+    const {data} = await getData("programPages", ["University/Institute","Program Name"]);
+    programRows = data.filter(r=>(r["Program Name"]||"").toString().trim());
+  }catch(e){ /* leave empty — breakdown just shows "no data yet" below */ }
+  const admissionCounts = { open:0, soon:0, closed:0, draft:0, other:0 };
+  programRows.forEach(r=> admissionCounts[statusKeyFor(r)]++);
+  let requestRows = [];
+  try{
+    const r = await authApiCall_("listRequirements", { token: AUTH_SESSION.token });
+    requestRows = r.rows || [];
+  }catch(e){ /* leave empty */ }
+  const requestStatusCounts = new Map();
+  requestRows.forEach(row=>{
+    const s = row["Status"] || "Not Started";
+    requestStatusCounts.set(s, (requestStatusCounts.get(s)||0)+1);
+  });
+  const completedCount = requestRows.filter(r=> (r["Status"]||"") === "Completed").length;
+  const completionPct = requestRows.length ? Math.round((completedCount/requestRows.length)*100) : 0;
+  let trendingCount = 0;
+  try{ trendingCount = (await loadTrendingKeys_(true)).size; }catch(e){}
+  if(!document.getElementById("ceoKpiGrid")) return; // navigated away while all the above loaded
+  document.getElementById("ceoKpiGrid").innerHTML = `
+    <div class="stat-card" style="--glass:var(--blue-tint-10);--fg:var(--blue)">
+      <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--blue)">${ic("home")}</div></div>
+      <div><div class="val">${totalPages.toLocaleString()}</div><div class="lbl">Total Web Pages</div></div>
+    </div>
+    <div class="stat-card" style="--glass:var(--yellow-tint);--fg:#8a6800">
+      <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:#8a6800">${ic("program")}</div></div>
+      <div><div class="val">${(pageCounts.program||0).toLocaleString()}</div><div class="lbl">Program Pages</div></div>
+    </div>
+    <div class="stat-card" style="--glass:rgba(61,220,132,.14);--fg:#1b9c58">
+      <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:#1b9c58">${ic("requirements")}</div></div>
+      <div><div class="val">${requestRows.length.toLocaleString()}</div><div class="lbl">Requests Raised</div></div>
+    </div>
+    <div class="stat-card" style="--glass:var(--red-tint);--fg:var(--red)">
+      <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--red)">${ic("bolt")}</div></div>
+      <div><div class="val">${completionPct}%</div><div class="lbl">Requests Completed</div></div>
+    </div>
+    <div class="stat-card" style="--glass:var(--blue-tint-10);--fg:var(--blue)">
+      <div class="stat-card-top"><div class="ic-badge" style="background:rgba(255,255,255,.55);color:var(--blue);font-size:16px">👑</div></div>
+      <div><div class="val">${trendingCount}</div><div class="lbl">Trending Programs</div></div>
+    </div>`;
+  const admissionLabels = { open:"Open", soon:"Closing Soon", closed:"Closed", draft:"Draft", other:"Unspecified" };
+  renderSimpleBars_(document.getElementById("ceoAdmissionBreakdown"),
+    Object.keys(admissionCounts).filter(k=>admissionCounts[k]>0).map(k=>[admissionLabels[k], admissionCounts[k]]));
+  renderSimpleBars_(document.getElementById("ceoRequestBreakdown"), [...requestStatusCounts.entries()]);
 }
 
 /* ================================================================================================
@@ -5489,7 +5623,7 @@ function logout_(){
 /* ---- Role gating: Support only sees the Web Page category sections + Home (Live Insights
    hidden there too); everything else (Requirements Log, Page/SEO Insights, Core Web Vitals, and
    the Users admin page) is Admin-only. ---- */
-const SUPPORT_HIDDEN_NAV = ["coreWebVitals","onPageAudit","combinedInsights"];
+const SUPPORT_HIDDEN_NAV = ["coreWebVitals","onPageAudit","combinedInsights","ceoDashboard"];
 function applyRoleGating_(){
   const role = getCurrentUserRole_();
   document.getElementById("userPill").style.display = "flex";
@@ -5668,6 +5802,7 @@ function init(){
   document.querySelector('.navitem[data-nav="coreWebVitals"]').addEventListener("click", ()=>navigate("coreWebVitals"));
   document.querySelector('.navitem[data-nav="onPageAudit"]').addEventListener("click", ()=>navigate("onPageAudit"));
   document.querySelector('.navitem[data-nav="combinedInsights"]').addEventListener("click", ()=>navigate("combinedInsights"));
+  document.querySelector('.navitem[data-nav="ceoDashboard"]').addEventListener("click", ()=>navigate("ceoDashboard"));
   document.querySelector('.navitem[data-nav="users"]').addEventListener("click", ()=>navigate("users"));
   document.getElementById("openRequestBtn").addEventListener("click", ()=>openRequestModal());
   document.getElementById("closeRequestBtn").addEventListener("click", closeRequestModal);

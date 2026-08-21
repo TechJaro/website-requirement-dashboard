@@ -417,21 +417,25 @@ switching needed. "By Page" (new) groups by University+Program, exactly surfacin
 keeps getting requested" regardless of who by. Both use the same click-a-slice-to-drill-down
 behavior as before (`openInsightListModal`).
 
-## CEO Dashboard — in progress, staying local per the user's explicit instruction (2026-08-20)
+## CEO Dashboard — built local-only (2026-08-20), deployed live (2026-08-21)
 
 User wants a new password-protected ("CEO@Jaro") executive-summary nav item, and a second Super
-Admin (`rr@jaro.in`, the CEO) added to `Code.gs` — but explicitly said the CEO Dashboard itself
-should stay **local only** until they say "deploy" in a future message, and that the CEO should
-not be notified/emailed about this access yet. Handling this by *not* copying this round's
-front-end work into `index.html` and *not* committing/pushing it — `Unified Dashboard.txt` will be
-ahead of `index.html`/the repo until explicitly told to ship it. **Whoever picks this up: check
-whether `Unified Dashboard.txt` still has uncommitted CEO Dashboard work sitting locally before
-assuming it matches the deployed site — this is a deliberate, temporary exception to the usual
-"keep them in sync" rule.** The Super Admin permission change itself (`SUPER_ADMIN_EMAILS` in
-`Code.gs`) is being committed normally — Code.gs never auto-deploys (always needs a manual paste +
-redeploy the user controls), so committing it doesn't put anything live. No Dashboard Users row is
-being created for `rr@jaro.in` — she can't log in until an Admin explicitly uses "Add a User" for
-her later; the email constant alone is inert until then.
+Admin (`rr@jaro.in`, the CEO) added to `Code.gs`. Originally held back from `index.html`/the repo
+per the user's explicit "keep it local until I say deploy" instruction (2026-08-20) — the user gave
+that explicit go-ahead on 2026-08-21 ("please deploy it here only"), so the exact same front-end
+code that was already built and verified locally was copied into `index.html` (diffed the two files
+first to confirm the *only* differences were the CEO Dashboard additions — sidebar nav item,
+`SECTIONS.ceoDashboard`, the `navigate()` dispatch branch, `SUPPORT_HIDDEN_NAV`, click-wiring, and
+the `renderCeoDashboardGateOrTable`/`renderCeoDashboard`/`renderSimpleBars_` functions themselves —
+then applied that exact block, nothing more, nothing less) and committed/pushed. Verified in the
+browser after copying: wrong password correctly rejected and stays locked; correct password
+(`CEO@Jaro`) unlocks it and the KPI grid/admission-status breakdown/request-status breakdown all
+render with accurate numbers (mocked `getData`/`authApiCall_`/`loadTrendingKeys_` to check the math
+without needing a real login). It's reachable from the sidebar's Admin group, right below Users —
+same as it always would have been once deployed. No Dashboard Users row exists for `rr@jaro.in` yet
+— she can't log in until an Admin explicitly uses "Add a User" for her; the `SUPER_ADMIN_EMAILS`
+constant alone is inert until then, and no notification email is sent to her as a side effect of
+any of this.
 
 ## File attachments: Google Drive approach dropped, replaced with chunked upload (2026-08-21)
 
@@ -506,21 +510,43 @@ logged in."` — `uploadFileChunked_`'s `authApiCall_("uploadChunk", {...})` cal
 that payload. Verified in the browser with a mock `authApiCall_` that every chunk now actually
 carries the session token before this was re-shipped.
 
+## Real bug fixed: uploadChunk's cleanup sweep made later uploads in a session crawl (2026-08-21)
+
+User reported attaching files was "taking a long time... even the media file is in KB" — screenshot
+showed two small images finishing fine, then a PDF stuck at 1% for a long stretch. Root cause:
+`handleUploadChunk_` ran its stale-chunk sweep (`sheet.getDataRange().getValues()` + a full scan)
+on **every single chunk**, not once per upload. That sweep re-reads and rescans the *entire*
+`UploadChunks` sheet — which keeps growing as chunks land, from every file attached in the same
+session, since rows aren't deleted until the whole email actually sends. So a file's 2nd chunk
+rescans what its 1st chunk wrote, its 50th chunk rescans 49 rows-worth of scanning-so-far, and if
+two earlier files (say ~110 chunks combined) are still sitting there un-sent, chunk 1 of a third
+file already has 110+ rows to read and scan before it's even added its own — quadratic work per
+file, worse the more files/chunks have piled up in the session. Fixed by only running the sweep on
+a file's first chunk (`chunkIndex === 0`) instead of every one — cuts sweep frequency by roughly the
+chunk count of a file (50-100x for a typical attachment). Also bumped `UPLOAD_CHUNK_CHARS` from
+3500 to 5000 and `UPLOAD_CONCURRENCY` from 6 to 8 (still comfortably under the ~6000-char URL
+budget with the 72-char token included) to cut the raw number of round trips per file — each chunk
+is still an unavoidable full Apps Script execution (opens the spreadsheet fresh every time, no way
+to keep a connection warm across separate JSONP requests), so some per-chunk latency is inherent to
+this transport, but the sweep fix removes the part that was making it actively worse over a
+session rather than just "as slow as one round trip per chunk should be."
+
 ## Immediate next action
 
 Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy — this
 round's backend changes are: (1) `SUPER_ADMIN_EMAILS` gaining `rr@jaro.in`; (2) the entire chunked
-file-attachment system above (`UPLOAD_CHUNKS_HEADER`, `MAX_ATTACHMENT_BYTES`,
+file-attachment system (`UPLOAD_CHUNKS_HEADER`, `MAX_ATTACHMENT_BYTES`,
 `handleUploadChunk_`/`assembleUploadedFile_`/`assembleAttachments_`/`deleteUploadChunks_`,
 `base64UrlToStandard_`, `sendGmailMessage_`'s new `attachments` support, `wrapBase64Lines_`, the
 `uploadChunk` dispatch case, and `handleSubmitRequest_`/`handleUpdateStatus_` now assembling and
-attaching before sending). Also requires the one-time Apps Script setup already documented above
-`sendGmailMessage_`'s own comment (Gmail API service added via Services (+) — should already be
-done from the earlier threading fix, nothing new needed there). After redeploying: (1) raise a test
-request with a real attached file (a few hundred KB is enough to exercise several chunks) and
-confirm it lands in the inbox as a real attachment, not missing and not as a broken email; (2)
-review the local-only CEO Dashboard once built and say whether to deploy it; (3) get exact symptoms
-for the still-open Insights-visibility issue further above; (4) decide whether to build the
-proposed shared-cache proxy for scaling; (5) confirm whether the old
+attaching before sending); (3) the per-chunk-sweep performance fix just above. Also requires the
+one-time Apps Script setup already documented above `sendGmailMessage_`'s own comment (Gmail API
+service added via Services (+) — should already be done from the earlier threading fix, nothing new
+needed there). After redeploying: (1) raise a test request with a real attached file (a few hundred
+KB is enough to exercise several chunks) and confirm it lands in the inbox as a real attachment,
+reasonably quickly, not missing and not as a broken email; (2) confirm the CEO Dashboard (now live,
+see above) actually works for a real logged-in Admin/Super Admin session, not just the mocked
+browser test; (3) get exact symptoms for the still-open Insights-visibility issue further above;
+(4) decide whether to build the proposed shared-cache proxy for scaling; (5) confirm whether the old
 `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy
 is confirmed working.
