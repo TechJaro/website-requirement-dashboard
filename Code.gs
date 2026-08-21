@@ -414,8 +414,12 @@ function requireAdmin_(token){
    so it can't be granted/revoked by editing the Dashboard Users sheet, only by changing this
    constant. Only the Super Admin can regenerate another user's password or change someone's role
    (Support <-> Admin); a regular Admin can still view the Users list and add new Support users. */
-const SUPER_ADMIN_EMAIL = "lalit.rade@jaro.in";
-function isSuperAdmin_(email){ return (email||"").trim().toLowerCase() === SUPER_ADMIN_EMAIL; }
+// rr@jaro.in (CEO) added 2026-08-20 — this constant alone grants nothing by itself: the account
+// still has to exist (an Admin adding her via "Add a User", which sends no email on its own) and
+// she still has to set up a password before she can log in at all. No notification is sent to her
+// as a side effect of this line being here.
+const SUPER_ADMIN_EMAILS = new Set(["lalit.rade@jaro.in", "rr@jaro.in"]);
+function isSuperAdmin_(email){ return SUPER_ADMIN_EMAILS.has((email||"").trim().toLowerCase()); }
 function requireSuperAdmin_(token){
   const session = requireAdmin_(token);
   if(!isSuperAdmin_(session.Email)) throw new Error("Only the Super Admin can do that.");

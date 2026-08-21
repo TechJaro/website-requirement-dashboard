@@ -468,6 +468,7 @@ td.link-cell a:hover{text-decoration:underline}
 .rte-btn svg{width:14px;height:14px}
 .rte-btn:hover{background:#fff;border-color:var(--line);color:var(--blue)}
 .rte-hint{font-size:10.5px;color:var(--ink-35);margin-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rte-uploading{display:inline-block;color:var(--ink-50);font-style:italic;font-size:12.5px}
 .rte-body{
   width:100%;min-height:150px;max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:0 0 9px 9px;
   padding:12px;font-size:13px;line-height:1.6;background:var(--canvas);outline:none;
@@ -1990,10 +1991,15 @@ async function renderHome(){
     <div id="requestActivityWrap" style="display:none">
       <div class="section-head"><div><h2>Request Activity</h2><div class="meta">Who's raising requests, live from the Requirements Log — Admins only</div></div></div>
       <div class="insights-grid" style="margin-bottom:26px">
-        <div class="insight-panel" style="grid-column:1 / -1">
+        <div class="insight-panel">
           <h4>Requests by Requester</h4>
           <div class="click-hint">Click any slice to see their requests — a tall bar for one person is worth a look ›</div>
           <div id="requesterBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+        </div>
+        <div class="insight-panel">
+          <h4>Requests by Page</h4>
+          <div class="click-hint">Click any slice to see those requests — a tall bar means the same page keeps getting requested ›</div>
+          <div id="pageBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
         </div>
       </div>
     </div>
@@ -2209,74 +2215,74 @@ function renderQuickInsights(rawData){
    noticed"), which is exactly what a disproportionately wide/tall segment makes obvious at a
    glance. Top 8 requesters shown individually, everyone else folded into one "N others" slice so
    this stays readable regardless of how many different people have ever raised a request. */
-// Two switchable breakdowns, each a plain <select> (per the user's request for "dropdown
-// format" rather than the bar-chart-and-legend visual used elsewhere on Quick Insights) —
-// picking an option immediately opens the existing drill-down modal for that slice. "By Page"
-// groups by University+Program so a page that keeps getting re-requested (regardless of who by)
-// stands out just as easily as a person who raises an unusual number of requests.
+// Back to the original bar-chart-and-legend visual (the dropdown version didn't land well) — now
+// as two side-by-side panels instead of a toggle, so "who's raising a lot of requests" and "which
+// page keeps getting re-requested" are both visible at once, no switching needed. "By Page" groups
+// by University+Program (skipping requests with no page context, e.g. a Blogs request).
+function renderBreakdownBars_(el, entries, emptyMsg, modalTitlePrefix, mapRow){
+  if(!entries.length){ el.innerHTML = `<div class="insight-loading">${emptyMsg}</div>`; return; }
+  const TOP_N = 8;
+  const shown = entries.slice(0, TOP_N);
+  const rest = entries.slice(TOP_N);
+  if(rest.length) shown.push(["__others__", { name: `${rest.length} other${rest.length===1?"":"s"}`, rows: rest.flatMap(([,v])=>v.rows) }]);
+  const total = entries.reduce((sum,[,v])=>sum+v.rows.length, 0) || 1;
+  el.innerHTML = `
+    <div class="status-bar">${shown.map(([key,v],i)=>
+      `<div data-slice="${esc(key)}" style="width:${(v.rows.length/total)*100}%;background:${TYPE_COLORS[i%TYPE_COLORS.length]};cursor:pointer" title="${esc(v.name)}: ${v.rows.length} — click to view"></div>`
+    ).join("")}</div>
+    <div class="status-legend">${shown.map(([key,v],i)=>`
+      <div class="status-legend-item" data-slice="${esc(key)}" style="cursor:pointer">
+        <span class="status-dot" style="background:${TYPE_COLORS[i%TYPE_COLORS.length]}"></span>${esc(v.name)} <b>${v.rows.length}</b>
+      </div>`).join("")}</div>`;
+  el.querySelectorAll("[data-slice]").forEach(node=>{
+    node.addEventListener("click", ()=>{
+      const found = shown.find(([key])=>key===node.dataset.slice);
+      if(found) openInsightListModal(`${modalTitlePrefix} — ${found[1].name}`, found[1].rows, mapRow);
+    });
+  });
+}
 async function renderRequesterActivity(){
-  const el = document.getElementById("requesterBreakdown");
-  if(!el) return;
+  const requesterEl = document.getElementById("requesterBreakdown");
+  const pageEl = document.getElementById("pageBreakdown");
+  if(!requesterEl && !pageEl) return;
   let rows;
   try{
     const r = await authApiCall_("listRequirements", { token: AUTH_SESSION.token });
     rows = r.rows || [];
-  }catch(e){ el.innerHTML = `<div class="insight-loading">Couldn't load request activity.</div>`; return; }
-  if(!el.isConnected) return; // navigated away while the fetch was in flight
-  if(!rows.length){ el.innerHTML = `<div class="insight-loading">No requests raised yet.</div>`; return; }
+  }catch(e){
+    if(requesterEl) requesterEl.innerHTML = `<div class="insight-loading">Couldn't load request activity.</div>`;
+    if(pageEl) pageEl.innerHTML = `<div class="insight-loading">Couldn't load request activity.</div>`;
+    return;
+  }
+  if(requesterEl && !requesterEl.isConnected) return; // navigated away while the fetch was in flight
   const byRequester = new Map(); // email -> { name, rows:[] }
   rows.forEach(row=>{
     const email = (row["Email"]||"").toString().trim().toLowerCase() || "unknown";
     if(!byRequester.has(email)) byRequester.set(email, { name: row["Requested By"] || email, rows: [] });
     byRequester.get(email).rows.push(row);
   });
-  const byPage = new Map(); // "university|||program" -> { label, rows:[] }
+  const byPage = new Map(); // "university|||program" -> { name (label), rows:[] }
   rows.forEach(row=>{
     const uni = (row["University"]||"").toString().trim();
     const prog = (row["Program"]||"").toString().trim();
     if(!uni && !prog) return; // no page context to group by (e.g. a Blogs/generic request)
     const key = (uni+"|||"+prog).toLowerCase();
-    if(!byPage.has(key)) byPage.set(key, { label: [uni,prog].filter(Boolean).join(" — "), rows: [] });
+    if(!byPage.has(key)) byPage.set(key, { name: [uni,prog].filter(Boolean).join(" — "), rows: [] });
     byPage.get(key).rows.push(row);
   });
-  const requesterEntries = [...byRequester.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
-  const pageEntries = [...byPage.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
   const mapRow = row => ({
     title: row["Subject"] || "Untitled request",
     sub: `${row["Status"]||"Not Started"} · ${(row["Timestamp"]||"").toString().slice(0,10)}`,
     link: firstLink(row["Related Link"]),
   });
-  el.innerHTML = `
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <button type="button" class="btn primary" id="raByRequesterBtn" style="font-size:12px;padding:6px 12px">By Requester</button>
-      <button type="button" class="btn" id="raByPageBtn" style="font-size:12px;padding:6px 12px">By Page</button>
-    </div>
-    <select id="raRequesterSelect" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:13px">
-      ${requesterEntries.map(([key,v])=>`<option value="${esc(key)}">${esc(v.name)} — ${v.rows.length} request${v.rows.length!==1?"s":""}</option>`).join("")}
-    </select>
-    <select id="raPageSelect" style="width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:13px;display:none">
-      ${pageEntries.length ? pageEntries.map(([key,v])=>`<option value="${esc(key)}">${esc(v.label)} — ${v.rows.length} request${v.rows.length!==1?"s":""}</option>`).join("") : `<option value="">No page-specific requests yet</option>`}
-    </select>`;
-  const requesterSelect = document.getElementById("raRequesterSelect");
-  const pageSelect = document.getElementById("raPageSelect");
-  const byRequesterBtn = document.getElementById("raByRequesterBtn");
-  const byPageBtn = document.getElementById("raByPageBtn");
-  requesterSelect.addEventListener("change", ()=>{
-    const found = byRequester.get(requesterSelect.value);
-    if(found) openInsightListModal(`Requests — ${found.name}`, found.rows, mapRow);
-  });
-  pageSelect.addEventListener("change", ()=>{
-    const found = byPage.get(pageSelect.value);
-    if(found) openInsightListModal(`Requests — ${found.label}`, found.rows, mapRow);
-  });
-  byRequesterBtn.addEventListener("click", ()=>{
-    byRequesterBtn.classList.add("primary"); byPageBtn.classList.remove("primary");
-    requesterSelect.style.display = ""; pageSelect.style.display = "none";
-  });
-  byPageBtn.addEventListener("click", ()=>{
-    byPageBtn.classList.add("primary"); byRequesterBtn.classList.remove("primary");
-    pageSelect.style.display = ""; requesterSelect.style.display = "none";
-  });
+  if(requesterEl){
+    const entries = [...byRequester.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
+    renderBreakdownBars_(requesterEl, entries, "No requests raised yet.", "Requests", mapRow);
+  }
+  if(pageEl){
+    const entries = [...byPage.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
+    renderBreakdownBars_(pageEl, entries, "No page-specific requests yet.", "Requests", mapRow);
+  }
 }
 /* Generic click-to-drill-down popup used by the Quick Insights breakdowns (Program AND Landing
    Page) above — lists the actual rows behind whichever slice was clicked, so a number in the chart
@@ -3276,6 +3282,7 @@ function createChipPicker(ids, defaultEmails, locked){
 }
 let toPicker, ccPicker;
 let LAST_SUBJECT_SUGGESTION = ""; // see maybeSuggestSubject() in wireRequestFormDependencies
+let REQUEST_DESC_RTE = null; // handle from wireRichTextEditor() — see submitRequest's upload wait
 
 function populateSectionDropdown(){
   const sel = document.getElementById("rf_section");
@@ -3557,21 +3564,41 @@ function wireRichTextEditor(ids){
       }
     }
   });
+  // Real bug this fixed: uploading is async (it needs a Drive round-trip, sometimes a Google
+  // sign-in popup too), but nothing previously stopped Submit/Send from firing before that
+  // finished — the request went out with no attachment link at all, silently, while a stale
+  // "Uploading…" toast was the only trace. pendingUploads tracks every in-flight upload so the
+  // submit handlers below can wait for them; a visible in-body placeholder (replaced in place once
+  // the upload settles) replaces the old fire-and-forget toast so success/failure is never silently
+  // lost either.
+  let uploadCounter = 0;
+  const pendingUploads = new Set();
   async function insertAttachedFile(file){
     if(!file) return;
     if(file.size > RTE_MAX_FILE_BYTES){ toast(`"${file.name}" is over the 35MB attachment limit — not attached`, true); return; }
     const isImage = file.type.startsWith("image/");
     const sizeLabel = (file.size/1024/1024).toFixed(file.size < 1024*1024 ? 2 : 1) + " MB";
-    toast(`Uploading ${file.name}…`);
-    try{
-      const link = await uploadFileToDrive_(file);
-      body.focus();
-      document.execCommand("insertHTML", false,
-        `<a href="${esc(link)}" target="_blank" rel="noopener">${isImage?"🖼️":"📎"} ${esc(file.name||"attachment")} (${sizeLabel})</a>&nbsp;`);
-    }catch(err){
-      toast(`Couldn't attach "${file.name}" — ${err.message}`, true);
-    }
+    const uploadId = `rte-upload-${++uploadCounter}-${Date.now()}`;
+    body.focus();
+    document.execCommand("insertHTML", false, `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Uploading ${esc(file.name)}…</span>&nbsp;`);
+    const task = (async()=>{
+      try{
+        const link = await uploadFileToDrive_(file);
+        const placeholder = document.getElementById(uploadId);
+        if(placeholder) placeholder.outerHTML = `<a href="${esc(link)}" target="_blank" rel="noopener">${isImage?"🖼️":"📎"} ${esc(file.name||"attachment")} (${sizeLabel})</a>&nbsp;`;
+      }catch(err){
+        const placeholder = document.getElementById(uploadId);
+        if(placeholder) placeholder.outerHTML = `<span style="color:var(--red)">⚠️ "${esc(file.name)}" failed to attach — ${esc(err.message)}</span>&nbsp;`;
+        toast(`Couldn't attach "${file.name}" — ${err.message}`, true);
+      }
+    })();
+    pendingUploads.add(task);
+    task.finally(()=> pendingUploads.delete(task));
   }
+  return {
+    hasPendingUploads: ()=> pendingUploads.size > 0,
+    waitForUploads: ()=> Promise.allSettled([...pendingUploads])
+  };
 }
 
 let REQUEST_SUBMIT_IN_FLIGHT = false;
@@ -3580,6 +3607,18 @@ async function submitRequest(e){
   // Belt-and-braces double-submit guard on top of disabling the button below — if this somehow
   // fires again before the DOM's disabled state takes effect, this flag stops it cold.
   if(REQUEST_SUBMIT_IN_FLIGHT) return;
+  // Real bug this fixed: an attachment upload is async (Drive round-trip, sometimes a Google
+  // sign-in popup) — submitting before it finished used to send the request with no attachment
+  // link at all, silently. Wait for any in-flight uploads first, so descHtml below is read only
+  // after every attachment has actually resolved to a link (or a visible failure message).
+  if(REQUEST_DESC_RTE && REQUEST_DESC_RTE.hasPendingUploads()){
+    const submitBtn = document.getElementById("submitRequestBtn");
+    const submitLabel = document.getElementById("submitRequestLabel");
+    const prevLabel = submitLabel.textContent;
+    submitBtn.disabled = true; submitLabel.textContent = "Waiting for attachment…";
+    await REQUEST_DESC_RTE.waitForUploads();
+    submitBtn.disabled = false; submitLabel.textContent = prevLabel;
+  }
   const descHtml = document.getElementById("rf_desc").innerHTML.trim();
   const descText = document.getElementById("rf_desc").innerText.trim();
   if(!descText && !/<img/.test(descHtml)){ toast("Please describe your requirement", true); return; }
@@ -4775,7 +4814,7 @@ function appliesToTagHtml_(row){
    into the status-update email instead of it being a bare "Status: Completed" line with nothing
    else. Cancelling reverts the dropdown to its previous value rather than leaving it changed with
    no email sent. */
-let statusNoteToPicker, statusNoteCcPicker;
+let statusNoteToPicker, statusNoteCcPicker, statusNoteRTE;
 function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, cc, section}){
   let overlay = document.getElementById("statusNoteOverlay");
   if(!overlay){
@@ -4839,7 +4878,7 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
         </div>
       </div>`);
     overlay = document.getElementById("statusNoteOverlay");
-    wireRichTextEditor({
+    statusNoteRTE = wireRichTextEditor({
       bodyId:"statusNoteText", scopeEl:document.getElementById("statusNoteToolbar"),
       linkBtnId:"statusNoteLinkBtn", imageBtnId:"statusNoteImageBtn", imageInputId:"statusNoteImageInput"
     });
@@ -4885,6 +4924,13 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
   const revert = ()=>{ sel.value = prevValue; overlay.classList.remove("show"); cleanup(); };
   const onOverlayClick = (e)=>{ if(e.target.id === "statusNoteOverlay") revert(); };
   const onConfirm = async ()=>{
+    // Same fix as submitRequest — wait for any in-flight attachment upload before reading the
+    // note's HTML, so it isn't sent without the attachment link that was still uploading.
+    if(statusNoteRTE && statusNoteRTE.hasPendingUploads()){
+      confirmBtn.disabled = true; confirmBtn.textContent = "Waiting for attachment…";
+      await statusNoteRTE.waitForUploads();
+      confirmBtn.disabled = false; confirmBtn.textContent = "Send Update";
+    }
     const noteHtml = textEl.innerHTML.trim();
     const noteText = textEl.innerText.trim();
     const toEmails = statusNoteToPicker.get().map(c=>c.email);
@@ -5570,7 +5616,7 @@ function init(){
   document.getElementById("requestOverlay").addEventListener("click", (e)=>{ if(e.target.id==="requestOverlay") closeRequestModal(); });
   document.getElementById("requestForm").addEventListener("submit", submitRequest);
   document.getElementById("menuBtn").addEventListener("click", ()=> document.getElementById("sidebar").classList.toggle("open"));
-  wireRichTextEditor();
+  REQUEST_DESC_RTE = wireRichTextEditor();
   wireRequestFormDependencies();
 
   navigate("home");

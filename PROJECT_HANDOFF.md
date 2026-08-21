@@ -384,14 +384,62 @@ User asked to restrict the 👑 toggle to Admin/Super Admin. Checked both layers
 (`handleSetTrending_` calls `requireAdmin_`) were already correctly gated from when this feature
 was first built — nothing to change here.
 
+## Real bug fixed: attachment upload could lose the race with Submit (2026-08-20)
+
+User reported attaching a file showed "Uploading X…" but the file never actually made it into the
+sent email — reproduced with a 187KB image, which ruled out it being a slow-upload/size issue.
+Root cause: `insertAttachedFile` (in `wireRichTextEditor`) is async (Drive round-trip, sometimes a
+Google sign-in popup) but nothing stopped `submitRequest`/the status modal's `onConfirm` from
+reading the description/note HTML and submitting *before* that finished — the request went out
+with whatever was in the field at that instant, silently missing the not-yet-inserted attachment
+link. Fixed two ways: (1) every in-flight upload is now tracked (`pendingUploads` inside
+`wireRichTextEditor`, exposed via a returned `{hasPendingUploads, waitForUploads}` handle —
+`REQUEST_DESC_RTE` for the request form, `statusNoteRTE` for the status modal); both submit
+handlers now await any pending uploads first, showing "Waiting for attachment…" on the button
+rather than proceeding early. (2) The old fire-and-forget toast is replaced with a persistent
+in-body placeholder (`⏳ Uploading filename…`, `contenteditable="false"`) that gets swapped in
+place for either the final link or a visible red error message — so a failure is no longer only a
+transient toast that's easy to miss, it's sitting right there in the description/note text.
+Verified the wait-for-upload mechanism directly in the browser (mocked a slow upload — button
+correctly disables/re-enables and the link lands in the right place once the upload resolves).
+**Could not verify the actual Google Drive upload call itself succeeding** — that needs a real
+Google sign-in popup, which can't complete in this environment. If it still fails after this fix,
+the in-body error text (now persistent, not a fading toast) will have the exact reason — get that
+exact text if it happens again.
+
+## Request Activity: back to bar-and-legend, both breakdowns shown at once (2026-08-20)
+
+The dropdown-based version from last round didn't land well ("no use of it"). Reverted to the
+original bar-chart-and-legend visual (`renderBreakdownBars_`, a new shared helper extracted from
+the old inline code) — but now as **two side-by-side panels** ("Requests by Requester" and
+"Requests by Page") instead of one panel with a toggle, so both are visible at once with no
+switching needed. "By Page" (new) groups by University+Program, exactly surfacing "the same page
+keeps getting requested" regardless of who by. Both use the same click-a-slice-to-drill-down
+behavior as before (`openInsightListModal`).
+
+## CEO Dashboard — in progress, staying local per the user's explicit instruction (2026-08-20)
+
+User wants a new password-protected ("CEO@Jaro") executive-summary nav item, and a second Super
+Admin (`rr@jaro.in`, the CEO) added to `Code.gs` — but explicitly said the CEO Dashboard itself
+should stay **local only** until they say "deploy" in a future message, and that the CEO should
+not be notified/emailed about this access yet. Handling this by *not* copying this round's
+front-end work into `index.html` and *not* committing/pushing it — `Unified Dashboard.txt` will be
+ahead of `index.html`/the repo until explicitly told to ship it. **Whoever picks this up: check
+whether `Unified Dashboard.txt` still has uncommitted CEO Dashboard work sitting locally before
+assuming it matches the deployed site — this is a deliberate, temporary exception to the usual
+"keep them in sync" rule.** The Super Admin permission change itself (`SUPER_ADMIN_EMAILS` in
+`Code.gs`) is being committed normally — Code.gs never auto-deploys (always needs a manual paste +
+redeploy the user controls), so committing it doesn't put anything live. No Dashboard Users row is
+being created for `rr@jaro.in` — she can't log in until an Admin explicitly uses "Add a User" for
+her later; the email constant alone is inert until then.
+
 ## Immediate next action
 
 Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy — this
-round's backend change is `handleListRequirements_`'s per-role filtering (no header/column changes
-this time). Then: (1) confirm the file-attachment Drive upload actually works end-to-end with a
-real Google sign-in (only tested structurally here — the OAuth popup can't complete in this
-environment); (2) get exact symptoms for the still-open Insights-visibility issue further above;
-(3) decide whether to build the proposed shared-cache proxy for scaling; (4) confirm whether the
-old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D:
-copy is confirmed working; (5) spot-check Requirements Log as a Support user (own rows only,
-read-only status) and as an Admin (everything, editable).
+round's backend change is `SUPER_ADMIN_EMAILS` gaining `rr@jaro.in` (see above). Then: (1) confirm
+the file-attachment fix actually works end-to-end with a real Google sign-in and real file;
+(2) review the local-only CEO Dashboard once built and say whether to deploy it; (3) get exact
+symptoms for the still-open Insights-visibility issue further above; (4) decide whether to build
+the proposed shared-cache proxy for scaling; (5) confirm whether the old
+`C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy
+is confirmed working.
