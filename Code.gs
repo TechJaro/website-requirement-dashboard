@@ -56,6 +56,16 @@ const OTPS_HEADER = ["Email","Purpose","Code","ExpiresAt","SetupToken"];
 // "university|||program" string used only for exact-match lookups; University/Program are kept
 // too so the Home page can render a card without needing to cross-reference Program Pages again.
 const TRENDING_HEADER = ["Key","University","Program","MarkedAt"];
+// Chunked file-attachment upload — see uploadFileChunked_ in the dashboard file for the client
+// side. Each row is one small piece (base64url-encoded) of one file; handleSubmitRequest_/
+// handleUpdateStatus_ reassemble a whole upload's rows back into the original file bytes and
+// attach it directly to the Gmail message (assembleUploadedFile_ / deleteUploadChunks_ below).
+// Exists because a real file-upload POST doesn't work for this domain-restricted deployment (the
+// login cookie is dropped on cross-site POSTs), and Google Drive requires each person to grant a
+// separate personal consent the user didn't want — this way rides the same small-GET-request
+// transport that already reliably works for everything else, just many times over per file.
+const UPLOAD_CHUNKS_HEADER = ["UploadId","ChunkIndex","Filename","MimeType","Data","CreatedAt"];
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024; // 10MB raw per file — Gmail's own message cap is 25MB total including ~33% base64 overhead, this leaves headroom for multiple attachments plus the email body itself
 
 /* ---- One-time setup: run this once from the Apps Script editor ---- */
 function setupAdmin(){
@@ -216,6 +226,7 @@ function dispatchAction_(body){
     case "setUserRole": return handleSetUserRole_(body);
     case "submitRequest": return handleSubmitRequest_(body);
     case "updateStatus": return handleUpdateStatus_(body);
+    case "uploadChunk": return handleUploadChunk_(body);
     case "listRequirements": return handleListRequirements_(body);
     case "listTrending": return handleListTrending_(body);
     case "setTrending": return handleSetTrending_(body);
@@ -251,6 +262,73 @@ function handleCheckResult_(body){
     }
   }
   return { ok:true, ready:false };
+}
+/* ---- Chunked file-attachment upload: see UPLOAD_CHUNKS_HEADER/MAX_ATTACHMENT_BYTES above for why
+   this exists instead of Google Drive or a real upload POST — a real POST's session cookie is
+   dropped on this domain-restricted deployment, and Drive needs a separate personal OAuth consent
+   per user that wasn't wanted. Each row is one small base64url-encoded slice of one file, keyed by
+   an UploadId the client generates; handleSubmitRequest_/handleUpdateStatus_ call
+   assembleAttachments_ to reassemble a whole upload's rows back into the original bytes right
+   before sending, then delete the rows once the email is actually sent. ---- */
+function handleUploadChunk_(body){
+  requireSession_(body.token);
+  const uploadId = (body.uploadId || "").toString();
+  const chunkIndex = +body.chunkIndex;
+  const data = (body.data || "").toString();
+  if(!uploadId || !Number.isInteger(chunkIndex) || !data) throw new Error("Malformed chunk upload.");
+  const sheet = getOrCreateSheet_("UploadChunks", UPLOAD_CHUNKS_HEADER);
+  sheet.appendRow([uploadId, chunkIndex, (body.filename||"").toString(), (body.mimeType||"").toString(), data, new Date().toISOString()]);
+  // Opportunistic sweep of anything left behind by an abandoned upload (tab closed mid-upload,
+  // Submit never clicked) — same pattern as storePendingResult_ above.
+  const values = sheet.getDataRange().getValues();
+  const cutoff = Date.now() - 30*60000;
+  for(let i = values.length - 1; i >= 1; i--){
+    if(new Date(values[i][5]).getTime() < cutoff) sheet.deleteRow(i + 1);
+  }
+  return { ok:true };
+}
+// base64url (URL-safe, no padding) -> standard base64 (+, /, = padding). Chunks travel as base64url
+// to avoid percent-encoding overhead over the GET transport; a MIME attachment's own
+// Content-Transfer-Encoding: base64 needs the standard alphabet, so this converts once at assembly.
+function base64UrlToStandard_(s){
+  let std = s.replace(/-/g, "+").replace(/_/g, "/");
+  while(std.length % 4) std += "=";
+  return std;
+}
+function assembleUploadedFile_(uploadId){
+  const sheet = getOrCreateSheet_("UploadChunks", UPLOAD_CHUNKS_HEADER);
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const idCol = headers.indexOf("UploadId"), idxCol = headers.indexOf("ChunkIndex"),
+        nameCol = headers.indexOf("Filename"), mimeCol = headers.indexOf("MimeType"), dataCol = headers.indexOf("Data");
+  const rows = values.slice(1).filter(r => (r[idCol]||"").toString() === uploadId);
+  if(!rows.length) throw new Error("An attached file's upload wasn't found (it may have expired) — please re-attach it and try again.");
+  rows.sort((a,b) => (+a[idxCol]) - (+b[idxCol]));
+  const base64 = base64UrlToStandard_(rows.map(r => r[dataCol]).join(""));
+  // Raw byte count from base64 (3 bytes per 4 chars, minus padding) — only meaningful once fully
+  // reassembled, so checked here rather than as each chunk trickles in.
+  const padding = (base64.match(/=+$/) || [""])[0].length;
+  const rawBytes = Math.floor(base64.length * 3 / 4) - padding;
+  const filename = rows[0][nameCol] || "attachment";
+  if(rawBytes > MAX_ATTACHMENT_BYTES){
+    throw new Error(`"${filename}" is too large (${(rawBytes/1024/1024).toFixed(1)}MB) — attachments are limited to ${MAX_ATTACHMENT_BYTES/1024/1024}MB.`);
+  }
+  return { filename, mimeType: rows[0][mimeCol] || "application/octet-stream", base64 };
+}
+function deleteUploadChunks_(uploadId){
+  const sheet = getOrCreateSheet_("UploadChunks", UPLOAD_CHUNKS_HEADER);
+  const values = sheet.getDataRange().getValues();
+  const idCol = values[0].indexOf("UploadId");
+  for(let i = values.length - 1; i >= 1; i--){
+    if((values[i][idCol]||"").toString() === uploadId) sheet.deleteRow(i + 1);
+  }
+}
+// Assembles every uploadId in order; deliberately lets a failure (missing/expired/oversized)
+// propagate rather than silently sending without it, so the caller can surface a clear error
+// instead of a status update or request that quietly went out missing its attachment.
+function assembleAttachments_(uploadIds){
+  if(!Array.isArray(uploadIds) || !uploadIds.length) return [];
+  return uploadIds.map(assembleUploadedFile_);
 }
 function respond_(result, viaForm, reqId){
   if(viaForm){
@@ -702,12 +780,20 @@ function handleSubmitRequest_(body){
   const to = (payload.to && payload.to.length) ? payload.to.join(",") : "lalit.rade@jaro.in";
   const cc = (payload.cc||[]).join(",");
   const html = requestEmailHtml_(payload, "New Request Raised");
+  const uploadIds = Array.isArray(payload.attachmentUploadIds) ? payload.attachmentUploadIds : [];
+  let attachments;
+  try{
+    attachments = assembleAttachments_(uploadIds);
+  }catch(err){
+    throw new Error("Couldn't attach the uploaded file: " + ((err && err.message) || err));
+  }
   let sent;
   try{
-    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html });
+    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments });
   }catch(err){
     throw friendlyGmailApiError_(err);
   }
+  uploadIds.forEach(deleteUploadChunks_); // only after a confirmed send, so a failed send can be retried without re-uploading
   const sheet = getRequestsSheet_();
   sheet.appendRow([
     new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
@@ -761,14 +847,18 @@ function getOriginalThreadingHeaders_(messageId){
     return { inReplyTo:"", references:"" };
   }
 }
-function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, references}){
+// attachments (optional): [{filename, mimeType, base64}], base64 in STANDARD encoding (+, /, =) —
+// see assembleUploadedFile_, which does the base64url->standard conversion before this is called.
+// Builds a multipart/mixed message when there are any; otherwise the exact same plain text/html
+// message as before (unchanged for the common no-attachment case).
+function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, references, attachments}){
   // Hardcoded rather than Session.getEffectiveUser().getEmail() — that call needs the
   // https://www.googleapis.com/auth/userinfo.email OAuth scope, which isn't in this project's
   // manifest, and adding it would mean yet another authorize-and-redeploy round trip for no real
   // benefit: this script only ever runs as this one account (same address already hardcoded
   // elsewhere in this file, e.g. setupAdmin() and the submitRequest fallback recipient).
   const fromEmail = "lalit.rade@jaro.in";
-  const rawHeaders = [
+  const baseHeaders = [
     "MIME-Version: 1.0",
     "From: \"Jaro Web Pages Dashboard\" <" + fromEmail + ">",
     "To: " + to,
@@ -776,13 +866,36 @@ function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, refe
     "Subject: " + mimeEncodeHeaderValue_(subject),
     inReplyTo ? ("In-Reply-To: " + inReplyTo) : null,
     references ? ("References: " + references) : null,
-    "Content-Type: text/html; charset=UTF-8",
-    "Content-Transfer-Encoding: 8bit"
-  ].filter(Boolean).join("\r\n");
-  const raw = Utilities.base64EncodeWebSafe(rawHeaders + "\r\n\r\n" + htmlBody, Utilities.Charset.UTF_8);
+  ].filter(Boolean);
+  let rawMessage;
+  if(Array.isArray(attachments) && attachments.length){
+    const boundary = "jarodash_" + Utilities.getUuid().replace(/-/g,"");
+    const bodyPart = ["--" + boundary, "Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: 8bit", "", htmlBody].join("\r\n");
+    const attachmentParts = attachments.map(a => [
+      "--" + boundary,
+      "Content-Type: " + (a.mimeType || "application/octet-stream") + "; name=\"" + a.filename + "\"",
+      "Content-Disposition: attachment; filename=\"" + a.filename + "\"",
+      "Content-Transfer-Encoding: base64",
+      "",
+      wrapBase64Lines_(a.base64)
+    ].join("\r\n"));
+    rawMessage = baseHeaders.concat(["Content-Type: multipart/mixed; boundary=\"" + boundary + "\""]).join("\r\n")
+      + "\r\n\r\n" + bodyPart + "\r\n" + attachmentParts.join("\r\n") + "\r\n--" + boundary + "--";
+  } else {
+    rawMessage = baseHeaders.concat(["Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: 8bit"]).join("\r\n")
+      + "\r\n\r\n" + htmlBody;
+  }
+  const raw = Utilities.base64EncodeWebSafe(rawMessage, Utilities.Charset.UTF_8);
   const resource = { raw: raw };
   if(threadId) resource.threadId = threadId;
   return Gmail.Users.Messages.send(resource, "me");
+}
+// MIME requires base64 attachment content wrapped at a fixed line length (76 chars is the
+// standard) — most clients tolerate one giant line but this keeps it spec-correct.
+function wrapBase64Lines_(b64){
+  const lines = [];
+  for(let i = 0; i < b64.length; i += 76) lines.push(b64.slice(i, i + 76));
+  return lines.join("\r\n");
 }
 function friendlyGmailApiError_(err){
   const msg = (err && err.message) || String(err);
@@ -805,6 +918,13 @@ function handleUpdateStatus_(body){
   const rowData = values[sheetRow - 1];
   if(!rowData) throw new Error("That request row couldn't be found.");
   const get = (name)=> rowData[headers.indexOf(name)];
+  const uploadIds = Array.isArray(body.attachmentUploadIds) ? body.attachmentUploadIds : [];
+  let attachments;
+  try{
+    attachments = assembleAttachments_(uploadIds);
+  }catch(err){
+    throw new Error("Couldn't attach the uploaded file: " + ((err && err.message) || err));
+  }
   sheet.getRange(sheetRow, headers.indexOf("Status") + 1).setValue(status);
   // "Applies To" (Program Page / Landing Page / Both) — only meaningful for a request raised
   // against the merged "Program Pages/Landing Pages" section, where a single request can cover
@@ -844,7 +964,7 @@ function handleUpdateStatus_(body){
       debugLines.push(`inReplyTo=${th.inReplyTo || "(empty — original Message-ID header lookup failed)"}`);
       const sent = sendGmailMessage_({
         threadId: threadId, to: to, cc: cc, subject: "Re: " + (payload.subject || "Your request"),
-        htmlBody: html, inReplyTo: th.inReplyTo, references: th.references
+        htmlBody: html, inReplyTo: th.inReplyTo, references: th.references, attachments
       });
       debugLines.push("path=gmail-api-threaded", `sentThreadId=${(sent && sent.threadId) || "(unknown)"}`);
     } else {
@@ -853,6 +973,7 @@ function handleUpdateStatus_(body){
       // since there's no thread on record for it.
       const options = { htmlBody: html, name: "Jaro Web Pages Dashboard" };
       if(cc) options.cc = cc;
+      if(attachments.length) options.attachments = attachments.map(a => Utilities.newBlob(Utilities.base64Decode(a.base64), a.mimeType, a.filename));
       GmailApp.sendEmail(to, `Re: ${payload.subject||"Your request"}`, "This email requires HTML to view.", options);
       debugLines.push("path=fresh-email-fallback (no Gmail Thread ID stored on this row)");
     }
@@ -863,6 +984,7 @@ function handleUpdateStatus_(body){
     const friendly = friendlyGmailApiError_(err);
     throw new Error("Status saved, but the notification email failed: " + friendly.message + " [" + debugLines.join(" | ") + "]");
   }
+  uploadIds.forEach(deleteUploadChunks_); // only after a confirmed send, so a failed send can be retried without re-uploading
   return { ok:true, debug: debugLines.join(" | ") };
 }
 // Support sees the Requirements Log, but only the rows they themselves raised — Admin/Super Admin

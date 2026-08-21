@@ -469,6 +469,7 @@ td.link-cell a:hover{text-decoration:underline}
 .rte-btn:hover{background:#fff;border-color:var(--line);color:var(--blue)}
 .rte-hint{font-size:10.5px;color:var(--ink-35);margin-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rte-uploading{display:inline-block;color:var(--ink-50);font-style:italic;font-size:12.5px}
+.rte-attached{display:inline-block;color:var(--blue);background:#eef2ff;border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12.5px}
 .rte-body{
   width:100%;min-height:150px;max-height:340px;overflow-y:auto;border:1px solid var(--line);border-radius:0 0 9px 9px;
   padding:12px;font-size:13px;line-height:1.6;background:var(--canvas);outline:none;
@@ -1010,9 +1011,9 @@ body.auth-locked #app{display:none}
             <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/></svg></button>
             <button type="button" class="rte-btn" data-cmd="italic" title="Italic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4h-9M14 20H5M15 4 9 20"/></svg></button>
             <button type="button" class="rte-btn" id="rteLinkBtn" title="Insert hyperlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></svg></button>
-            <button type="button" class="rte-btn" id="rteImageBtn" title="Attach a file (image, PDF, etc. — up to 35MB)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
+            <button type="button" class="rte-btn" id="rteImageBtn" title="Attach a file (image, PDF, etc. — up to 10MB)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
             <input type="file" id="rteImageInput" multiple hidden>
-            <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V), or attach any file up to 35MB</span>
+            <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V), or attach any file up to 10MB</span>
           </div>
           <div class="rte-body" id="rf_desc" contenteditable="true" data-placeholder="What needs to be added, changed, or fixed? Include as much detail as possible — paste screenshots straight in…"></div>
         </div>
@@ -1102,7 +1103,7 @@ const CONFIG = {
   // session (token lasts ~1hr). See the procedure notes for how to create the OAuth Client ID.
   oauth: {
     clientId: "169035673500-5rjm58tf5n27qlfaajbr553ie3th8q5s.apps.googleusercontent.com", // paste the OAuth 2.0 Client ID (Web application type) here
-    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.file"
+    scopes: "https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email"
   },
   ga4PropertyId: "281070911", // same GA4 Property ID you put in Code.gs's CONFIG.GA4_PROPERTY_ID
   gscSiteUrl: "https://www.jaroeducation.com/",    // same Search Console property URL you put in Code.gs's CONFIG.GSC_SITE_URL
@@ -3533,37 +3534,59 @@ function buildRequestSubject(payload){
    of hardcoding the request form's ids. scopeEl bounds the "[data-cmd]" button lookup to just this
    editor's own toolbar, so two editors on the page at once don't wire each other's bold/italic
    buttons to the wrong body. */
-// Uploads straight to Google Drive with the person's own Google sign-in (same ensureGoogleAuth_
-// token flow Page/SEO Insights already use — the combined scope list means any token already
-// covers Drive too, no separate consent screen beyond the one popup) instead of embedding the
-// file inline as base64. Inline embedding is what capped attachments at a few KB in the first
-// place: the whole request/note rides through a URL-length-limited request to Apps Script (the
-// only transport that's ever reliably worked for this domain-restricted deployment — a plain POST
-// upload was tried before specifically to dodge this limit and found the login cookie gets
-// silently dropped). Routing the actual bytes through Drive instead means only a short link travels
-// through that size-limited request, so the real ceiling becomes Drive's, not a URL's — capped here
-// at 35MB per file by choice, not by any technical limit lower than that.
-const RTE_MAX_FILE_BYTES = 35 * 1024 * 1024;
-async function uploadFileToDrive_(file){
-  const token = await ensureGoogleAuth_();
-  const boundary = "jarodash-" + Date.now();
-  const metaPart = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: file.name || "attachment" })}\r\n`;
-  const filePartHeader = `--${boundary}\r\nContent-Type: ${file.type || "application/octet-stream"}\r\n\r\n`;
-  const body = new Blob([metaPart, filePartHeader, await file.arrayBuffer(), `\r\n--${boundary}--`]);
-  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
-    body
+// Chunked upload: splits the file into many small pieces and sends each through the same JSONP GET
+// transport that already reliably works for everything else here (see submitRequestDirect_'s own
+// comment on why — a real POST upload drops the login cookie on this domain-restricted deployment,
+// and Google Drive needs each person to grant their own personal consent, which wasn't wanted).
+// Code.gs's handleUploadChunk_ appends each piece as one row in a scratch sheet keyed by uploadId;
+// once every piece has landed, submitRequestDirect_/updateRequestStatus_ pass the uploadId along and
+// Code.gs reassembles it into the real file and attaches it directly to the Gmail message — a
+// genuine attachment, no link, no Drive, no extra popup. Capped at 10MB per file (MAX_ATTACHMENT_BYTES
+// in Code.gs) — Gmail's own message limit is 25MB total including ~33% base64 overhead, this leaves
+// headroom for multiple attachments plus the email body itself.
+const RTE_MAX_FILE_BYTES = 10 * 1024 * 1024;
+// Chars of base64url per chunk — keeps each uploadChunk GET well under the ~6000-char practical
+// URL-length ceiling already established for this deployment's JSONP transport (see
+// submitRequestDirect_'s own threshold check), even after JSON/idemKey/token overhead.
+const UPLOAD_CHUNK_CHARS = 3500;
+const UPLOAD_CONCURRENCY = 6;
+function fileToBase64Url_(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=> reject(new Error("Couldn't read the file"));
+    reader.onload = ()=>{
+      const dataUrl = reader.result;
+      const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+      resolve(b64.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""));
+    };
+    reader.readAsDataURL(file);
   });
-  const json = await res.json();
-  if(!res.ok) throw new Error((json.error && json.error.message) || "Drive upload failed");
-  // Anyone-with-the-link viewable — needed since email recipients won't otherwise have access to a
-  // file sitting in the uploader's own Drive.
-  await fetch(`https://www.googleapis.com/drive/v3/files/${json.id}/permissions`, {
-    method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ role: "reader", type: "anyone" })
-  }).catch(()=>{}); // the file still uploaded even if this secondary call fails
-  return json.webViewLink || `https://drive.google.com/file/d/${json.id}/view`;
+}
+async function runWithConcurrency_(items, limit, worker){
+  let idx = 0;
+  const results = new Array(items.length);
+  async function next(){
+    while(idx < items.length){
+      const i = idx++;
+      results[i] = await worker(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, next));
+  return results;
+}
+async function uploadFileChunked_(file, onProgress){
+  const uploadId = "up_" + Date.now() + "_" + Math.random().toString(36).slice(2);
+  const base64url = await fileToBase64Url_(file);
+  const chunks = [];
+  for(let i = 0; i < base64url.length; i += UPLOAD_CHUNK_CHARS) chunks.push(base64url.slice(i, i + UPLOAD_CHUNK_CHARS));
+  let done = 0;
+  await runWithConcurrency_(chunks, UPLOAD_CONCURRENCY, (chunk, i)=>
+    authApiCall_("uploadChunk", {
+      uploadId, chunkIndex: i, data: chunk,
+      filename: file.name || "attachment", mimeType: file.type || "application/octet-stream"
+    }).then(()=>{ done++; if(onProgress) onProgress(Math.round(done / chunks.length * 100)); })
+  );
+  return uploadId;
 }
 function wireRichTextEditor(ids){
   const cfg = Object.assign({
@@ -3592,28 +3615,30 @@ function wireRichTextEditor(ids){
       }
     }
   });
-  // Real bug this fixed: uploading is async (it needs a Drive round-trip, sometimes a Google
-  // sign-in popup too), but nothing previously stopped Submit/Send from firing before that
-  // finished — the request went out with no attachment link at all, silently, while a stale
-  // "Uploading…" toast was the only trace. pendingUploads tracks every in-flight upload so the
-  // submit handlers below can wait for them; a visible in-body placeholder (replaced in place once
-  // the upload settles) replaces the old fire-and-forget toast so success/failure is never silently
-  // lost either.
+  // Real bug this fixed: uploading is async (many small chunk requests in sequence/parallel), but
+  // nothing previously stopped Submit/Send from firing before that finished — the request went out
+  // with no attachment at all, silently, while a stale "Uploading…" toast was the only trace.
+  // pendingUploads tracks every in-flight upload so the submit handlers below can wait for them; a
+  // visible in-body placeholder (replaced in place once the upload settles, showing live progress
+  // meanwhile) replaces the old fire-and-forget toast so success/failure is never silently lost.
   let uploadCounter = 0;
   const pendingUploads = new Set();
   async function insertAttachedFile(file){
     if(!file) return;
-    if(file.size > RTE_MAX_FILE_BYTES){ toast(`"${file.name}" is over the 35MB attachment limit — not attached`, true); return; }
+    if(file.size > RTE_MAX_FILE_BYTES){ toast(`"${file.name}" is over the 10MB attachment limit — not attached`, true); return; }
     const isImage = file.type.startsWith("image/");
     const sizeLabel = (file.size/1024/1024).toFixed(file.size < 1024*1024 ? 2 : 1) + " MB";
     const uploadId = `rte-upload-${++uploadCounter}-${Date.now()}`;
     body.focus();
-    document.execCommand("insertHTML", false, `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Uploading ${esc(file.name)}…</span>&nbsp;`);
+    document.execCommand("insertHTML", false, `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Uploading ${esc(file.name)}… 0%</span>&nbsp;`);
     const task = (async()=>{
       try{
-        const link = await uploadFileToDrive_(file);
+        const chunkUploadId = await uploadFileChunked_(file, (pct)=>{
+          const placeholder = document.getElementById(uploadId);
+          if(placeholder) placeholder.textContent = `⏳ Uploading ${file.name}… ${pct}%`;
+        });
         const placeholder = document.getElementById(uploadId);
-        if(placeholder) placeholder.outerHTML = `<a href="${esc(link)}" target="_blank" rel="noopener">${isImage?"🖼️":"📎"} ${esc(file.name||"attachment")} (${sizeLabel})</a>&nbsp;`;
+        if(placeholder) placeholder.outerHTML = `<span class="rte-attached" data-upload-id="${esc(chunkUploadId)}" contenteditable="false">${isImage?"🖼️":"📎"} ${esc(file.name||"attachment")} (${sizeLabel}) — will be attached to the email</span>&nbsp;`;
       }catch(err){
         const placeholder = document.getElementById(uploadId);
         if(placeholder) placeholder.outerHTML = `<span style="color:var(--red)">⚠️ "${esc(file.name)}" failed to attach — ${esc(err.message)}</span>&nbsp;`;
@@ -3625,7 +3650,11 @@ function wireRichTextEditor(ids){
   }
   return {
     hasPendingUploads: ()=> pendingUploads.size > 0,
-    waitForUploads: ()=> Promise.allSettled([...pendingUploads])
+    waitForUploads: ()=> Promise.allSettled([...pendingUploads]),
+    // DOM-driven rather than a tracked list — if someone backspaces out an attached-file chip
+    // (the whole span deletes as one unit, same as the "uploading" placeholder always has), it
+    // stops counting as attached, so removing it from the message body is all it takes to drop it.
+    getAttachmentIds: ()=> [...body.querySelectorAll("[data-upload-id]")].map(el => el.dataset.uploadId)
   };
 }
 
@@ -3680,6 +3709,7 @@ async function submitRequest(e){
     cc: ccList.map(c=>c.email),
     descriptionHtml: descHtml,
     descriptionText: descText,
+    attachmentUploadIds: REQUEST_DESC_RTE ? REQUEST_DESC_RTE.getAttachmentIds() : [],
   };
   // Threading rule: same requester + same subject (exact match) -> same email thread
   payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
@@ -3898,7 +3928,7 @@ async function submitRequestDirect_(payload){
    sheet row itself and replies in-thread via GmailApp (far more reliable than hand-building
    In-Reply-To/References headers client-side), with a status email styled to match the original
    "New Request Raised" template instead of the old plain one-liner. ---- */
-async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, cc, appliesTo}){
+async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, cc, appliesTo, attachmentUploadIds}){
   if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
   // noteHtml carries formatting/links/pasted screenshots from the status modal's rich text editor;
   // noteText is the plain-text fallback Code.gs uses if noteHtml is empty (e.g. a fresh <br>-only div).
@@ -3913,7 +3943,7 @@ async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, c
     noteHtml = noteHtml.replace(/<img[^>]*>/gi,
       "[a pasted screenshot was too large to send and was left out — please attach it separately if needed]");
   }
-  return await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml, noteText: noteText || "", to: to || [], cc: cc || [], appliesTo: appliesTo || "" });
+  return await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml, noteText: noteText || "", to: to || [], cc: cc || [], appliesTo: appliesTo || "", attachmentUploadIds: attachmentUploadIds || [] });
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
@@ -4892,9 +4922,9 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
                 <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/></svg></button>
                 <button type="button" class="rte-btn" data-cmd="italic" title="Italic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4h-9M14 20H5M15 4 9 20"/></svg></button>
                 <button type="button" class="rte-btn" id="statusNoteLinkBtn" title="Insert hyperlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></svg></button>
-                <button type="button" class="rte-btn" id="statusNoteImageBtn" title="Attach a file (image, PDF, etc. — up to 35MB)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
+                <button type="button" class="rte-btn" id="statusNoteImageBtn" title="Attach a file (image, PDF, etc. — up to 10MB)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
                 <input type="file" id="statusNoteImageInput" multiple hidden>
-                <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V), or attach any file up to 35MB</span>
+                <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V), or attach any file up to 10MB</span>
               </div>
               <div class="rte-body" id="statusNoteText" contenteditable="true" data-placeholder="Add any details, links, or screenshots you want included in this update email…" style="min-height:110px"></div>
             </div>
@@ -4969,7 +4999,8 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
     confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
     sel.disabled = true;
     try{
-      const r = await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails, appliesTo });
+      const attachmentUploadIds = statusNoteRTE ? statusNoteRTE.getAttachmentIds() : [];
+      const r = await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails, appliesTo, attachmentUploadIds });
       const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
       sel.style.background = c.bg; sel.style.color = c.fg;
       // Surfacing Code.gs's debug trail directly here — Google's own Executions/Cloud Logging

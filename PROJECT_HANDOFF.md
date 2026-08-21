@@ -433,13 +433,85 @@ redeploy the user controls), so committing it doesn't put anything live. No Dash
 being created for `rr@jaro.in` — she can't log in until an Admin explicitly uses "Add a User" for
 her later; the email constant alone is inert until then.
 
+## File attachments: Google Drive approach dropped, replaced with chunked upload (2026-08-21)
+
+**The Drive-based attachment approach (2026-08-20, section above) did not work in the user's real
+usage** — "I'm literally not able to upload anything directly, nor status is shown that it is
+uploaded or not." The user also explicitly rejected the other technically-sound fix (opening the
+Apps Script Web App's access setting from "Anyone within Jaro" to "Anyone" so a real upload POST
+could work) — "this removes the specific Google restriction is not possible here." Explicit final
+instruction: *"I just want to add the media to be uploaded from the local computer here. Please
+make it happen anyhow."* No Drive, no OAuth popup, no deployment-access change.
+
+**New approach: split the file into many small pieces and send each one through the transport that
+already reliably works.** JSONP GET is the only transport confirmed to carry the login session's
+cookie through this domain-restricted deployment (a real POST silently drops it — see
+`submitRequestDirect_`'s own comment, and `authApiCallLarge_`, which is dead code left in place as
+a record that the POST+iframe route was already tried and found not to work here). So instead of
+one large request, an attached file is base64url-encoded client-side and cut into ~3500-character
+pieces, each sent as its own tiny `uploadChunk` action (well under the ~6000-char practical URL
+length already established elsewhere in this file), 6 at a time in parallel
+(`uploadFileChunked_`/`runWithConcurrency_` in the dashboard file). `Code.gs`'s new
+`handleUploadChunk_` appends each piece as one row in a scratch "UploadChunks" sheet
+(`UPLOAD_CHUNKS_HEADER`), keyed by a client-generated `uploadId`; rows older than 30 minutes are
+swept opportunistically on every new chunk upload (same pattern as the existing `PendingResults`
+scratch sheet). Once every piece for a file has landed, `handleSubmitRequest_`/`handleUpdateStatus_`
+call `assembleAttachments_`/`assembleUploadedFile_`, which sorts the rows by `ChunkIndex`,
+concatenates them back into the full base64url string, converts it to standard base64
+(`base64UrlToStandard_` — chunks travel as base64url purely to avoid percent-encoding overhead over
+the GET transport; a real MIME attachment needs the standard alphabet), and enforces
+`MAX_ATTACHMENT_BYTES` (10MB raw per file) on the fully-reassembled size. `sendGmailMessage_` now
+accepts an optional `attachments` array and builds a genuine `multipart/mixed` MIME message
+(boundary-separated HTML body + one `Content-Disposition: attachment` part per file,
+`wrapBase64Lines_` wrapping each at 76 chars) instead of the old plain `text/html` message — this
+is a real email attachment, opens directly in Gmail/Outlook/etc., no link, no separate Drive
+permission, no popup. Chunks are deleted (`deleteUploadChunks_`) only after the email actually
+sends, so a failed send can be retried without re-uploading the file.
+
+**Front end:** `wireRichTextEditor` (shared by both the request form and the status-update note)
+no longer touches Drive or `ensureGoogleAuth_` for this — `drive.file` was removed from
+`CONFIG.oauth.scopes` entirely, it's not needed for anything else. The in-body placeholder now
+shows live percentage (`⏳ Uploading file.png… 43%`) instead of a static "Uploading…", and on
+success becomes a plain (non-clickable) chip — `📎 file.png (1.2 MB) — will be attached to the
+email` — tagged `data-upload-id="…"` rather than a Drive link, since the file has nowhere to link
+to until the email actually sends. `getAttachmentIds()` (new on the handle `wireRichTextEditor`
+returns) reads these tags straight from the live DOM rather than keeping a separate tracked list —
+so if someone backspaces a chip out of the message body, it stops counting as attached with no
+extra bookkeeping. `RTE_MAX_FILE_BYTES` dropped from 35MB to 10MB to match the new
+`MAX_ATTACHMENT_BYTES` ceiling (the 35MB number was specific to routing through Drive, which no
+longer applies). `submitRequest`'s payload and `updateRequestStatus_`'s call both now include
+`attachmentUploadIds` (from `getAttachmentIds()`), which `handleSubmitRequest_`/`handleUpdateStatus_`
+assemble and attach before sending.
+
+**Verified in the browser** (mocking `authApiCall_` — a real Gmail send can't be exercised outside
+the actual deployment): chunk splitting, the 6-way concurrency cap, and progress reporting all
+behave correctly; the full client-encode → chunk → reassemble → server-decode round trip reproduces
+the original file bytes exactly (byte-for-byte, tested with two different random buffers of
+different sizes, one a plain multiple-of-3 length and one not, so base64 padding was exercised);
+driving a real `<input type=file>` `change` event through `wireRichTextEditor` end-to-end correctly
+swaps the placeholder to the final chip and `getAttachmentIds()` returns exactly that upload's id;
+clearing the message body and re-checking `getAttachmentIds()` correctly returns empty; a file over
+10MB is rejected client-side with a toast and never attempts an upload. **What's still unverified is
+the one thing that can't be tested outside the real deployment: an actual Gmail send with a real
+`multipart/mixed` attachment landing correctly in a real inbox.** If the attachment doesn't show up
+or the email looks malformed after redeploying, the exact symptom (attachment missing vs. email
+broken vs. error toast, and any error text shown) is what's needed to diagnose further.
+
 ## Immediate next action
 
 Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy — this
-round's backend change is `SUPER_ADMIN_EMAILS` gaining `rr@jaro.in` (see above). Then: (1) confirm
-the file-attachment fix actually works end-to-end with a real Google sign-in and real file;
-(2) review the local-only CEO Dashboard once built and say whether to deploy it; (3) get exact
-symptoms for the still-open Insights-visibility issue further above; (4) decide whether to build
-the proposed shared-cache proxy for scaling; (5) confirm whether the old
+round's backend changes are: (1) `SUPER_ADMIN_EMAILS` gaining `rr@jaro.in`; (2) the entire chunked
+file-attachment system above (`UPLOAD_CHUNKS_HEADER`, `MAX_ATTACHMENT_BYTES`,
+`handleUploadChunk_`/`assembleUploadedFile_`/`assembleAttachments_`/`deleteUploadChunks_`,
+`base64UrlToStandard_`, `sendGmailMessage_`'s new `attachments` support, `wrapBase64Lines_`, the
+`uploadChunk` dispatch case, and `handleSubmitRequest_`/`handleUpdateStatus_` now assembling and
+attaching before sending). Also requires the one-time Apps Script setup already documented above
+`sendGmailMessage_`'s own comment (Gmail API service added via Services (+) — should already be
+done from the earlier threading fix, nothing new needed there). After redeploying: (1) raise a test
+request with a real attached file (a few hundred KB is enough to exercise several chunks) and
+confirm it lands in the inbox as a real attachment, not missing and not as a broken email; (2)
+review the local-only CEO Dashboard once built and say whether to deploy it; (3) get exact symptoms
+for the still-open Insights-visibility issue further above; (4) decide whether to build the
+proposed shared-cache proxy for scaling; (5) confirm whether the old
 `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy
 is confirmed working.
