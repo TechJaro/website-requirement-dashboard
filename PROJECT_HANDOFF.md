@@ -497,6 +497,15 @@ the one thing that can't be tested outside the real deployment: an actual Gmail 
 or the email looks malformed after redeploying, the exact symptom (attachment missing vs. email
 broken vs. error toast, and any error text shown) is what's needed to diagnose further.
 
+## Real bug fixed: uploadChunk calls were missing the session token (2026-08-21)
+
+First live test after deploying the above showed `"certificate.png" failed to attach — You're not
+logged in."` — `uploadFileChunked_`'s `authApiCall_("uploadChunk", {...})` call never included
+`token: AUTH_SESSION.token` (every other action in this file does), so `Code.gs`'s
+`requireSession_` correctly rejected every chunk as unauthenticated. Fixed by adding the token to
+that payload. Verified in the browser with a mock `authApiCall_` that every chunk now actually
+carries the session token before this was re-shipped.
+
 ## Immediate next action
 
 Waiting on the user to paste the latest `Code.gs` into the Apps Script editor and redeploy — this

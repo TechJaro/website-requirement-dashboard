@@ -3582,7 +3582,7 @@ async function uploadFileChunked_(file, onProgress){
   let done = 0;
   await runWithConcurrency_(chunks, UPLOAD_CONCURRENCY, (chunk, i)=>
     authApiCall_("uploadChunk", {
-      uploadId, chunkIndex: i, data: chunk,
+      token: AUTH_SESSION.token, uploadId, chunkIndex: i, data: chunk,
       filename: file.name || "attachment", mimeType: file.type || "application/octet-stream"
     }).then(()=>{ done++; if(onProgress) onProgress(Math.round(done / chunks.length * 100)); })
   );
