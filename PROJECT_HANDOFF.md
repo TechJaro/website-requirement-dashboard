@@ -754,18 +754,37 @@ both unit-tested standalone in Node (can't run real Apps Script here): attribute
 non-image attachments correctly left un-inlined, unrelated `<img>` tags with no matching id left
 untouched, and multiple images in one body each getting distinct `cid:`s — all pass.
 
+## Inline images now consistent across both attachment paths (2026-08-21)
+
+User asked for a Form-attached image ("when the user adds any media through Forms also na") to show
+up inline in the email body too, not just a chunked one. `rewireInlineImages_` in `Code.gs` was
+already fully generic (it only checks an attachment's `mimeType`, not which mechanism produced it),
+so the gap was purely front-end: `insertAttachedFileViaForm`'s success handler always built a text
+chip regardless of file type, never the `<img data-upload-id>` tag the backend actually looks for.
+Fixed to branch the same way `insertAttachedFile` already does — an image gets a real `<img>` tag
+(now consistent with the chunked path, no Code.gs change needed at all this round), anything else
+keeps the text chip. The one real difference from the chunked path: there's no live compose-time
+preview, since this path's bytes live in Drive rather than this page's own memory — a generic
+placeholder graphic (`FORM_IMAGE_PLACEHOLDER_SRC`, an inline SVG data URI, no network request) shows
+in its place until the email is actually sent, at which point the real picture appears exactly like
+any other inline image. Practically this only matters for a large image if one ever gets routed to
+the Form path — today's routing keeps all images on the chunked path regardless of size (see
+Attachments v4 above) — but this closes a real correctness gap rather than leaving one path
+silently behind the other. Verified in the browser: a Form result that resolves to an image mimeType
+produces the `<img>` tag with the placeholder loading successfully (not a broken-image icon) and the
+correct `data-upload-id`; a Form result that resolves to a non-image still produces the original
+text chip, confirming no regression there.
+
 ## Immediate next action
 
-Paste the latest `Code.gs` into the Apps Script editor and redeploy — this round adds `_id` to both
-assemblers' return values, the new `rewireInlineImages_` function, and its call sites in
-`handleSubmitRequest_`/`handleUpdateStatus_`; `assembleAttachments_` now routes by id prefix instead
-of unconditionally calling the Form-based assembler. After redeploying: attach a real image (via the
-button, not paste, to exercise the just-changed code path) to a real request and confirm it (a)
-uploads quickly via the normal one-click flow, no new tab, and (b) shows up as an actual visible
-picture in the delivered email, not just a download link. Separately, attach a genuinely large
-non-image (a several-MB PDF) and confirm the new tab still opens automatically with the toast
-explaining why, and the file still lands correctly once re-picked there. Other still-open items,
-unchanged: (1) exact symptoms for the still-open Insights-visibility issue further above; (2) decide
-whether to build the proposed shared-cache proxy for scaling; (3) confirm whether the old
+No Code.gs change this round — purely front-end (`index.html`/`Unified Dashboard.txt`), already
+pushed. Ask the user to try the full loop again for a real image attached via the button (which
+still won't touch the Form path under current routing, so this is really about the earlier
+Attachments v4 change) and, if they specifically want to verify the Form-path inline behavior, that
+would require attaching a large enough non-image that gets routed there for now — there's currently
+no way to force an image through that path from the UI to test it directly, since the routing
+intentionally keeps images off it. Other still-open items, unchanged: (1) exact symptoms for the
+still-open Insights-visibility issue further above; (2) decide whether to build the proposed
+shared-cache proxy for scaling; (3) confirm whether the old
 `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy
 is confirmed working.

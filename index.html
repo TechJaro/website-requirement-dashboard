@@ -3656,6 +3656,11 @@ const FORM_ATTACH_URL = "https://docs.google.com/forms/d/e/1FAIpQLScJBFHJStzszLD
 const FORM_ATTACH_REF_ENTRY = "entry.1127435854";
 const FORM_ATTACH_POLL_MS = 2500;
 const FORM_ATTACH_MAX_WAIT_MS = 20 * 60 * 1000; // generous — this is a human filling in a real form in another tab, not a server call
+// Stand-in shown in the compose body for a Form-attached image, in place of a live preview — this
+// path never has the actual bytes client-side (they live in Drive, fetched only server-side at
+// send time), unlike the chunked path which can preview straight from the File object it already
+// has in memory.
+const FORM_IMAGE_PLACEHOLDER_SRC = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='110'%3E%3Crect width='160' height='110' fill='%23eef2ff'/%3E%3Ctext x='50%25' y='50%25' font-size='12' fill='%235b6472' text-anchor='middle' dy='.3em' font-family='Arial,sans-serif'%3E%F0%9F%96%BC%EF%B8%8F Image attached%3C/text%3E%3C/svg%3E";
 // Polls checkFormUpload for a given reference until it's found, a real (non-transient) error keeps
 // recurring, cancel() is called, or FORM_ATTACH_MAX_WAIT_MS elapses. "Real error" is judged by
 // repetition rather than by message content — the exact same error three polls running (e.g. "too
@@ -3824,7 +3829,18 @@ function wireRichTextEditor(ids){
       }
       const isImage = (info.mimeType||"").startsWith("image/");
       const sizeLabel = info.sizeBytes ? ` (${(info.sizeBytes/1024/1024).toFixed(info.sizeBytes < 1024*1024 ? 2 : 1)} MB)` : "";
-      if(el) el.outerHTML = `<span class="rte-attached" data-upload-id="${esc(info.fileId)}" contenteditable="false">${isImage?"🖼️":"📎"} ${esc(info.filename||"attachment")}${sizeLabel} — will be attached to the email</span>&nbsp;`;
+      if(el){
+        if(isImage){
+          // Same real <img data-upload-id> tag insertAttachedFile's chunked path uses, so
+          // Code.gs's rewireInlineImages_ treats a Form-attached image identically to a chunked
+          // one and it shows up as a real picture in the delivered email either way. No live
+          // compose-time preview here (the bytes live in Drive, not this page's memory, unlike
+          // the chunked path) — a generic placeholder stands in until the email is actually sent.
+          el.outerHTML = `<br><img src="${FORM_IMAGE_PLACEHOLDER_SRC}" data-upload-id="${esc(info.fileId)}" alt="${esc(info.filename||"attachment")}" style="max-width:280px;max-height:220px;border-radius:8px;display:block;margin:6px 0">&nbsp;`;
+        } else {
+          el.outerHTML = `<span class="rte-attached" data-upload-id="${esc(info.fileId)}" contenteditable="false">📎 ${esc(info.filename||"attachment")}${sizeLabel} — will be attached to the email</span>&nbsp;`;
+        }
+      }
       toast(`"${info.filename}" attached ✓`);
     });
     pendingUploads.add(task);
