@@ -3619,97 +3619,57 @@ async function uploadFileChunked_(file, onProgress){
   );
   return uploadId;
 }
-/* ---- Attach-a-file v2: a real Google Form (with a File Upload question), embedded in a modal —
-   replaces the "attach a file" button's old behavior (native file picker -> uploadFileChunked_,
-   still defined above and still used by the paste-a-screenshot path, which stays fast enough as-is
-   and needs no modal). The old chunked path's real limit was structural: a large PDF meant hundreds
-   of separate Apps Script round trips, each paying its own ~1s tax. This instead hands the file
-   straight to Google's own upload infrastructure — one real stream, no chunking, no per-piece cost.
-   See the "Attachments v2" comment in Code.gs (above assembleAttachments_) for the full mechanism —
-   the Form's responses are linked to the same spreadsheet Code.gs already uses, keyed by a
-   per-attempt "Request Reference" this modal generates and pre-fills into the embedded Form's URL.
-   One shared modal instance — only one attach flow is ever active at a time, used by both the
-   request form's and the status modal's rich text editors below. */
+/* ---- Attach-a-file v2: a real Google Form (with a File Upload question) — replaces the "attach a
+   file" button's old behavior (native file picker -> uploadFileChunked_, still defined above and
+   still used by the paste-a-screenshot path, which stays fast enough as-is). The old chunked path's
+   real limit was structural: a large PDF meant hundreds of separate Apps Script round trips, each
+   paying its own ~1s tax. This instead hands the file straight to Google's own upload
+   infrastructure — one real stream, no chunking, no per-piece cost. See the "Attachments v2"
+   comment in Code.gs (above assembleAttachments_) for the full server-side mechanism.
+   FIRST ATTEMPT embedded the Form in an iframe inside a modal — Google refused to render it
+   ("We're sorry. This document is not published."), because a Form with a File Upload question
+   requires sign-in, and Google blocks framing sign-in-required content on a third-party page
+   (clickjacking prevention on Google's end, not something fixable from here). Opening the Form as
+   a real new tab instead sidesteps this entirely — no framing involved, so no restriction applies —
+   at the cost of the dashboard having no direct signal for when the Google tab's own Submit button
+   is clicked; polling checkFormUpload is the only way to find out. */
 const FORM_ATTACH_URL = "https://docs.google.com/forms/d/e/1FAIpQLScJBFHJStzszLDT0VgttaCZX8tcT18OmxzaAqTLtq0sfuZByQ/viewform";
 const FORM_ATTACH_REF_ENTRY = "entry.1127435854";
 const FORM_ATTACH_POLL_MS = 2500;
-let formAttachOverlayEl = null;
-function ensureFormAttachModal_(){
-  if(formAttachOverlayEl) return formAttachOverlayEl;
-  document.body.insertAdjacentHTML("beforeend", `
-    <div class="modal-overlay" id="formAttachOverlay">
-      <div class="modal" style="max-width:640px">
-        <div class="modal-head">
-          <div class="ic">${ic("image")}</div>
-          <div>
-            <h3>Attach a File</h3>
-            <p>Pick a file below, then submit inside it — this closes automatically once received</p>
-          </div>
-          <button class="modal-close" id="formAttachClose" type="button">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
-          </button>
-        </div>
-        <div class="modal-body" style="padding:0">
-          <iframe id="formAttachIframe" style="width:100%;height:480px;border:0;display:block" src="about:blank"></iframe>
-        </div>
-        <div class="modal-foot" style="justify-content:space-between;align-items:center">
-          <div id="formAttachStatus" style="font-size:12.5px;color:var(--ink-50)">Waiting for the form to be submitted…</div>
-          <button type="button" class="btn" id="formAttachCancel">Cancel</button>
-        </div>
-      </div>
-    </div>`);
-  formAttachOverlayEl = document.getElementById("formAttachOverlay");
-  return formAttachOverlayEl;
-}
-// Opens the modal pre-filled with a fresh per-attempt reference, polls Code.gs until that
-// reference's file shows up in the Form's linked responses, then resolves with the file's info (or
-// null if cancelled). Polling is the only way to know completion — the embedded Form is a genuine
-// cross-origin page, so there's no direct callback/event from it when the person hits its own
-// Submit button.
-function openFormAttachModal_(reference){
-  return new Promise((resolve)=>{
-    const overlay = ensureFormAttachModal_();
-    const iframe = document.getElementById("formAttachIframe");
-    const statusEl = document.getElementById("formAttachStatus");
-    const closeBtn = document.getElementById("formAttachClose");
-    const cancelBtn = document.getElementById("formAttachCancel");
-    iframe.src = `${FORM_ATTACH_URL}?embedded=true&${FORM_ATTACH_REF_ENTRY}=${encodeURIComponent(reference)}`;
-    statusEl.textContent = "Waiting for the form to be submitted…";
-    overlay.classList.add("show");
-    let settled = false, pollTimer = null;
-    const cleanup = ()=>{
-      closeBtn.removeEventListener("click", onCancel);
-      cancelBtn.removeEventListener("click", onCancel);
-      overlay.removeEventListener("click", onOverlayClick);
-    };
-    const finish = (result)=>{
-      if(settled) return;
-      settled = true;
-      clearTimeout(pollTimer);
-      overlay.classList.remove("show");
-      iframe.src = "about:blank";
-      cleanup();
-      resolve(result);
-    };
-    const onCancel = ()=> finish(null);
-    const onOverlayClick = (e)=>{ if(e.target === overlay) onCancel(); };
-    closeBtn.addEventListener("click", onCancel);
-    cancelBtn.addEventListener("click", onCancel);
-    overlay.addEventListener("click", onOverlayClick);
+const FORM_ATTACH_MAX_WAIT_MS = 20 * 60 * 1000; // generous — this is a human filling in a real form in another tab, not a server call
+// Polls checkFormUpload for a given reference until it's found, a real (non-transient) error keeps
+// recurring, cancel() is called, or FORM_ATTACH_MAX_WAIT_MS elapses. "Real error" is judged by
+// repetition rather than by message content — the exact same error three polls running (e.g. "too
+// large") is treated as permanent and surfaced, while a one-off network hiccup just gets retried on
+// the next tick, since transient JSONP failures are already a known, ordinary occurrence elsewhere
+// in this file (see authApiCallOnce_'s own comments).
+function pollForFormUpload_(reference){
+  let settled = false, pollTimer = null, resolveFn = null;
+  let consecutiveErrors = 0, lastErrorMsg = "";
+  const startedAt = Date.now();
+  const promise = new Promise((resolve)=>{
+    resolveFn = resolve;
     const poll = async ()=>{
       if(settled) return;
+      if(Date.now() - startedAt > FORM_ATTACH_MAX_WAIT_MS){
+        settled = true;
+        resolve({ error: "Timed out waiting for the file — try attaching again" });
+        return;
+      }
       try{
         const r = await authApiCall_("checkFormUpload", { token: AUTH_SESSION.token, reference });
-        if(r.found){
-          statusEl.textContent = `Got "${r.filename}" ✓`;
-          setTimeout(()=> finish({ fileId:r.fileId, filename:r.filename, mimeType:r.mimeType, sizeBytes:r.sizeBytes }), 500);
-          return;
-        }
-      }catch(err){ /* transient poll hiccup — just try again on the next tick */ }
+        consecutiveErrors = 0;
+        if(r.found){ settled = true; clearTimeout(pollTimer); resolve(r); return; }
+      }catch(err){
+        const msg = (err && err.message) || String(err);
+        if(msg === lastErrorMsg) consecutiveErrors++; else { consecutiveErrors = 1; lastErrorMsg = msg; }
+        if(consecutiveErrors >= 3){ settled = true; clearTimeout(pollTimer); resolve({ error: msg }); return; }
+      }
       if(!settled) pollTimer = setTimeout(poll, FORM_ATTACH_POLL_MS);
     };
     pollTimer = setTimeout(poll, FORM_ATTACH_POLL_MS);
   });
+  return { promise, cancel(){ if(settled) return; settled = true; clearTimeout(pollTimer); resolveFn(null); } };
 }
 function wireRichTextEditor(ids){
   const cfg = Object.assign({
@@ -3789,24 +3749,36 @@ function wireRichTextEditor(ids){
     task.finally(()=> pendingUploads.delete(task));
   }
   // The attach button's path (as opposed to insertAttachedFile above, still used for pasted
-  // screenshots) — opens the Form modal, waits for its polling to resolve, then inserts the same
-  // kind of chip. Shares pendingUploads/uploadCounter with insertAttachedFile so waitForUploads()
-  // and getAttachmentIds() work identically regardless of which path a given attachment came from.
-  async function insertAttachedFileViaForm(){
-    const uploadId = `rte-upload-${++uploadCounter}-${Date.now()}`;
+  // screenshots) — opens the Form in a real new tab (window.open, called synchronously here so the
+  // click itself is what triggers it — calling it after any await would risk the browser treating
+  // it as an unrequested popup and blocking it), then polls in the background until the file shows
+  // up. Shares pendingUploads/uploadCounter with insertAttachedFile so waitForUploads() and
+  // getAttachmentIds() work identically regardless of which path a given attachment came from.
+  function insertAttachedFileViaForm(){
     const reference = `ref_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const url = `${FORM_ATTACH_URL}?${FORM_ATTACH_REF_ENTRY}=${encodeURIComponent(reference)}`;
+    const opened = window.open(url, "_blank", "noopener");
+    if(!opened){ toast("Couldn't open the attachment form — your browser may have blocked the pop-up", true); return; }
+    const uploadId = `rte-upload-${++uploadCounter}-${Date.now()}`;
     body.focus();
-    document.execCommand("insertHTML", false, `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Waiting for file…</span>&nbsp;`);
-    const task = openFormAttachModal_(reference).then(info=>{
-      const placeholder = document.getElementById(uploadId);
-      if(!info){ if(placeholder) placeholder.remove(); return; } // modal was cancelled
+    document.execCommand("insertHTML", false,
+      `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Waiting for the file — submit it in the new tab… <a href="#" data-cancel-ref="${reference}" style="color:inherit">cancel</a></span>&nbsp;`);
+    const poller = pollForFormUpload_(reference);
+    const placeholder = document.getElementById(uploadId);
+    const cancelLink = placeholder && placeholder.querySelector(`[data-cancel-ref="${reference}"]`);
+    if(cancelLink) cancelLink.addEventListener("click", (e)=>{ e.preventDefault(); poller.cancel(); });
+    const task = poller.promise.then(info=>{
+      const el = document.getElementById(uploadId);
+      if(!info){ if(el) el.remove(); return; } // cancelled
+      if(info.error){
+        if(el) el.outerHTML = `<span style="color:var(--red)">⚠️ Couldn't attach the file — ${esc(info.error)}</span>&nbsp;`;
+        toast(`Couldn't attach the file — ${info.error}`, true);
+        return;
+      }
       const isImage = (info.mimeType||"").startsWith("image/");
       const sizeLabel = info.sizeBytes ? ` (${(info.sizeBytes/1024/1024).toFixed(info.sizeBytes < 1024*1024 ? 2 : 1)} MB)` : "";
-      if(placeholder) placeholder.outerHTML = `<span class="rte-attached" data-upload-id="${esc(info.fileId)}" contenteditable="false">${isImage?"🖼️":"📎"} ${esc(info.filename||"attachment")}${sizeLabel} — will be attached to the email</span>&nbsp;`;
-    }).catch(err=>{
-      const placeholder = document.getElementById(uploadId);
-      if(placeholder) placeholder.outerHTML = `<span style="color:var(--red)">⚠️ Couldn't attach the file — ${esc(err.message)}</span>&nbsp;`;
-      toast(`Couldn't attach the file — ${err.message}`, true);
+      if(el) el.outerHTML = `<span class="rte-attached" data-upload-id="${esc(info.fileId)}" contenteditable="false">${isImage?"🖼️":"📎"} ${esc(info.filename||"attachment")}${sizeLabel} — will be attached to the email</span>&nbsp;`;
+      toast(`"${info.filename}" attached ✓`);
     });
     pendingUploads.add(task);
     task.finally(()=> pendingUploads.delete(task));

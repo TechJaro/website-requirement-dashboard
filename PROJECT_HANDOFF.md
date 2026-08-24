@@ -644,26 +644,64 @@ the one thing that genuinely can't be tested outside a real Google session:** wh
 Form's own file-upload widget behaves smoothly inside the iframe (versus, say, needing a separate
 popup window for the actual Drive/upload picker) — that needs the user's real first attempt.
 
+## Real bug fixed: the embedded Form iframe refused to render (2026-08-21)
+
+First live test of the iframe-embedded modal (previous section) showed a Google Drive error page
+inside it: *"We're sorry. This document is not published."* Root cause: the Form has a File Upload
+question, which forces Google to require sign-in from respondents — and Google blocks framing any
+sign-in-required page inside a third-party site's iframe (a clickjacking protection on Google's
+side, not a bug in this project and not something fixable by any setting on the Form itself). So
+embedding could never have worked once the Form needed sign-in, no matter how the iframe was
+configured.
+
+**Fixed by opening the Form as a real new browser tab instead of an iframe** — `window.open(url,
+"_blank", "noopener")`, called synchronously from the button's click handler (calling it after any
+`await` risks the browser treating it as an unrequested pop-up and blocking it, since pop-up
+allowance is tied to being inside a genuine user-gesture call stack). A full top-level tab
+navigation has no framing involved at all, so Google's restriction doesn't apply. The trade-off:
+still no direct callback when the person submits the Form in that other tab (a plain new tab is
+just as cross-origin as an iframe was, from a JS-observability standpoint) — polling
+`checkFormUpload` remains the only way to know, same as before, just without the modal/iframe UI
+around it. `ensureFormAttachModal_`/`openFormAttachModal_` (the iframe-modal code) were replaced
+entirely rather than kept as a fallback — unlike the chunked-upload system, there's no scenario
+where reverting to a known-broken iframe would ever be the right call.
+
+**New design:** `pollForFormUpload_(reference)` runs the poll loop standalone (no modal), returning
+`{promise, cancel()}`. The in-body placeholder that used to say "Uploading…" now says "Waiting for
+the file — submit it in the new tab…" with an inline "cancel" link (a real anchor tag inside the
+`contenteditable="false"` placeholder span — clicking it calls `poller.cancel()`), so the person can
+back out without leaving a stuck placeholder if they close the other tab without submitting. Polling
+gives up and surfaces an error after either 3 *consecutive identical* error responses (distinguishing
+a genuinely stuck problem, like a too-large file, from an ordinary one-off JSONP network hiccup that
+just gets silently retried — same tolerance this file already extends to every other JSONP call) or
+20 minutes elapsed (a human filling in a form in another tab needs a much longer allowance than a
+server call would). A toast confirms success too, since the person's attention may still be on the
+other tab when it lands.
+
+**Verified in the browser** (mocking `authApiCall_`/`window.open`, since the real cross-tab
+Google sign-in flow can't be exercised outside a live browser session): the success path, the
+3-strikes permanent-error path, a flaky-then-recovers transient-error sequence (confirms it does
+*not* false-positive on ordinary network blips), the cancel link (removes the placeholder, stops
+polling immediately — confirmed via a call counter that stops incrementing), and the pop-up-blocked
+path (clear toast, no orphaned pending upload) — all behave correctly. The full button-click ->
+new-tab-opens -> poll -> resolve -> chip-insertion chain works end to end with zero race window on
+`pendingUploads` (confirmed synchronous registration, same pattern as everywhere else in this file).
+
 ## Immediate next action
 
-Paste the latest `Code.gs` into the Apps Script editor and redeploy — this round adds the entire
-"Attachments v3" system above (`findFormResponsesSheet_`, `extractDriveFileIdFromCell_`,
-`handleCheckFormUpload_`, `assembleFormFile_`, `deleteFormFile_`, the `checkFormUpload` dispatch
-case, and `assembleAttachments_`/the two post-send cleanup call-sites now pointing at the Form-based
-functions instead of the chunked ones). **New one-time setup step this round:** `DriveApp` is a
-service this script has never called before — the very first real `checkFormUpload`/attach attempt
-after redeploying may trigger a fresh authorization prompt (same shape as the one-time Gmail API
-authorization done earlier this project) rather than working silently; if so, just approve it and
-try again, no code change needed.
-
-After redeploying: raise a real test request, click "attach a file," confirm the embedded Form
-modal opens and looks reasonable, pick a real file (try something a few MB, ideally a PDF, since
-that's the exact case that was unacceptably slow before) and submit it inside the Form, and confirm
-the dashboard's modal closes on its own within a few seconds and the email arrives with a real
-attachment. If the embedded Form's file-picker behaves oddly inside the iframe (doesn't fit, opens
-a stray window, etc.), that's the one genuinely untested part — get the exact symptom and it can be
-adjusted (e.g. opening the Form in a new tab instead of an iframe) without touching the rest of the
-mechanism. Other still-open items, unchanged: (1) exact symptoms for the still-open
-Insights-visibility issue further above; (2) decide whether to build the proposed shared-cache proxy
-for scaling; (3) confirm whether the old `C:\Users\user\Downloads\Website Requirement Dashboard`
-folder can be deleted now that the D: copy is confirmed working.
+No Code.gs change this round — this was a front-end-only fix (index.html/Unified Dashboard.txt),
+already pushed. The user should refresh and try again: click "attach a file," confirm a **new
+browser tab** opens (not a popup/modal) showing the real Google Form, pick a file there and submit
+it, then switch back to the dashboard tab and confirm the "cancel" link's placeholder updates to the
+final attached-file chip within a few seconds on its own. Try a several-MB file (ideally a PDF)
+since that's the exact case that was unacceptably slow before — this really should feel close to a
+normal file upload now, not the multi-minute chunked wait. If the new tab gets blocked by the
+browser's own pop-up blocker, the toast will say so explicitly — get the exact browser/message if
+that happens. **First-time-only:** if `DriveApp` (used server-side to fetch the file Google Forms
+stored) hasn't been authorized for this Apps Script project before, the very first real attach may
+trigger a fresh authorization prompt rather than working silently — approve it and try again, no
+code change needed; this was already flagged when the Code.gs for Attachments v3 was sent. Other
+still-open items, unchanged: (1) exact symptoms for the still-open Insights-visibility issue further
+above; (2) decide whether to build the proposed shared-cache proxy for scaling; (3) confirm whether
+the old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the
+D: copy is confirmed working.
