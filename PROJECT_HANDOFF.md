@@ -775,16 +775,43 @@ produces the `<img>` tag with the placeholder loading successfully (not a broken
 correct `data-upload-id`; a Form result that resolves to a non-image still produces the original
 text chip, confirming no regression there.
 
+## Back to an embedded modal — no new tab at all (2026-08-21)
+
+User explicitly asked to remove the new-tab requirement entirely ("I dont want that thing in it").
+This prompted revisiting whether the iframe embedding really was blocked by framing rules, as first
+assumed — or whether that diagnosis had simply never been re-tested after the *actual* fix (the Form
+needing to be Published, discovered afterward) landed. Since the "not published" error was proven to
+happen identically on a bare, non-embedded URL, framing was never actually confirmed to be the
+problem — only suspected, based on a symptom that turned out to have an unrelated cause. So embedding
+was rebuilt: `ensureFormAttachModal_`/`openFormAttachModal_` are back (a modal containing an
+`<iframe src=".../viewform?embedded=true&...">`), and `pollForFormUpload_` (built for the new-tab
+version) is reused completely unchanged underneath it — only the "how the person sees the Form"
+layer differs, so all of that function's existing behavior (3-strikes permanent-error detection, the
+20-minute generous timeout, clean cancellation) carries over with zero risk of regression there.
+`insertAttachedFileViaForm` simplified accordingly: no more `window.open`/popup-blocked handling
+(a modal can't be blocked by a popup blocker, since it's just DOM) and no more inline "cancel" link
+in the placeholder text (the modal has its own Cancel button and backdrop-click-to-close now).
+
+**This is explicitly a retry, not a confirmed fix** — verified in the browser that the modal
+mechanics themselves are correct (opens with the right pre-filled `embedded=true` iframe src, closes
+cleanly on success/Cancel-button/backdrop-click/X-button, `window.open` is never called, the full
+button-click → modal → poll → resolve → chip-insertion chain works with mocked responses), but
+**whether Google actually renders the published Form correctly inside that iframe** can only be
+confirmed with a real Google-authenticated browser session, which isn't available here. If it still
+fails now, that would be new, actually-confirmed information (framing really is blocked, independent
+of publish state) rather than the untested assumption the first embedding attempt was built on — and
+the fully-intact new-tab version (git history, commit range `b7db1f9`..`8bab02a`) is the fallback.
+
 ## Immediate next action
 
-No Code.gs change this round — purely front-end (`index.html`/`Unified Dashboard.txt`), already
-pushed. Ask the user to try the full loop again for a real image attached via the button (which
-still won't touch the Form path under current routing, so this is really about the earlier
-Attachments v4 change) and, if they specifically want to verify the Form-path inline behavior, that
-would require attaching a large enough non-image that gets routed there for now — there's currently
-no way to force an image through that path from the UI to test it directly, since the routing
-intentionally keeps images off it. Other still-open items, unchanged: (1) exact symptoms for the
-still-open Insights-visibility issue further above; (2) decide whether to build the proposed
-shared-cache proxy for scaling; (3) confirm whether the old
+No Code.gs change this round — purely front-end, already pushed. Ask the user to test the real
+thing: attach a large non-image (a several-MB PDF, to trigger the Form path) and confirm the Form
+now renders **inside a popup on the dashboard page itself**, not a new browser tab. If it renders
+correctly and the file can be picked/submitted right there, this fully resolves their request. If it
+still shows "This document is not published" or a blank/broken frame, that's new information — get
+the exact symptom, since it would mean reverting to the new-tab version (intact in git history) is
+necessary after all, this time for a confirmed rather than assumed reason. Other still-open items,
+unchanged: (1) exact symptoms for the still-open Insights-visibility issue further above; (2) decide
+whether to build the proposed shared-cache proxy for scaling; (3) confirm whether the old
 `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy
 is confirmed working.

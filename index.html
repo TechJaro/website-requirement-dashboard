@@ -3641,17 +3641,22 @@ async function uploadFileChunked_(file, onProgress){
    comment above and the attach button's wiring below): only used for a non-image file too large to
    chunk in reasonable time. A real Google Form (with a File Upload question) hands the file
    straight to Google's own upload infrastructure — one real stream, no chunking, no per-piece cost
-   — at the cost of an extra browser tab and having to re-pick the file there, which is why this is
-   reserved for the case that actually needs it rather than used for everything. See the
-   "Attachments v4" comment in Code.gs (above assembleAttachments_) for the full server-side
-   mechanism, and its own history for why the routing ended up this way.
-   Opens as a real new tab, not an embedded iframe: the first attempt embedded it, and Google
-   refused to render it ("We're sorry. This document is not published.") because a Form with a File
-   Upload question requires sign-in, and Google blocks framing sign-in-required content on a
-   third-party page (clickjacking prevention on Google's end, not fixable from here). A genuine new-
-   tab navigation has no framing involved, so that restriction doesn't apply — at the cost of the
-   dashboard having no direct signal for when the Google tab's own Submit button is clicked; polling
-   checkFormUpload is the only way to find out. */
+   — at the cost of having to re-pick the file inside it, which is why this is reserved for the case
+   that actually needs it rather than used for everything. See the "Attachments v4" comment in
+   Code.gs (above assembleAttachments_) for the full server-side mechanism, and its own history for
+   why the routing ended up this way.
+   Embedded directly on the page (openFormAttachModal_ below), not a separate tab — per the user's
+   explicit request not to send people away from the dashboard to attach a file. This is actually a
+   SECOND attempt at embedding: the first hit "We're sorry. This document is not published." and was
+   (wrongly, it turned out) blamed on Google blocking framed sign-in-required content. The real cause
+   was that the Form had simply never been published — a one-time step in the Form editor, unrelated
+   to framing — confirmed because the *bare, non-framed* URL failed identically until that was fixed.
+   Framing itself was never actually confirmed broken, only suspected from a symptom that had a
+   different real cause — so embedding is being retried now that the Form is properly published. If
+   it turns out framing genuinely doesn't work, the new-tab version (window.open, no iframe) is still
+   intact in git history as a fallback. Either way, there's still no direct signal for when the
+   Form's own Submit button is clicked inside it (a cross-origin page, embedded or not) — polling
+   checkFormUpload remains the only way to find out. */
 const FORM_ATTACH_URL = "https://docs.google.com/forms/d/e/1FAIpQLScJBFHJStzszLDT0VgttaCZX8tcT18OmxzaAqTLtq0sfuZByQ/viewform";
 const FORM_ATTACH_REF_ENTRY = "entry.1127435854";
 const FORM_ATTACH_POLL_MS = 2500;
@@ -3694,6 +3699,70 @@ function pollForFormUpload_(reference){
     pollTimer = setTimeout(poll, FORM_ATTACH_POLL_MS);
   });
   return { promise, cancel(){ if(settled) return; settled = true; clearTimeout(pollTimer); resolveFn(null); } };
+}
+// Embeds the Form in a modal instead of opening a new tab — reusing pollForFormUpload_ unchanged
+// underneath, only the "how the person sees/interacts with the Form" part differs. This is a
+// SECOND attempt at embedding: the first (see the git history around 2026-08-21) hit "We're sorry.
+// This document is not published." and was blamed on Google blocking framed sign-in-required
+// content — but that turned out to be the wrong diagnosis. The real cause, found afterward, was
+// simply that the Form itself had never been published (a separate, one-time step in the Form
+// editor, unrelated to framing at all) — the bare, non-framed URL failed identically until that was
+// fixed. Now that publishing has happened, embedding is worth retrying properly, since nothing
+// about framing was ever actually confirmed broken — only inferred from a symptom that had a
+// different real cause. If it turns out framing genuinely doesn't work even now, that would be
+// newly-confirmed information (not yet true when this was written), and reverting to a new tab
+// (still fully intact in git history) would be the fallback.
+let formAttachOverlayEl = null;
+function ensureFormAttachModal_(){
+  if(formAttachOverlayEl) return formAttachOverlayEl;
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="modal-overlay" id="formAttachOverlay">
+      <div class="modal" style="max-width:640px">
+        <div class="modal-head">
+          <div class="ic">${ic("image")}</div>
+          <div>
+            <h3>Attach a File</h3>
+            <p>Pick a file below, then submit inside it — this closes automatically once received</p>
+          </div>
+          <button class="modal-close" id="formAttachClose" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body" style="padding:0">
+          <iframe id="formAttachIframe" style="width:100%;height:480px;border:0;display:block" src="about:blank"></iframe>
+        </div>
+        <div class="modal-foot" style="justify-content:space-between;align-items:center">
+          <div id="formAttachStatus" style="font-size:12.5px;color:var(--ink-50)">Waiting for the form to be submitted…</div>
+          <button type="button" class="btn" id="formAttachCancel">Cancel</button>
+        </div>
+      </div>
+    </div>`);
+  formAttachOverlayEl = document.getElementById("formAttachOverlay");
+  return formAttachOverlayEl;
+}
+function openFormAttachModal_(reference){
+  const overlay = ensureFormAttachModal_();
+  const iframe = document.getElementById("formAttachIframe");
+  const statusEl = document.getElementById("formAttachStatus");
+  const closeBtn = document.getElementById("formAttachClose");
+  const cancelBtn = document.getElementById("formAttachCancel");
+  iframe.src = `${FORM_ATTACH_URL}?embedded=true&${FORM_ATTACH_REF_ENTRY}=${encodeURIComponent(reference)}`;
+  statusEl.textContent = "Waiting for the form to be submitted…";
+  overlay.classList.add("show");
+  const poller = pollForFormUpload_(reference);
+  const onCancel = ()=> poller.cancel();
+  const onOverlayClick = (e)=>{ if(e.target === overlay) onCancel(); };
+  closeBtn.addEventListener("click", onCancel);
+  cancelBtn.addEventListener("click", onCancel);
+  overlay.addEventListener("click", onOverlayClick);
+  return poller.promise.then(result=>{
+    closeBtn.removeEventListener("click", onCancel);
+    cancelBtn.removeEventListener("click", onCancel);
+    overlay.removeEventListener("click", onOverlayClick);
+    overlay.classList.remove("show");
+    iframe.src = "about:blank";
+    return result;
+  });
 }
 function wireRichTextEditor(ids){
   const cfg = Object.assign({
@@ -3800,26 +3869,17 @@ function wireRichTextEditor(ids){
     pendingUploads.add(task);
     task.finally(()=> pendingUploads.delete(task));
   }
-  // Only reached for a large non-image (see the imgInput change handler above) — opens the Form in
-  // a real new tab (window.open, called synchronously here so the triggering click/change itself is
-  // what opens it — calling it after any await would risk the browser treating it as an unrequested
-  // popup and blocking it), then polls in the background until the file shows up. Shares
+  // Only reached for a large non-image (see the imgInput change handler above) — opens the Form
+  // embedded in a modal (openFormAttachModal_ above), right on this page, no new tab. Shares
   // pendingUploads/uploadCounter with insertAttachedFile so waitForUploads() and getAttachmentIds()
   // work identically regardless of which path a given attachment came from.
   function insertAttachedFileViaForm(){
     const reference = `ref_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const url = `${FORM_ATTACH_URL}?${FORM_ATTACH_REF_ENTRY}=${encodeURIComponent(reference)}`;
-    const opened = window.open(url, "_blank", "noopener");
-    if(!opened){ toast("Couldn't open the attachment form — your browser may have blocked the pop-up", true); return; }
     const uploadId = `rte-upload-${++uploadCounter}-${Date.now()}`;
     body.focus();
     document.execCommand("insertHTML", false,
-      `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Waiting for the file — submit it in the new tab… <a href="#" data-cancel-ref="${reference}" style="color:inherit">cancel</a></span>&nbsp;`);
-    const poller = pollForFormUpload_(reference);
-    const placeholder = document.getElementById(uploadId);
-    const cancelLink = placeholder && placeholder.querySelector(`[data-cancel-ref="${reference}"]`);
-    if(cancelLink) cancelLink.addEventListener("click", (e)=>{ e.preventDefault(); poller.cancel(); });
-    const task = poller.promise.then(info=>{
+      `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Waiting for the file…</span>&nbsp;`);
+    const task = openFormAttachModal_(reference).then(info=>{
       const el = document.getElementById(uploadId);
       if(!info){ if(el) el.remove(); return; } // cancelled
       if(info.error){
