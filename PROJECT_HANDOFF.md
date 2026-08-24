@@ -687,21 +687,85 @@ path (clear toast, no orphaned pending upload) — all behave correctly. The ful
 new-tab-opens -> poll -> resolve -> chip-insertion chain works end to end with zero race window on
 `pendingUploads` (confirmed synchronous registration, same pattern as everywhere else in this file).
 
+## Root cause of "This document is not published": the Form itself, not the code (2026-08-21)
+
+The new-tab fix (previous section) didn't resolve it either — the exact same error appeared on a
+genuine top-level navigation to the bare `viewform` URL with zero query parameters, which
+conclusively ruled out anything on the dashboard's side (framing, the pre-filled reference
+parameter, JS logic — none of it was ever involved). Walked the user through diagnosing their own
+Form: Settings had no obvious toggle for it, but the **Responses tab** (a sibling of Questions/
+Settings, not a section within Settings) showed *"No responses. Publish your form..."* — Google
+Forms has an explicit **Publish** step (a button in the editor's top-right, separate from "Send"),
+and this Form had never been published, despite already accepting a live test response earlier via
+the owner's own authenticated preview (which bypasses the publish gate entirely, which is exactly
+why the earlier "Get pre-filled link" preview rendered fine while every real respondent-facing open
+failed). The user clicked Publish, confirmed the bare URL then worked, and confirmed "Accepting
+responses" was on and "Responders: Anyone with the link" in the resulting "Published options"
+dialog. **Nothing on the dashboard or in Code.gs ever needed to change for this** — worth
+remembering if this Form is ever recreated or a second one is added: it must be explicitly
+Published, once, from the editor, or every real attempt to open it will fail this exact way
+regardless of any other setting.
+
+## Attachments v4: chunked-by-default again, Form flow only for large non-images, images now inline (2026-08-21)
+
+With the Form actually working, the user tested it for real and reported two problems with the
+*design*, not bugs: (1) a single image attached this way didn't show up in the email body — it only
+ever produced a downloadable attachment, never a real inline picture; (2) the whole new-tab/pick-
+again/wait dance was excessive friction for something as simple as one image, when the old chunked
+path (already fast for images thanks to compression) needed none of it. Both fair, and both fixed:
+
+**Routing (front end, `wireRichTextEditor`):** the attach button is a native file picker again
+(`imgInput.click()`), not a Form-tab launcher. Once a file is picked, `CHUNKED_UPLOAD_SIZE_THRESHOLD`
+(1.5MB) decides the path: **images always go through the chunked system regardless of size**
+(compression already handles them, so in practice almost none are ever slow), and **only a non-image
+over the threshold** gets redirected to `insertAttachedFileViaForm()` (a toast explains why, then the
+Form tab opens automatically — the person re-picks the same file there). Pasting a screenshot
+(Ctrl/Cmd+V) is unaffected either way, already going through the fast chunked path as before.
+
+**Inline images (front end + back end):** `insertAttachedFile`'s success handler now inserts a real
+`<img data-upload-id="...">` tag (with a `data:` URL compose-time preview generated via the new
+`fileToDataUrlForPreview_`) instead of a text chip, for image attachments specifically — non-images
+keep the existing chip. `Code.gs`'s new `rewireInlineImages_(html, attachments)` (called in both
+`handleSubmitRequest_` and `handleUpdateStatus_`, right after `assembleAttachments_` and right before
+`sendGmailMessage_`) scans the final composed HTML for those tags, matches each one's
+`data-upload-id` back to its assembled attachment by a new `_id` field both `assembleUploadedFile_`
+and `assembleFormFile_` now include, rewrites the tag's `src` to a `cid:` reference, and marks that
+attachment `{inline: true, contentId}`. `sendGmailMessage_`'s MIME builder uses `Content-Disposition:
+inline` + a `Content-ID` header for those parts instead of `Content-Disposition: attachment` — Gmail
+(and every client that matters here, since recipients are all Workspace users) renders this
+correctly even flattened into the existing `multipart/mixed` structure, without needing a nested
+`multipart/related`. A pasted/attached image now shows up as a real picture directly in the email,
+the same as attaching one in Gmail itself, while still being a genuine attachment underneath (not
+capped at a few KB the way the very first, pre-this-whole-saga approach was).
+
+**Id-space disambiguation:** since images/small files (chunked ids, prefixed `"up_"`) and large
+non-images (raw Drive file ids, no fixed prefix) can now both appear in the same
+`attachmentUploadIds` list for one request, `assembleAttachments_` routes each id to
+`assembleUploadedFile_` or `assembleFormFile_` by checking for that prefix — no other change needed
+to `handleSubmitRequest_`/`handleUpdateStatus_`, which already just pass the whole list through.
+
+**Verified in the browser** (mocking `authApiCall_`/`window.open`): a small image goes through the
+chunked path, produces zero Form-tab opens, and inserts a real `<img>` tag with a valid `data:`
+preview; a large (2MB) non-image correctly opens the Form tab with zero chunk calls and the right
+toast; a *large* image (tested at ~29MB of incompressible random noise, a deliberately worst-case
+input) still goes through chunking and never opens the Form tab, confirming images are never
+misrouted regardless of size. `rewireInlineImages_`'s regex logic and the id-prefix routing were
+both unit-tested standalone in Node (can't run real Apps Script here): attribute-order variations,
+non-image attachments correctly left un-inlined, unrelated `<img>` tags with no matching id left
+untouched, and multiple images in one body each getting distinct `cid:`s — all pass.
+
 ## Immediate next action
 
-No Code.gs change this round — this was a front-end-only fix (index.html/Unified Dashboard.txt),
-already pushed. The user should refresh and try again: click "attach a file," confirm a **new
-browser tab** opens (not a popup/modal) showing the real Google Form, pick a file there and submit
-it, then switch back to the dashboard tab and confirm the "cancel" link's placeholder updates to the
-final attached-file chip within a few seconds on its own. Try a several-MB file (ideally a PDF)
-since that's the exact case that was unacceptably slow before — this really should feel close to a
-normal file upload now, not the multi-minute chunked wait. If the new tab gets blocked by the
-browser's own pop-up blocker, the toast will say so explicitly — get the exact browser/message if
-that happens. **First-time-only:** if `DriveApp` (used server-side to fetch the file Google Forms
-stored) hasn't been authorized for this Apps Script project before, the very first real attach may
-trigger a fresh authorization prompt rather than working silently — approve it and try again, no
-code change needed; this was already flagged when the Code.gs for Attachments v3 was sent. Other
-still-open items, unchanged: (1) exact symptoms for the still-open Insights-visibility issue further
-above; (2) decide whether to build the proposed shared-cache proxy for scaling; (3) confirm whether
-the old `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the
-D: copy is confirmed working.
+Paste the latest `Code.gs` into the Apps Script editor and redeploy — this round adds `_id` to both
+assemblers' return values, the new `rewireInlineImages_` function, and its call sites in
+`handleSubmitRequest_`/`handleUpdateStatus_`; `assembleAttachments_` now routes by id prefix instead
+of unconditionally calling the Form-based assembler. After redeploying: attach a real image (via the
+button, not paste, to exercise the just-changed code path) to a real request and confirm it (a)
+uploads quickly via the normal one-click flow, no new tab, and (b) shows up as an actual visible
+picture in the delivered email, not just a download link. Separately, attach a genuinely large
+non-image (a several-MB PDF) and confirm the new tab still opens automatically with the toast
+explaining why, and the file still lands correctly once re-picked there. Other still-open items,
+unchanged: (1) exact symptoms for the still-open Insights-visibility issue further above; (2) decide
+whether to build the proposed shared-cache proxy for scaling; (3) confirm whether the old
+`C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy
+is confirmed working.

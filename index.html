@@ -3545,6 +3545,13 @@ function buildRequestSubject(payload){
 // in Code.gs) — Gmail's own message limit is 25MB total including ~33% base64 overhead, this leaves
 // headroom for multiple attachments plus the email body itself.
 const RTE_MAX_FILE_BYTES = 10 * 1024 * 1024;
+// Non-image files up to this size go through the fast chunked path below (worst case well under a
+// minute); anything bigger is routed to the slower-but-necessary Google Form tab instead (see
+// insertAttachedFileViaForm) — chunking a multi-MB PDF would mean hundreds of round trips and
+// several minutes, which is exactly the problem that flow exists to avoid. Images have no such
+// threshold at all: maybeCompressImage_ below already shrinks them before this check ever runs, so
+// in practice they almost never hit it.
+const CHUNKED_UPLOAD_SIZE_THRESHOLD = 1.5 * 1024 * 1024;
 // Chars of base64url per chunk — keeps each uploadChunk GET well under the ~6000-char practical
 // URL-length ceiling already established for this deployment's JSONP transport (see
 // submitRequestDirect_'s own threshold check), even after JSON/idemKey/token overhead (token alone
@@ -3562,6 +3569,17 @@ function fileToBase64Url_(file){
       const b64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
       resolve(b64.replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""));
     };
+    reader.readAsDataURL(file);
+  });
+}
+// Compose-time-only image preview (a real data: URL, not stripped/re-encoded like
+// fileToBase64Url_ above) — best-effort: if reading fails for any reason, resolves to "" rather
+// than rejecting, since a missing preview thumbnail shouldn't stop the actual attach/send.
+function fileToDataUrlForPreview_(file){
+  return new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=> resolve("");
+    reader.onload = ()=> resolve(reader.result || "");
     reader.readAsDataURL(file);
   });
 }
@@ -3619,20 +3637,21 @@ async function uploadFileChunked_(file, onProgress){
   );
   return uploadId;
 }
-/* ---- Attach-a-file v2: a real Google Form (with a File Upload question) — replaces the "attach a
-   file" button's old behavior (native file picker -> uploadFileChunked_, still defined above and
-   still used by the paste-a-screenshot path, which stays fast enough as-is). The old chunked path's
-   real limit was structural: a large PDF meant hundreds of separate Apps Script round trips, each
-   paying its own ~1s tax. This instead hands the file straight to Google's own upload
-   infrastructure — one real stream, no chunking, no per-piece cost. See the "Attachments v2"
-   comment in Code.gs (above assembleAttachments_) for the full server-side mechanism.
-   FIRST ATTEMPT embedded the Form in an iframe inside a modal — Google refused to render it
-   ("We're sorry. This document is not published."), because a Form with a File Upload question
-   requires sign-in, and Google blocks framing sign-in-required content on a third-party page
-   (clickjacking prevention on Google's end, not something fixable from here). Opening the Form as
-   a real new tab instead sidesteps this entirely — no framing involved, so no restriction applies —
-   at the cost of the dashboard having no direct signal for when the Google tab's own Submit button
-   is clicked; polling checkFormUpload is the only way to find out. */
+/* ---- Attach-a-file via Google Form — NOT the primary path (see CHUNKED_UPLOAD_SIZE_THRESHOLD's
+   comment above and the attach button's wiring below): only used for a non-image file too large to
+   chunk in reasonable time. A real Google Form (with a File Upload question) hands the file
+   straight to Google's own upload infrastructure — one real stream, no chunking, no per-piece cost
+   — at the cost of an extra browser tab and having to re-pick the file there, which is why this is
+   reserved for the case that actually needs it rather than used for everything. See the
+   "Attachments v4" comment in Code.gs (above assembleAttachments_) for the full server-side
+   mechanism, and its own history for why the routing ended up this way.
+   Opens as a real new tab, not an embedded iframe: the first attempt embedded it, and Google
+   refused to render it ("We're sorry. This document is not published.") because a Form with a File
+   Upload question requires sign-in, and Google blocks framing sign-in-required content on a
+   third-party page (clickjacking prevention on Google's end, not fixable from here). A genuine new-
+   tab navigation has no framing involved, so that restriction doesn't apply — at the cost of the
+   dashboard having no direct signal for when the Google tab's own Submit button is clicked; polling
+   checkFormUpload is the only way to find out. */
 const FORM_ATTACH_URL = "https://docs.google.com/forms/d/e/1FAIpQLScJBFHJStzszLDT0VgttaCZX8tcT18OmxzaAqTLtq0sfuZByQ/viewform";
 const FORM_ATTACH_REF_ENTRY = "entry.1127435854";
 const FORM_ATTACH_POLL_MS = 2500;
@@ -3683,11 +3702,26 @@ function wireRichTextEditor(ids){
     const url = prompt("Paste the URL to link:");
     if(url) { body.focus(); document.execCommand("createLink", false, url); }
   });
-  // The attach button now opens the Form-based modal (insertAttachedFileViaForm, defined below)
-  // instead of the native file picker — see the "Attach-a-file v2" comment above wireRichTextEditor.
-  // The hidden <input type=file> (cfg.imageInputId) is no longer wired to anything; left in the DOM
-  // rather than removed, same revert-safety reasoning as the kept-but-unused chunked-upload code.
-  document.getElementById(cfg.imageBtnId).addEventListener("click", ()=> insertAttachedFileViaForm());
+  // Back to a single native file picker for the attach button — the Google Form tab (previous
+  // round) technically worked but was worse UX for the overwhelmingly common case (one small
+  // image): an extra tab plus a manual re-submit, when the chunked path below (already fast enough
+  // once combined with compression) needed none of that. So: pick a file, and only route it to the
+  // Form tab if it's a large non-image, where chunking really would take minutes — see
+  // CHUNKED_UPLOAD_SIZE_THRESHOLD's comment above and insertAttachedFileViaForm below.
+  const imgInput = document.getElementById(cfg.imageInputId);
+  document.getElementById(cfg.imageBtnId).addEventListener("click", ()=> imgInput.click());
+  imgInput.addEventListener("change", ()=>{
+    [...imgInput.files].forEach(file=>{
+      const isImage = file.type.startsWith("image/");
+      if(!isImage && file.size > CHUNKED_UPLOAD_SIZE_THRESHOLD){
+        toast(`"${file.name}" is large — opening Google's upload form for a faster transfer. Pick it again in the new tab.`);
+        insertAttachedFileViaForm();
+      } else {
+        insertAttachedFile(file);
+      }
+    });
+    imgInput.value = "";
+  });
   body.addEventListener("paste", (e)=>{
     const items = (e.clipboardData || window.clipboardData).items;
     for(const item of items){
@@ -3738,7 +3772,20 @@ function wireRichTextEditor(ids){
           if(placeholder) placeholder.textContent = `⏳ Uploading ${file.name}… ${pct}%`;
         });
         const placeholder = document.getElementById(uploadId);
-        if(placeholder) placeholder.outerHTML = `<span class="rte-attached" data-upload-id="${esc(chunkUploadId)}" contenteditable="false">${isImage?"🖼️":"📎"} ${esc(file.name||"attachment")} (${sizeLabel}) — will be attached to the email</span>&nbsp;`;
+        if(placeholder){
+          if(isImage){
+            // A real <img> (not a text chip) tagged with data-upload-id — Code.gs's
+            // rewireInlineImages_ finds this exact tag at send time and points its src at the
+            // final cid: reference, so the picture shows up directly in the delivered email
+            // instead of only ever being a separate downloadable attachment. The data-URL used
+            // here is only a compose-time preview (cheap — the bytes are already in memory from
+            // compression/reading the file) and gets replaced before the email is actually built.
+            const previewSrc = await fileToDataUrlForPreview_(file);
+            placeholder.outerHTML = `<br><img src="${previewSrc}" data-upload-id="${esc(chunkUploadId)}" alt="${esc(file.name||"attachment")}" style="max-width:280px;max-height:220px;border-radius:8px;display:block;margin:6px 0">&nbsp;`;
+          } else {
+            placeholder.outerHTML = `<span class="rte-attached" data-upload-id="${esc(chunkUploadId)}" contenteditable="false">📎 ${esc(file.name||"attachment")} (${sizeLabel}) — will be attached to the email</span>&nbsp;`;
+          }
+        }
       }catch(err){
         const placeholder = document.getElementById(uploadId);
         if(placeholder) placeholder.outerHTML = `<span style="color:var(--red)">⚠️ "${esc(file.name)}" failed to attach — ${esc(err.message)}</span>&nbsp;`;
@@ -3748,12 +3795,12 @@ function wireRichTextEditor(ids){
     pendingUploads.add(task);
     task.finally(()=> pendingUploads.delete(task));
   }
-  // The attach button's path (as opposed to insertAttachedFile above, still used for pasted
-  // screenshots) — opens the Form in a real new tab (window.open, called synchronously here so the
-  // click itself is what triggers it — calling it after any await would risk the browser treating
-  // it as an unrequested popup and blocking it), then polls in the background until the file shows
-  // up. Shares pendingUploads/uploadCounter with insertAttachedFile so waitForUploads() and
-  // getAttachmentIds() work identically regardless of which path a given attachment came from.
+  // Only reached for a large non-image (see the imgInput change handler above) — opens the Form in
+  // a real new tab (window.open, called synchronously here so the triggering click/change itself is
+  // what opens it — calling it after any await would risk the browser treating it as an unrequested
+  // popup and blocking it), then polls in the background until the file shows up. Shares
+  // pendingUploads/uploadCounter with insertAttachedFile so waitForUploads() and getAttachmentIds()
+  // work identically regardless of which path a given attachment came from.
   function insertAttachedFileViaForm(){
     const reference = `ref_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const url = `${FORM_ATTACH_URL}?${FORM_ATTACH_REF_ENTRY}=${encodeURIComponent(reference)}`;

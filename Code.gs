@@ -332,7 +332,7 @@ function assembleUploadedFile_(uploadId){
   if(rawBytes > MAX_ATTACHMENT_BYTES){
     throw new Error(`"${filename}" is too large (${(rawBytes/1024/1024).toFixed(1)}MB) — attachments are limited to ${MAX_ATTACHMENT_BYTES/1024/1024}MB.`);
   }
-  return { filename, mimeType: rows[0][mimeCol] || "application/octet-stream", base64 };
+  return { _id: uploadId, filename, mimeType: rows[0][mimeCol] || "application/octet-stream", base64 };
 }
 function deleteUploadChunks_(uploadId){
   const sheet = getOrCreateSheet_("UploadChunks", UPLOAD_CHUNKS_HEADER);
@@ -407,17 +407,48 @@ function assembleFormFile_(fileId){
   if(bytes.length > MAX_ATTACHMENT_BYTES){
     throw new Error(`"${file.getName()}" is too large (${(bytes.length/1024/1024).toFixed(1)}MB) — attachments are limited to ${MAX_ATTACHMENT_BYTES/1024/1024}MB.`);
   }
-  return { filename: file.getName(), mimeType: blob.getContentType(), base64: Utilities.base64Encode(bytes) };
+  return { _id: fileId, filename: file.getName(), mimeType: blob.getContentType(), base64: Utilities.base64Encode(bytes) };
 }
 function deleteFormFile_(fileId){
   try{ DriveApp.getFileById(fileId).setTrashed(true); }catch(err){ /* already gone or inaccessible — nothing more to do */ }
 }
+/* ---- Attachments v4: the Form-based flow (v2/v3 above) turned out to be worse UX for the common
+   case — a single small image now needs a whole extra browser tab and a manual re-submit, when the
+   chunked system (v1, kept the whole time as a fallback — see the "Attachments v2" comment) was
+   already fast enough for that case once combined with client-side image compression. So the
+   attach button goes back to a single native file picker; the front end itself decides per file
+   which backend path to use — small/any-size images and small non-images go through the fast
+   chunked path (uploadId, prefixed "up_"), and only a genuinely large non-image (where chunking
+   really would take minutes) gets routed to the slower-but-necessary Form tab (a raw Drive file id,
+   no "up_" prefix — that's what tells the two apart below). Both id shapes can arrive mixed in the
+   same attachmentUploadIds list, since a request can carry more than one attachment. ---- */
 // Assembles every id in order; deliberately lets a failure (missing/expired/oversized) propagate
 // rather than silently sending without it, so the caller can surface a clear error instead of a
 // status update or request that quietly went out missing its attachment.
-function assembleAttachments_(uploadIds){
-  if(!Array.isArray(uploadIds) || !uploadIds.length) return [];
-  return uploadIds.map(assembleFormFile_);
+function assembleAttachments_(ids){
+  if(!Array.isArray(ids) || !ids.length) return [];
+  return ids.map(id => id.toString().startsWith("up_") ? assembleUploadedFile_(id) : assembleFormFile_(id));
+}
+// The front end inserts an <img data-upload-id="..."> tag directly into the compose body for image
+// attachments (instead of a text chip) — this finds those tags, points their src at a cid:
+// reference, and marks the matching attachment as inline (Content-Disposition: inline + a
+// Content-ID header, wired in by sendGmailMessage_) so it renders as a real picture in the
+// delivered email, the same as a normal Gmail paste, instead of only ever being a separate
+// downloadable file. Non-image attachments and any <img> tag with no matching id are left alone.
+function rewireInlineImages_(html, attachments){
+  const byId = {};
+  attachments.forEach(a => { if(a._id) byId[a._id] = a; });
+  let counter = 0;
+  return html.replace(/<img\b[^>]*>/gi, (tag) => {
+    const idMatch = tag.match(/data-upload-id="([^"]+)"/);
+    if(!idMatch) return tag;
+    const attachment = byId[idMatch[1]];
+    if(!attachment || !(attachment.mimeType||"").startsWith("image/")) return tag;
+    const cid = "img" + (++counter) + "_" + Utilities.getUuid().replace(/-/g,"") + "@jarodashboard";
+    attachment.inline = true;
+    attachment.contentId = cid;
+    return tag.replace(/\ssrc="[^"]*"/i, ` src="cid:${cid}"`);
+  });
 }
 function respond_(result, viaForm, reqId){
   if(viaForm){
@@ -868,7 +899,7 @@ function handleSubmitRequest_(body){
   payload.subject = subject;
   const to = (payload.to && payload.to.length) ? payload.to.join(",") : "lalit.rade@jaro.in";
   const cc = (payload.cc||[]).join(",");
-  const html = requestEmailHtml_(payload, "New Request Raised");
+  let html = requestEmailHtml_(payload, "New Request Raised");
   const uploadIds = Array.isArray(payload.attachmentUploadIds) ? payload.attachmentUploadIds : [];
   let attachments;
   try{
@@ -876,6 +907,7 @@ function handleSubmitRequest_(body){
   }catch(err){
     throw new Error("Couldn't attach the uploaded file: " + ((err && err.message) || err));
   }
+  html = rewireInlineImages_(html, attachments);
   let sent;
   try{
     sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments });
@@ -960,14 +992,20 @@ function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, refe
   if(Array.isArray(attachments) && attachments.length){
     const boundary = "jarodash_" + Utilities.getUuid().replace(/-/g,"");
     const bodyPart = ["--" + boundary, "Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: 8bit", "", htmlBody].join("\r\n");
+    // a.inline (set by rewireInlineImages_ below) makes an image render directly in the email body
+    // instead of only showing as a separate downloadable file — Gmail (and every client that
+    // matters here, since recipients are all Workspace/Gmail users) renders a Content-ID'd inline
+    // part referenced via cid: correctly even flattened into this multipart/mixed rather than
+    // nested under a separate multipart/related, so that extra nesting is skipped for simplicity.
     const attachmentParts = attachments.map(a => [
       "--" + boundary,
       "Content-Type: " + (a.mimeType || "application/octet-stream") + "; name=\"" + a.filename + "\"",
-      "Content-Disposition: attachment; filename=\"" + a.filename + "\"",
+      a.inline ? ("Content-Disposition: inline; filename=\"" + a.filename + "\"") : ("Content-Disposition: attachment; filename=\"" + a.filename + "\""),
+      a.inline ? ("Content-ID: <" + a.contentId + ">") : null,
       "Content-Transfer-Encoding: base64",
       "",
       wrapBase64Lines_(a.base64)
-    ].join("\r\n"));
+    ].filter(Boolean).join("\r\n"));
     rawMessage = baseHeaders.concat(["Content-Type: multipart/mixed; boundary=\"" + boundary + "\""]).join("\r\n")
       + "\r\n\r\n" + bodyPart + "\r\n" + attachmentParts.join("\r\n") + "\r\n--" + boundary + "--";
   } else {
@@ -1034,7 +1072,7 @@ function handleUpdateStatus_(body){
     type:get("Request Type"), priority:get("Priority"), link:get("Related Link"), description:get("Description"),
     appliesTo: appliesTo
   };
-  const html = statusEmailHtml_(payload, status, noteHtml, noteText);
+  const html = rewireInlineImages_(statusEmailHtml_(payload, status, noteHtml, noteText), attachments);
   // Recipients: whatever the Admin picked in the status modal's own Send To/CC fields, editable
   // per update — falls back to the row's original To/Cc (or just the requester) if those come
   // through empty for any reason.
