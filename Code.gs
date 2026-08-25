@@ -104,21 +104,28 @@ function authorizeGmailAccess(){
 }
 
 /* ---- HTTP entry point ----
-   Two transports are supported, because the Web App is deployed at a domain-restricted URL
-   (.../a/macros/jaro.in/s/.../exec). A plain cross-origin fetch() from a site hosted elsewhere
-   (e.g. Vercel) cannot carry the caller's Google session cookie to that URL, and even with
-   credentials:"include" the browser follows Google's own auth redirect in a way fetch can't
-   read across origins — that shows up in DevTools as "TypeError: Failed to fetch". A hidden
-   <iframe> + real <form> POST is a genuine browser navigation instead of an XHR/fetch, so it is
-   not subject to CORS at all and follows the auth redirect exactly like a normal page load.
+   Two transports are supported here for historical reasons. Originally the Web App was deployed
+   at a domain-restricted URL (.../a/macros/jaro.in/s/.../exec) — a plain cross-origin fetch()
+   from a site hosted elsewhere (e.g. Vercel) couldn't carry the caller's Google session cookie to
+   that URL, and even with credentials:"include" the browser follows Google's own auth redirect in
+   a way fetch can't read across origins (DevTools showed "TypeError: Failed to fetch"). The
+   iframe+form-POST path below was built to work around that (a genuine browser navigation isn't
+   subject to CORS at all), but it never actually worked either — Apps Script's own
+   Content-Security-Policy blocks the postMessage script from running once framed cross-origin, so
+   it's kept only as a fallback/reference, same precedent as authApiCallLarge_ in the dashboard.
+   Since the 2026-08 ownership migration to tech@jaro.in, this deployment's access is "Anyone"
+   instead of domain-restricted — Google's own cookie-based gate is gone entirely, so a plain
+   fetch() POST (Content-Type: text/plain to dodge a CORS preflight Apps Script can't answer,
+   carrying a JSON body Apps Script itself doesn't care is mislabeled) now reaches this function
+   and gets a normal JSON response back, no iframe/postMessage trickery needed at all. This is the
+   transport uploadFileDirect_/submitRequestDirect_/updateRequestStatus_ actually use now for
+   anything that might carry an attachment; everything else still rides the proven JSONP GET
+   transport below (doGet), unchanged.
 
-   - Form-POST callers (the dashboard's iframe/form transport) send one field named "payload"
-     (a JSON string) via application/x-www-form-urlencoded — that lands in e.parameter.payload.
-     Because the caller can't read the iframe's response body across origins either, the response
-     here is a tiny HTML page whose only job is to postMessage() the result back to the parent
-     window, tagged with the same reqId the caller sent in payload.
-   - Legacy/JSON callers (anything still POSTing a raw JSON body, e.g. text/plain to dodge
-     preflight) keep getting a plain JSON response, unchanged from before.
+   - Form-POST callers (legacy, unused — see above) send one field named "payload" (a JSON
+     string) via application/x-www-form-urlencoded, landing in e.parameter.payload.
+   - Plain POST callers (the active path now) send a raw JSON body, landing in e.postData.contents,
+     and get a plain JSON response.
 */
 function doPost(e){
   let body, viaForm = false;
@@ -428,6 +435,27 @@ function deleteFormFile_(fileId){
 function assembleAttachments_(ids){
   if(!Array.isArray(ids) || !ids.length) return [];
   return ids.map(id => id.toString().startsWith("up_") ? assembleUploadedFile_(id) : assembleFormFile_(id));
+}
+/* ---- Attachments v5: real direct upload, replacing the Form tab too — made possible by the
+   2026-08 ownership migration to tech@jaro.in, whose deployment access is "Anyone" instead of
+   domain-restricted (see the doPost comment above for why that specifically is what unblocks a
+   plain fetch() POST). With no cookie gate and no URL-length ceiling to work around, there's no
+   reason left to chunk a file or hand it to a separate Google product at all — the browser just
+   reads it into memory as base64 and sends it inline, in the exact same POST as the rest of the
+   request/status-update payload. handleSubmitRequest_/handleUpdateStatus_ use these already-
+   assembled objects directly — no reassembly, no Drive lookup, nothing to clean up afterward,
+   since nothing was ever stored server-side ahead of time. The chunked and Form-based systems
+   above stay defined, unused, as a fallback (same precedent as authApiCallLarge_) in case this
+   ever needs reverting — but this is now the only path the front end's attach button uses. */
+function validateDirectAttachment_(a){
+  const base64 = (a && a.base64 || "").toString();
+  const filename = (a && a.filename) || "attachment";
+  const padding = (base64.match(/=+$/) || [""])[0].length;
+  const rawBytes = Math.floor(base64.length * 3 / 4) - padding;
+  if(rawBytes > MAX_ATTACHMENT_BYTES){
+    throw new Error(`"${filename}" is too large (${(rawBytes/1024/1024).toFixed(1)}MB) — attachments are limited to ${MAX_ATTACHMENT_BYTES/1024/1024}MB.`);
+  }
+  return { _id: (a && a._id) || filename, filename, mimeType: (a && a.mimeType) || "application/octet-stream", base64 };
 }
 // The front end inserts an <img data-upload-id="..."> tag directly into the compose body for image
 // attachments (instead of a text chip) — this finds those tags, points their src at a cid:
@@ -901,9 +929,10 @@ function handleSubmitRequest_(body){
   const cc = (payload.cc||[]).join(",");
   let html = requestEmailHtml_(payload, "New Request Raised");
   const uploadIds = Array.isArray(payload.attachmentUploadIds) ? payload.attachmentUploadIds : [];
+  const directAttachments = Array.isArray(payload.attachments) ? payload.attachments : [];
   let attachments;
   try{
-    attachments = assembleAttachments_(uploadIds);
+    attachments = assembleAttachments_(uploadIds).concat(directAttachments.map(validateDirectAttachment_));
   }catch(err){
     throw new Error("Couldn't attach the uploaded file: " + ((err && err.message) || err));
   }
@@ -1050,9 +1079,10 @@ function handleUpdateStatus_(body){
   if(!rowData) throw new Error("That request row couldn't be found.");
   const get = (name)=> rowData[headers.indexOf(name)];
   const uploadIds = Array.isArray(body.attachmentUploadIds) ? body.attachmentUploadIds : [];
+  const directAttachments = Array.isArray(body.attachments) ? body.attachments : [];
   let attachments;
   try{
-    attachments = assembleAttachments_(uploadIds);
+    attachments = assembleAttachments_(uploadIds).concat(directAttachments.map(validateDirectAttachment_));
   }catch(err){
     throw new Error("Couldn't attach the uploaded file: " + ((err && err.message) || err));
   }

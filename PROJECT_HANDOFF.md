@@ -802,16 +802,112 @@ fails now, that would be new, actually-confirmed information (framing really is 
 of publish state) rather than the untested assumption the first embedding attempt was built on — and
 the fully-intact new-tab version (git history, commit range `b7db1f9`..`8bab02a`) is the fallback.
 
+## Ownership migration: lalit.rade@jaro.in → tech@jaro.in (2026-08-21/22)
+
+Full infrastructure migration, driven by two things: management wanting emails sent from an
+approved address (lalit.rade@jaro.in's use for this wasn't approved), and tech@jaro.in specifically
+being able to get IT approval for "Anyone" Web App access, which lalit.rade@jaro.in's account
+couldn't. Completed:
+- **Google**: spreadsheet ownership (and the Apps Script bound to it) transferred to tech@jaro.in;
+  redeployed as a brand-new deployment under that identity — confirmed via the actual deployment
+  settings screen: "Execute as: Me (tech@jaro.in)", "Who has access: Anyone". New exec URL:
+  `https://script.google.com/macros/s/AKfycbwGYDwIzRQAcPNs2HqU6kf9ev1CjUMTPKfkE4mSas6fAO85txk9GALY0L6j6J9slex8Dg/exec`.
+  The Google Form (Attachments v2-v4) was *not* migrated — moot once Attachments v5 (below) replaced
+  it entirely.
+- **GitHub**: repo transferred twice — first attempt went to the `techjaroeducation` **organization**,
+  which hit "deploying from a private GitHub organization requires a Vercel Pro plan" on the Vercel
+  side; transferred again to the **personal** `TechJaro` account instead (also tech@jaro.in-controlled,
+  just not an org), which Vercel's free tier fully supports for private repos. Now at
+  `github.com/TechJaro/website-requirement-dashboard`. Local git remotes (Downloads + D: copies)
+  updated and verified (fetch + push) at each transfer.
+- **Vercel**: new `TECHJARO` team, project imported from the repo above, deployed and confirmed
+  rendering correctly. Stable URL: `website-requirement-dashboard.vercel.app` (not the per-deployment
+  URL Vercel also shows, which changes on every future deploy).
+- **Code.gs**: only `sendGmailMessage_`'s `fromEmail` changed, to `"tech@jaro.in"` — matches the new
+  "Execute as" identity, and is what actually determines which account Gmail API sends as. Everything
+  else referencing lalit.rade@jaro.in (`SUPER_ADMIN_EMAILS`, the submitRequest fallback recipient,
+  `setupAdmin()`'s seeded account) deliberately left unchanged, per explicit instruction — those are
+  about Lalit's own role *within* the dashboard's login system, unrelated to which Google account the
+  script itself executes as.
+- Frontend's `CONFIG.authApiUrl`/`CONFIG.requestForm.webAppUrl` updated to the new exec URL.
+
+## Attachments v5: real direct upload, replacing the Form entirely (2026-08-22)
+
+Once "Anyone" access was confirmed live, the user tested the embedded-Form flow (Attachments v4)
+and rejected it outright — "I dont want this form now anymore... Make it similar to Google Gmail
+itself." This is the culmination of the whole attachments saga this session: with the Web App now
+set to "Anyone" instead of domain-restricted, the actual root blocker behind chunking *and* the
+Form (Google's own cookie-based gate in front of the Web App, which a cross-site POST's cookie gets
+dropped for) is gone entirely. There's no reason left to chunk a file or hand it to a separate
+Google product — the browser can now just POST the whole thing directly, in one request, like any
+normal website's upload.
+
+**The backend transport already existed and needed zero changes** — `doPost` in Code.gs was built
+during an earlier (at-the-time-unsuccessful) attempt to avoid the JSONP GET transport
+(`authApiCallLarge_`'s hidden-iframe+form-POST idea), and its plain-JSON-body branch is exactly
+"POST a JSON body, get JSON back." That attempt failed purely because of the domain-restricted
+cookie gate — with that gate gone, the exact same doPost code just works via a normal `fetch()` now.
+
+**What changed:**
+- `authApiPostCall_`/`authApiPostCallOnce_` (new, dashboard file) — a plain `fetch()` POST with
+  `Content-Type: text/plain` (deliberate: keeps it a CORS "simple request" with no preflight, which
+  Apps Script can't answer correctly anyway; Code.gs's `e.postData.contents` is parsed as JSON
+  regardless of the declared Content-Type). Same idemKey/one-retry shape as `authApiCall_`, reusing
+  Code.gs's existing `dispatch_` idempotency cache. Used only for `submitRequest`/`updateStatus` —
+  every other action stays on the proven JSONP GET transport, unchanged, since there's no reason to
+  touch what already works.
+- `wireRichTextEditor` rewritten to a single, unified mechanism: pick a file (or paste), it's read
+  into memory as base64 (`fileToStandardBase64_`) — compressed first if it's an image
+  (`maybeCompressImage_`, kept — still genuinely useful for real network transfer time, not chunking
+  overhead) — and shown immediately in the compose body: a real `<img>` for images (the actual
+  attachment bytes as the preview `src`, not a stand-in) or a text chip for anything else. No upload
+  step at all until the person hits Submit/Send — the bytes travel inline, in the *same* POST as
+  the rest of the payload. All the old size/type-based routing to a Form tab is gone — no threshold,
+  no special-casing, just the flat 10MB cap for everything. `getAttachments()` (was
+  `getAttachmentIds()`) returns full `{_id, filename, mimeType, base64}` objects now, DOM-driven
+  exactly as before (delete the chip/image from the body, it stops being sent).
+- `submitRequestDirect_`/`updateRequestStatus_` moved to `authApiPostCall_`, and the old
+  URL-length-based "strip large pasted screenshots" safeguards were removed from both — no longer
+  needed at all now that there's no URL-length ceiling to protect against.
+- Code.gs: `validateDirectAttachment_` (new) — checks the same `MAX_ATTACHMENT_BYTES` cap against
+  attachments that arrive already-assembled inline, rather than needing lookup/reassembly.
+  `handleSubmitRequest_`/`handleUpdateStatus_` now concat these with whatever `assembleAttachments_`
+  returns from the old id-based paths (which will be empty going forward, but cost nothing to keep).
+  `rewireInlineImages_` needed *no changes* — it already worked generically off `mimeType`/`_id`
+  regardless of source.
+- The entire chunked-upload system (v1) and the Google Form system (v2-v4) — `uploadFileChunked_`,
+  `maybeCompressImage_`'s call site inside it, `handleUploadChunk_`, `assembleUploadedFile_`,
+  `deleteUploadChunks_`, `keepRowsWhere_`, `findFormResponsesSheet_`, `handleCheckFormUpload_`,
+  `assembleFormFile_`, `deleteFormFile_`, `ensureFormAttachModal_`, `openFormAttachModal_`,
+  `pollForFormUpload_` — all stay defined, entirely unused, same precedent as `authApiCallLarge_`:
+  already tried, worked (to varying degrees), superseded, kept only in case of a revert.
+
+**Verified in the browser** (mocking `fetch`, since a real Gmail send still can't be exercised
+outside the live deployment): `authApiPostCall_` sends the exact right URL/method/Content-Type/body
+shape and correctly retries once with the *same* idemKey on a network failure while surfacing a
+server-returned error immediately; `insertAttachedFile`'s new direct-read mechanism has zero race
+window (task registers in `pendingReads` before any await, confirmed the same way every prior
+version of this mechanism was verified); an attached image produces a real `<img>` tag whose `src`
+is provably the exact same base64 as what `getAttachments()` returns (not a placeholder); a
+non-image produces the text chip; an over-the-limit file is rejected client-side with the right
+toast and never gets attached; deleting the chip/image from the compose body correctly drops it
+from `getAttachments()`; and the full chain from attaching a file through `submitRequestDirect_`
+produces a well-formed POST body with the attachment's real filename/base64/id inside
+`payload.attachments`, exactly what Code.gs's `validateDirectAttachment_` expects.
+
 ## Immediate next action
 
-No Code.gs change this round — purely front-end, already pushed. Ask the user to test the real
-thing: attach a large non-image (a several-MB PDF, to trigger the Form path) and confirm the Form
-now renders **inside a popup on the dashboard page itself**, not a new browser tab. If it renders
-correctly and the file can be picked/submitted right there, this fully resolves their request. If it
-still shows "This document is not published" or a blank/broken frame, that's new information — get
-the exact symptom, since it would mean reverting to the new-tab version (intact in git history) is
-necessary after all, this time for a confirmed rather than assumed reason. Other still-open items,
-unchanged: (1) exact symptoms for the still-open Insights-visibility issue further above; (2) decide
-whether to build the proposed shared-cache proxy for scaling; (3) confirm whether the old
+Paste the latest `Code.gs` into the Apps Script editor (the tech@jaro.in-owned project) and
+redeploy — this round adds `validateDirectAttachment_` and the `payload.attachments`/`body.attachments`
+handling in `handleSubmitRequest_`/`handleUpdateStatus_`, plus the updated `doPost` comment. After
+redeploying: attach a real image and a real non-image file (a PDF, even a large one) via the
+**single attach button** — no Form, no tab, no chunking indicator — confirm both show up
+immediately while composing, and confirm the delivered email shows the image inline and the PDF as
+a real attachment, and that this now feels close to instant regardless of file size (bounded mainly
+by the sender's own upload bandwidth, same as Gmail itself, not by anything this dashboard does).
+This is the actual, final resolution of the attachments saga that's run through most of this
+session — if this works as verified locally, the "attach a file" feature is done. Other still-open
+items, unchanged: (1) exact symptoms for the still-open Insights-visibility issue further above;
+(2) decide whether to build the proposed shared-cache proxy for scaling; (3) confirm whether the old
 `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy
 is confirmed working.

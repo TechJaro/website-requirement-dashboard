@@ -3623,6 +3623,20 @@ async function maybeCompressImage_(file){
     return file;
   }
 }
+// Attachments v5: standard (not URL-safe) base64 — this travels inline in a real POST body now,
+// not chunked through a GET URL, so there's no percent-encoding overhead to avoid and no reason to
+// use the URL-safe alphabet uploadFileChunked_ below needed.
+function fileToStandardBase64_(file){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=> reject(new Error("Couldn't read the file"));
+    reader.onload = ()=>{
+      const dataUrl = reader.result;
+      resolve(dataUrl.slice(dataUrl.indexOf(",") + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
 async function uploadFileChunked_(file, onProgress){
   const uploadId = "up_" + Date.now() + "_" + Math.random().toString(36).slice(2);
   const base64url = await fileToBase64Url_(file);
@@ -3776,24 +3790,16 @@ function wireRichTextEditor(ids){
     const url = prompt("Paste the URL to link:");
     if(url) { body.focus(); document.execCommand("createLink", false, url); }
   });
-  // Back to a single native file picker for the attach button — the Google Form tab (previous
-  // round) technically worked but was worse UX for the overwhelmingly common case (one small
-  // image): an extra tab plus a manual re-submit, when the chunked path below (already fast enough
-  // once combined with compression) needed none of that. So: pick a file, and only route it to the
-  // Form tab if it's a large non-image, where chunking really would take minutes — see
-  // CHUNKED_UPLOAD_SIZE_THRESHOLD's comment above and insertAttachedFileViaForm below.
+  // Attachments v5: one native file picker for everything — no size/type-based routing to a Form
+  // tab anymore. Now that submitRequest/updateStatus travel over a real direct POST
+  // (authApiPostCall_, no URL-length ceiling), there's no reason left to chunk a file or hand it
+  // to a separate Google product at all. Pick a file, it reads into memory as base64 right here
+  // (fast — purely local, no network involved in this step), and the bytes travel inline in the
+  // same request as everything else once the person actually hits Submit/Send.
   const imgInput = document.getElementById(cfg.imageInputId);
   document.getElementById(cfg.imageBtnId).addEventListener("click", ()=> imgInput.click());
   imgInput.addEventListener("change", ()=>{
-    [...imgInput.files].forEach(file=>{
-      const isImage = file.type.startsWith("image/");
-      if(!isImage && file.size > CHUNKED_UPLOAD_SIZE_THRESHOLD){
-        toast(`"${file.name}" is large — opening Google's upload form for a faster transfer. Pick it again in the new tab.`);
-        insertAttachedFileViaForm();
-      } else {
-        insertAttachedFile(file);
-      }
-    });
+    [...imgInput.files].forEach(insertAttachedFile);
     imgInput.value = "";
   });
   body.addEventListener("paste", (e)=>{
@@ -3805,14 +3811,14 @@ function wireRichTextEditor(ids){
       }
     }
   });
-  // Real bug this fixed: uploading is async (many small chunk requests in sequence/parallel), but
-  // nothing previously stopped Submit/Send from firing before that finished — the request went out
-  // with no attachment at all, silently, while a stale "Uploading…" toast was the only trace.
-  // pendingUploads tracks every in-flight upload so the submit handlers below can wait for them; a
-  // visible in-body placeholder (replaced in place once the upload settles, showing live progress
-  // meanwhile) replaces the old fire-and-forget toast so success/failure is never silently lost.
+  // Real bug this fixed, still relevant even with no network upload anymore: reading/compressing a
+  // file is still async, and nothing stops Submit/Send from firing before that finishes.
+  // pendingReads tracks every in-flight read so the submit handlers below can wait for them; a
+  // visible in-body placeholder (replaced in place once reading settles) makes a failure visible
+  // instead of silently missing.
   let uploadCounter = 0;
-  const pendingUploads = new Set();
+  const pendingReads = new Set();
+  const attachedFiles = new Map();
   async function insertAttachedFile(file){
     if(!file) return;
     const isImage = file.type.startsWith("image/");
@@ -3822,15 +3828,15 @@ function wireRichTextEditor(ids){
     if(!isImage && file.size > RTE_MAX_FILE_BYTES){ toast(`"${file.name}" is over the 10MB attachment limit — not attached`, true); return; }
     const uploadId = `rte-upload-${++uploadCounter}-${Date.now()}`;
     body.focus();
-    document.execCommand("insertHTML", false, `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Uploading ${esc(file.name)}… 0%</span>&nbsp;`);
-    // Real bug this fixed: compressing the file before registering it in pendingUploads (i.e.
-    // `await`ing anything before the `pendingUploads.add(task)` line below) reintroduces the exact
-    // race this whole tracking mechanism exists to prevent — insertAttachedFile is called
+    document.execCommand("insertHTML", false, `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Reading ${esc(file.name)}…</span>&nbsp;`);
+    // Real bug this fixed (see this file's own history — the same race resurfaced twice as this
+    // mechanism was reworked): doing anything async *before* pendingReads.add(task) below
+    // reintroduces the exact race this tracking exists to prevent — insertAttachedFile is called
     // fire-and-forget from the file-input's change handler, so the very first `await` inside it is
-    // also the point where control returns to that caller; if pendingUploads.add(task) hasn't run
-    // yet by then, a submit handler calling waitForUploads() immediately after can see an empty set
-    // and resolve instantly, before compression (let alone the actual upload) has even started.
-    // Compression therefore happens *inside* the IIFE below, after pendingUploads already has it.
+    // also the point where control returns to that caller; a submit handler calling
+    // waitForUploads() immediately after could see an empty set and resolve instantly, before the
+    // file has actually been read. Everything async therefore happens *inside* the IIFE below,
+    // after pendingReads already has it.
     const task = (async()=>{
       try{
         if(isImage) file = await maybeCompressImage_(file);
@@ -3840,24 +3846,21 @@ function wireRichTextEditor(ids){
           toast(`"${file.name}" is over the 10MB attachment limit — not attached`, true);
           return;
         }
+        const base64 = await fileToStandardBase64_(file);
+        attachedFiles.set(uploadId, { _id: uploadId, filename: file.name || "attachment", mimeType: file.type || "application/octet-stream", base64 });
         const sizeLabel = (file.size/1024/1024).toFixed(file.size < 1024*1024 ? 2 : 1) + " MB";
-        const chunkUploadId = await uploadFileChunked_(file, (pct)=>{
-          const placeholder = document.getElementById(uploadId);
-          if(placeholder) placeholder.textContent = `⏳ Uploading ${file.name}… ${pct}%`;
-        });
         const placeholder = document.getElementById(uploadId);
         if(placeholder){
           if(isImage){
             // A real <img> (not a text chip) tagged with data-upload-id — Code.gs's
             // rewireInlineImages_ finds this exact tag at send time and points its src at the
             // final cid: reference, so the picture shows up directly in the delivered email
-            // instead of only ever being a separate downloadable attachment. The data-URL used
-            // here is only a compose-time preview (cheap — the bytes are already in memory from
-            // compression/reading the file) and gets replaced before the email is actually built.
-            const previewSrc = await fileToDataUrlForPreview_(file);
-            placeholder.outerHTML = `<br><img src="${previewSrc}" data-upload-id="${esc(chunkUploadId)}" alt="${esc(file.name||"attachment")}" style="max-width:280px;max-height:220px;border-radius:8px;display:block;margin:6px 0">&nbsp;`;
+            // instead of only ever being a separate downloadable attachment. What's shown here
+            // while composing is the actual attachment data itself, not a stand-in — the same
+            // bytes that get sent.
+            placeholder.outerHTML = `<br><img src="data:${file.type};base64,${base64}" data-upload-id="${esc(uploadId)}" alt="${esc(file.name||"attachment")}" style="max-width:280px;max-height:220px;border-radius:8px;display:block;margin:6px 0">&nbsp;`;
           } else {
-            placeholder.outerHTML = `<span class="rte-attached" data-upload-id="${esc(chunkUploadId)}" contenteditable="false">📎 ${esc(file.name||"attachment")} (${sizeLabel}) — will be attached to the email</span>&nbsp;`;
+            placeholder.outerHTML = `<span class="rte-attached" data-upload-id="${esc(uploadId)}" contenteditable="false">📎 ${esc(file.name||"attachment")} (${sizeLabel}) — will be attached to the email</span>&nbsp;`;
           }
         }
       }catch(err){
@@ -3866,53 +3869,16 @@ function wireRichTextEditor(ids){
         toast(`Couldn't attach "${file.name}" — ${err.message}`, true);
       }
     })();
-    pendingUploads.add(task);
-    task.finally(()=> pendingUploads.delete(task));
-  }
-  // Only reached for a large non-image (see the imgInput change handler above) — opens the Form
-  // embedded in a modal (openFormAttachModal_ above), right on this page, no new tab. Shares
-  // pendingUploads/uploadCounter with insertAttachedFile so waitForUploads() and getAttachmentIds()
-  // work identically regardless of which path a given attachment came from.
-  function insertAttachedFileViaForm(){
-    const reference = `ref_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const uploadId = `rte-upload-${++uploadCounter}-${Date.now()}`;
-    body.focus();
-    document.execCommand("insertHTML", false,
-      `<span id="${uploadId}" class="rte-uploading" contenteditable="false">⏳ Waiting for the file…</span>&nbsp;`);
-    const task = openFormAttachModal_(reference).then(info=>{
-      const el = document.getElementById(uploadId);
-      if(!info){ if(el) el.remove(); return; } // cancelled
-      if(info.error){
-        if(el) el.outerHTML = `<span style="color:var(--red)">⚠️ Couldn't attach the file — ${esc(info.error)}</span>&nbsp;`;
-        toast(`Couldn't attach the file — ${info.error}`, true);
-        return;
-      }
-      const isImage = (info.mimeType||"").startsWith("image/");
-      const sizeLabel = info.sizeBytes ? ` (${(info.sizeBytes/1024/1024).toFixed(info.sizeBytes < 1024*1024 ? 2 : 1)} MB)` : "";
-      if(el){
-        if(isImage){
-          // Same real <img data-upload-id> tag insertAttachedFile's chunked path uses, so
-          // Code.gs's rewireInlineImages_ treats a Form-attached image identically to a chunked
-          // one and it shows up as a real picture in the delivered email either way. No live
-          // compose-time preview here (the bytes live in Drive, not this page's memory, unlike
-          // the chunked path) — a generic placeholder stands in until the email is actually sent.
-          el.outerHTML = `<br><img src="${FORM_IMAGE_PLACEHOLDER_SRC}" data-upload-id="${esc(info.fileId)}" alt="${esc(info.filename||"attachment")}" style="max-width:280px;max-height:220px;border-radius:8px;display:block;margin:6px 0">&nbsp;`;
-        } else {
-          el.outerHTML = `<span class="rte-attached" data-upload-id="${esc(info.fileId)}" contenteditable="false">📎 ${esc(info.filename||"attachment")}${sizeLabel} — will be attached to the email</span>&nbsp;`;
-        }
-      }
-      toast(`"${info.filename}" attached ✓`);
-    });
-    pendingUploads.add(task);
-    task.finally(()=> pendingUploads.delete(task));
+    pendingReads.add(task);
+    task.finally(()=> pendingReads.delete(task));
   }
   return {
-    hasPendingUploads: ()=> pendingUploads.size > 0,
-    waitForUploads: ()=> Promise.allSettled([...pendingUploads]),
-    // DOM-driven rather than a tracked list — if someone backspaces out an attached-file chip
-    // (the whole span deletes as one unit, same as the "uploading" placeholder always has), it
+    hasPendingUploads: ()=> pendingReads.size > 0,
+    waitForUploads: ()=> Promise.allSettled([...pendingReads]),
+    // DOM-driven rather than a tracked list — if someone backspaces out an attached-file chip (the
+    // whole span/image deletes as one unit, same as the "reading" placeholder always has), it
     // stops counting as attached, so removing it from the message body is all it takes to drop it.
-    getAttachmentIds: ()=> [...body.querySelectorAll("[data-upload-id]")].map(el => el.dataset.uploadId)
+    getAttachments: ()=> [...body.querySelectorAll("[data-upload-id]")].map(el => attachedFiles.get(el.dataset.uploadId)).filter(Boolean)
   };
 }
 
@@ -3922,10 +3888,10 @@ async function submitRequest(e){
   // Belt-and-braces double-submit guard on top of disabling the button below — if this somehow
   // fires again before the DOM's disabled state takes effect, this flag stops it cold.
   if(REQUEST_SUBMIT_IN_FLIGHT) return;
-  // Real bug this fixed: an attachment upload is async (Drive round-trip, sometimes a Google
-  // sign-in popup) — submitting before it finished used to send the request with no attachment
-  // link at all, silently. Wait for any in-flight uploads first, so descHtml below is read only
-  // after every attachment has actually resolved to a link (or a visible failure message).
+  // Reading/encoding an attached file is still async (see wireRichTextEditor) even though it's now
+  // purely local with no network round-trip — submitting before it finished would still send the
+  // request with the attachment silently missing. Wait for any in-flight reads first, so descHtml
+  // below is read only after every attachment has actually resolved (or shown a visible failure).
   if(REQUEST_DESC_RTE && REQUEST_DESC_RTE.hasPendingUploads()){
     const submitBtn = document.getElementById("submitRequestBtn");
     const submitLabel = document.getElementById("submitRequestLabel");
@@ -3967,7 +3933,7 @@ async function submitRequest(e){
     cc: ccList.map(c=>c.email),
     descriptionHtml: descHtml,
     descriptionText: descText,
-    attachmentUploadIds: REQUEST_DESC_RTE ? REQUEST_DESC_RTE.getAttachmentIds() : [],
+    attachments: REQUEST_DESC_RTE ? REQUEST_DESC_RTE.getAttachments() : [],
   };
   // Threading rule: same requester + same subject (exact match) -> same email thread
   payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
@@ -4166,42 +4132,26 @@ async function submitRequestDirect_(payload){
   // dashboard needs to grant anything themselves; their identity comes from the login session.
   if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
   payload.threadKey = `${payload.email}||${payload.subject}`.toLowerCase();
-  // Back on the plain JSONP transport (authApiCall_), not the hidden-iframe POST+poll one
-  // (authApiCallLarge_) — it turns out that path never actually worked here: browsers withhold
-  // Google's session cookie from a cross-site POST even when it happily sends it on the GET
-  // navigations JSONP relies on (a SameSite=Lax quirk), so the POST silently never reached doPost
-  // at all, and every submission just sat there until the 45s poll gave up. JSONP GET is the
-  // transport that's actually proven reliable end to end for this domain-restricted deployment.
-  // The one trade-off: a GET URL has a practical length ceiling, so a very large pasted screenshot
-  // (inline base64 image) in the description could occasionally not fit — stripped out below with
-  // a note left in its place, rather than letting the whole submission silently fail again.
-  const encoded = encodeURIComponent(JSON.stringify({ action:"submitRequest", token: AUTH_SESSION.token, payload }));
-  if(encoded.length > 6000 && /<img/i.test(payload.descriptionHtml||"")){
-    payload.descriptionHtml = (payload.descriptionHtml||"").replace(/<img[^>]*>/gi,
-      "[a pasted screenshot was too large to send and was left out — please attach it separately if needed]");
-  }
-  await authApiCall_("submitRequest", { token: AUTH_SESSION.token, payload });
+  // Real direct POST now (authApiPostCall_) — see its own comment for why this works now (the
+  // tech@jaro.in ownership migration's "Anyone" access) when it didn't before. No URL-length
+  // ceiling to work around anymore, so pasted screenshots/attachments travel through whole,
+  // unlike the old JSONP-GET path which sometimes had to strip them out.
+  await authApiPostCall_("submitRequest", { token: AUTH_SESSION.token, payload });
 }
 /* ---- Status updates: same backend call — Code.gs looks up the original message/thread from the
    sheet row itself and replies in-thread via GmailApp (far more reliable than hand-building
    In-Reply-To/References headers client-side), with a status email styled to match the original
    "New Request Raised" template instead of the old plain one-liner. ---- */
-async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, cc, appliesTo, attachmentUploadIds}){
+async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, cc, appliesTo, attachments}){
   if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
   // noteHtml carries formatting/links/pasted screenshots from the status modal's rich text editor;
   // noteText is the plain-text fallback Code.gs uses if noteHtml is empty (e.g. a fresh <br>-only div).
   // to/cc are whatever the Admin picked in the status modal's own Send To/CC fields — editable per
   // update, independent of who was on the original request (Code.gs falls back to the original
   // To/Cc if these come through empty for some reason).
-  // Same URL-length safeguard as submitRequestDirect_ — this call still rides the JSONP GET
-  // transport, so a big pasted screenshot in the note can blow past the practical URL length limit.
-  noteHtml = noteHtml || "";
-  const probeLen = encodeURIComponent(JSON.stringify({ action:"updateStatus", token:AUTH_SESSION.token, sheetRow, status, noteHtml, noteText, to, cc })).length;
-  if(probeLen > 6000 && /<img/i.test(noteHtml)){
-    noteHtml = noteHtml.replace(/<img[^>]*>/gi,
-      "[a pasted screenshot was too large to send and was left out — please attach it separately if needed]");
-  }
-  return await authApiCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml, noteText: noteText || "", to: to || [], cc: cc || [], appliesTo: appliesTo || "", attachmentUploadIds: attachmentUploadIds || [] });
+  // Real direct POST now (authApiPostCall_) — see its own comment above submitRequestDirect_'s
+  // call. No URL-length ceiling to strip pasted screenshots against anymore.
+  return await authApiPostCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml: noteHtml || "", noteText: noteText || "", to: to || [], cc: cc || [], appliesTo: appliesTo || "", attachments: attachments || [] });
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
@@ -5257,8 +5207,8 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
     confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
     sel.disabled = true;
     try{
-      const attachmentUploadIds = statusNoteRTE ? statusNoteRTE.getAttachmentIds() : [];
-      const r = await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails, appliesTo, attachmentUploadIds });
+      const attachments = statusNoteRTE ? statusNoteRTE.getAttachments() : [];
+      const r = await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails, appliesTo, attachments });
       const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
       sel.style.background = c.bg; sel.style.color = c.fg;
       // Surfacing Code.gs's debug trail directly here — Google's own Executions/Cloud Logging
@@ -5540,6 +5490,55 @@ function authApiCallOnce_(action, data, attempt){
     script.src = url;
     document.head.appendChild(script);
   });
+}
+/* ---- Attachments v5: real direct upload — a plain fetch() POST, made possible by the 2026-08
+   ownership migration to tech@jaro.in, whose deployment access is "Anyone" instead of domain-
+   restricted. That's the specific thing that used to make a real POST impossible: Google's own
+   gate in front of the Web App needed a session cookie the browser withholds on a cross-site
+   POST (see authApiCallLarge_'s own comment below — that was the earlier, unsuccessful attempt to
+   work around it with a hidden iframe+form, kept only as a fallback/reference now). With that
+   gate gone, there's no cookie problem left to work around at all.
+   Content-Type: text/plain is deliberate, not a mistake — it keeps this a CORS "simple request",
+   so the browser sends it directly with no preflight OPTIONS round trip, which Apps Script has no
+   way to answer correctly. Code.gs's doPost doesn't care what the declared Content-Type says; it
+   just parses e.postData.contents as JSON either way.
+   Used only for submitRequest/updateStatus, the two actions that might carry attachment bytes —
+   everything else stays on the proven JSONP GET transport above, unchanged, since there's no
+   reason to touch what already works. Same idemKey/one-retry shape as authApiCall_, reusing
+   Code.gs's existing dispatch_ idempotency guard, which doesn't care which transport called it. */
+function authApiPostCall_(action, data, _ctx){
+  const ctx = _ctx || { attempt: 1, idemKey: "idem_" + Date.now() + "_" + Math.random().toString(36).slice(2) };
+  const payload = Object.assign({ idemKey: ctx.idemKey }, data || {});
+  return authApiPostCallOnce_(action, payload).catch(err=>{
+    if(ctx.attempt < 2){
+      return new Promise(resolve=>setTimeout(resolve, 500)).then(()=> authApiPostCall_(action, data, { attempt: ctx.attempt + 1, idemKey: ctx.idemKey }));
+    }
+    throw err;
+  });
+}
+async function authApiPostCallOnce_(action, data){
+  if(!CONFIG.authApiUrl) throw new Error("CONFIG.authApiUrl isn't set yet");
+  const controller = new AbortController();
+  // Generous — this call can carry a real file's worth of bytes (up to the 10MB cap), not just a
+  // tiny action payload, so it needs real headroom on a slower connection.
+  const timer = setTimeout(()=> controller.abort(), 60000);
+  let res;
+  try{
+    res = await fetch(CONFIG.authApiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ action }, data||{})),
+      signal: controller.signal
+    });
+  }catch(err){
+    clearTimeout(timer);
+    if(err.name === "AbortError") throw new Error("The server didn't respond in time — check your connection and try again");
+    throw new Error("Couldn't reach the server — check your connection and try again");
+  }
+  clearTimeout(timer);
+  const json = await res.json();
+  if(json && json.ok) return json;
+  throw new Error((json && json.error) || "Something went wrong — try again");
 }
 // authApiCallLarge_ is for calls whose payload might be too big for a URL — specifically
 // submitRequest, whose description can include pasted screenshots as inline base64 images, easily
