@@ -976,9 +976,13 @@ function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, refe
   // Hardcoded rather than Session.getEffectiveUser().getEmail() — that call needs the
   // https://www.googleapis.com/auth/userinfo.email OAuth scope, which isn't in this project's
   // manifest, and adding it would mean yet another authorize-and-redeploy round trip for no real
-  // benefit: this script only ever runs as this one account (same address already hardcoded
-  // elsewhere in this file, e.g. setupAdmin() and the submitRequest fallback recipient).
-  const fromEmail = "lalit.rade@jaro.in";
+  // benefit: this script only ever runs as this one account (matching the "Execute as" identity
+  // on the deployment — tech@jaro.in as of the 2026-08 ownership migration). Deliberately
+  // different from lalit.rade@jaro.in elsewhere in this file (setupAdmin(), SUPER_ADMIN_EMAILS,
+  // the submitRequest fallback recipient) — those are about Lalit's own role *within* the
+  // dashboard's login system, which stays unchanged; this is about which Google account the
+  // script itself is authorized to run as and send mail through, which moved.
+  const fromEmail = "tech@jaro.in";
   const baseHeaders = [
     "MIME-Version: 1.0",
     "From: \"Jaro Web Pages Dashboard\" <" + fromEmail + ">",
