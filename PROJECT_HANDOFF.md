@@ -911,3 +911,21 @@ items, unchanged: (1) exact symptoms for the still-open Insights-visibility issu
 (2) decide whether to build the proposed shared-cache proxy for scaling; (3) confirm whether the old
 `C:\Users\user\Downloads\Website Requirement Dashboard` folder can be deleted now that the D: copy
 is confirmed working.
+
+## Real bug fixed: Vercel Hobby plan blocked commits from a non-owner author (2026-08-22)
+
+The two most recent deployments (`5d071d0`, `28098cf`) sat at **Blocked** in Vercel, never actually
+going live — the dashboard kept showing pre-migration behavior no matter how hard the page was
+refreshed, because the live Production deployment was still genuinely the older `a34272d` commit.
+Vercel's own message: *"The deployment was blocked because the commit author did not have
+contributing access to the project on Vercel. The Hobby Plan does not support collaboration for
+private repositories."* Root cause: every commit in this repo is authored under the `lalitrade-jaro`
+git identity (this environment's configured git user, which git-safety rules prohibit changing) —
+but the GitHub repo and Vercel project are now owned by `TechJaro`. Vercel's free plan treats a
+commit from any author other than the project owner as an unapproved collaborator on a private
+repo and blocks the deployment outright — structural, not a one-off, so it would have blocked
+*every* future push the same way. Fixed by making the GitHub repo public (confirmed via
+`gh api repos/TechJaro/website-requirement-dashboard --jq '.private'` → `false`) — this specific
+restriction is scoped to private repos, and per the user's choice, made after weighing it against
+the other two options (upgrading to Pro, ruled out on cost; or having the user push future changes
+under their own identity, workable but adds friction to every round of changes going forward).
