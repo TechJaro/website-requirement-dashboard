@@ -501,6 +501,16 @@ td.link-cell a:hover{text-decoration:underline}
 .chip-suggest-item b{font-weight:600}
 .chip-suggest-item span{font-size:11px;color:var(--ink-50)}
 .chip-suggest-empty{padding:10px 12px;font-size:12px;color:var(--ink-35)}
+.mention-suggest{
+  position:fixed;background:#fff;border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow-md);
+  max-height:220px;overflow-y:auto;z-index:200;display:none;min-width:220px;max-width:300px;
+}
+.mention-suggest.show{display:block}
+.mention-suggest-item{padding:9px 12px;font-size:12.5px;cursor:pointer;display:flex;flex-direction:column;gap:1px}
+.mention-suggest-item:hover{background:var(--blue-tint-06)}
+.mention-suggest-item b{font-weight:600}
+.mention-suggest-item span{font-size:11px;color:var(--ink-50)}
+.rte-mention{background:var(--blue-tint-10);color:var(--blue);border-radius:4px;padding:1px 5px;font-weight:600}
 .field-hint{font-size:11px;color:var(--blue);margin-top:6px;font-weight:500}
 
 /* ---------- PER-ITEM "RAISE A REQUEST" MINI BUTTON ---------- */
@@ -3326,6 +3336,7 @@ function createChipPicker(ids, defaultEmails, locked){
   }
   return {
     get: ()=>selected.slice(),
+    add,
     reset: (emails)=>{ selected = []; render(); (emails||[]).forEach(email=>{
       const known = CONTACTS.find(c=>c.email.toLowerCase()===email.toLowerCase());
       add(known || { name:email, email });
@@ -3803,7 +3814,13 @@ function openFormAttachModal_(reference){
 }
 function wireRichTextEditor(ids){
   const cfg = Object.assign({
-    bodyId:"rf_desc", scopeEl:document, linkBtnId:"rteLinkBtn", imageBtnId:"rteImageBtn", imageInputId:"rteImageInput"
+    bodyId:"rf_desc", scopeEl:document, linkBtnId:"rteLinkBtn", imageBtnId:"rteImageBtn", imageInputId:"rteImageInput",
+    // A getter, not the picker itself — at the point this function is called, the CC chip-picker it
+    // belongs to (module-level `ccPicker` for the request form, `statusNoteCcPicker` for the status
+    // modal) hasn't necessarily been created yet (both are lazily created on a modal's first open,
+    // same as this RTE is). Deferring the lookup to actual mention-insertion time, rather than
+    // capturing whatever the variable held at wiring time, is what makes that ordering safe.
+    ccPicker: null
   }, ids||{});
   const body = document.getElementById(cfg.bodyId);
   cfg.scopeEl.querySelectorAll(".rte-btn[data-cmd]").forEach(btn=>{
@@ -3895,6 +3912,72 @@ function wireRichTextEditor(ids){
     pendingReads.add(task);
     task.finally(()=> pendingReads.delete(task));
   }
+  // ---- @mention autocomplete ----
+  // Typing "@" at the start of a word — not preceded by a letter/digit, so typing an email address
+  // inline (e.g. "chirag@runtime-solutions.com") doesn't trigger this — opens a dropdown of
+  // matching Contacts. Picking one inserts a styled, non-editable mention chip in the text. Since a
+  // mention in the body text alone wouldn't actually notify anyone, it also adds that person to
+  // this editor's CC list, if one was wired in via cfg.ccPicker.
+  let mentionEl = null, mentionRange = null;
+  function ensureMentionEl(){
+    if(mentionEl) return mentionEl;
+    mentionEl = document.createElement("div");
+    mentionEl.className = "mention-suggest";
+    document.body.appendChild(mentionEl);
+    return mentionEl;
+  }
+  function hideMention(){ if(mentionEl) mentionEl.classList.remove("show"); mentionRange = null; }
+  function insertMention(contact){
+    if(!mentionRange) return;
+    mentionRange.deleteContents();
+    const span = document.createElement("span");
+    span.className = "rte-mention";
+    span.contentEditable = "false";
+    span.textContent = "@" + (contact.name || contact.email);
+    mentionRange.insertNode(span);
+    const space = document.createTextNode(" ");
+    span.after(space);
+    const sel = window.getSelection();
+    const r = document.createRange();
+    r.setStartAfter(space); r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+    const picker = cfg.ccPicker && cfg.ccPicker();
+    if(picker) picker.add(contact);
+    hideMention();
+    body.focus();
+  }
+  body.addEventListener("input", ()=>{
+    const sel = window.getSelection();
+    if(!sel.rangeCount || !sel.isCollapsed){ hideMention(); return; }
+    const range = sel.getRangeAt(0);
+    if(!body.contains(range.startContainer) || range.startContainer.nodeType !== Node.TEXT_NODE){ hideMention(); return; }
+    const text = range.startContainer.textContent.slice(0, range.startOffset);
+    const at = text.lastIndexOf("@");
+    if(at === -1){ hideMention(); return; }
+    if(/[\s ]/.test(text.slice(at+1))){ hideMention(); return; } // "@" belongs to an earlier, already-finished word
+    const before = text[at-1];
+    if(before && !/[\s ]/.test(before)){ hideMention(); return; } // mid-word (e.g. typing an email address) — not a mention
+    const query = text.slice(at+1).toLowerCase();
+    const matches = CONTACTS.filter(c => c.name.toLowerCase().includes(query) || c.email.toLowerCase().includes(query)).slice(0, 8);
+    if(!matches.length){ hideMention(); return; }
+    const el = ensureMentionEl();
+    el.innerHTML = matches.map((c,i)=>`<div class="mention-suggest-item" data-i="${i}"><b>${esc(c.name)}</b><span>${esc(c.email)}</span></div>`).join("");
+    el.querySelectorAll(".mention-suggest-item").forEach(item=>{
+      // mousedown (not click), with preventDefault, so the contenteditable's selection — which
+      // mentionRange below is about to capture — isn't lost to a focus change before this fires.
+      item.addEventListener("mousedown", (e)=>{ e.preventDefault(); insertMention(matches[+item.dataset.i]); });
+    });
+    const atRange = document.createRange();
+    atRange.setStart(range.startContainer, at);
+    atRange.setEnd(range.startContainer, range.startOffset);
+    mentionRange = atRange;
+    const rect = range.getClientRects()[0] || body.getBoundingClientRect();
+    el.style.left = rect.left + "px";
+    el.style.top = (rect.bottom + 4) + "px";
+    el.classList.add("show");
+  });
+  body.addEventListener("keydown", (e)=>{ if(e.key === "Escape") hideMention(); });
+  document.addEventListener("click", (e)=>{ if(mentionEl && !mentionEl.contains(e.target) && e.target !== body) hideMention(); });
   return {
     hasPendingUploads: ()=> pendingReads.size > 0,
     waitForUploads: ()=> Promise.allSettled([...pendingReads]),
@@ -4175,6 +4258,118 @@ async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, c
   // Real direct POST now (authApiPostCall_) — see its own comment above submitRequestDirect_'s
   // call. No URL-length ceiling to strip pasted screenshots against anymore.
   return await authApiPostCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml: noteHtml || "", noteText: noteText || "", to: to || [], cc: cc || [], target: target || "", senderName: senderName || "", attachments: attachments || [] });
+}
+/* ---- Quick Action confirm modal — reached only via a "?quickAction=<token>" link in the "New
+   Request Raised" email (Mark Completed / Assign to Someone). Deliberately no login step is built
+   into this flow: if the browser already has a valid dashboard session for one of the allowed
+   people, it's used as-is; otherwise this just tells them to log in normally and click the email
+   link again, rather than pausing mid-flow to prompt for credentials. Reuses the same rich-text
+   note + attachment machinery as the status modal (openStatusNoteModal_), since the ask was for the
+   same note/attach capability here too. Must match Code.gs's QUICK_ACTION_ALLOWED_EMAILS. */
+const QUICK_ACTION_ALLOWED_EMAILS = new Set([
+  "jasmeet.kaur@jaro.in", "lalit.rade@jaro.in", "sudesh@runtime-solutions.com",
+  "chirag@runtime-solutions.com", "runtimeomkar@gmail.com", "ishaan.b@jaro.in"
+]);
+let quickActionRTE = null;
+async function openQuickActionModal_(quickToken){
+  if(!QUICK_ACTION_ALLOWED_EMAILS.has((AUTH_SESSION.email||"").toLowerCase())){
+    toast("Only specific team members can use Quick Actions", true);
+    return;
+  }
+  let info;
+  try{
+    info = await authApiCall_("quickActionInfo", { token: AUTH_SESSION.token, quickAction: quickToken });
+  }catch(err){
+    toast(err.message || "Couldn't open this Quick Action", true);
+    return;
+  }
+  const title = info.isAssign ? "Assign to Someone" : `Mark ${info.target ? info.target + " " : ""}${esc(info.status)}`;
+  const subtitle = esc(info.subject || "This request") + (info.university ? " — " + esc(info.university) : "");
+  document.body.insertAdjacentHTML("beforeend", `
+    <div class="modal-overlay show" id="quickActionOverlay">
+      <div class="modal" style="max-width:480px">
+        <div class="modal-watermark"></div>
+        <div class="modal-head">
+          <div class="ic">${ic("link")}</div>
+          <div>
+            <h3>${title}</h3>
+            <p>${subtitle}</p>
+          </div>
+          <button class="modal-close" id="qaClose" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body" style="display:grid;gap:14px">
+          ${info.isAssign ? `
+          <div class="field">
+            <label>Assign to (email)</label>
+            <input type="email" id="qaAssigneeInput" placeholder="name@jaro.in" autocomplete="off">
+          </div>` : ""}
+          <div class="field">
+            <label>Message (optional)</label>
+            <div class="rte-toolbar" id="qaToolbar">
+              <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/></svg></button>
+              <button type="button" class="rte-btn" data-cmd="italic" title="Italic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4h-9M14 20H5M15 4 9 20"/></svg></button>
+              <button type="button" class="rte-btn" id="qaLinkBtn" title="Insert hyperlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></svg></button>
+              <button type="button" class="rte-btn" id="qaImageBtn" title="Attach a file (image, PDF, etc. — up to 10MB)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
+              <input type="file" id="qaImageInput" multiple hidden>
+              <span class="rte-hint">Paste screenshots directly (Ctrl/Cmd+V), or attach any file up to 10MB</span>
+            </div>
+            <div class="rte-body" id="qaNote" contenteditable="true" data-placeholder="Add any details, links, or screenshots…" style="min-height:110px"></div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" class="btn" id="qaCancel">Cancel</button>
+          <button type="button" class="btn primary" id="qaConfirm">Confirm</button>
+        </div>
+      </div>
+    </div>`);
+  const overlay = document.getElementById("quickActionOverlay");
+  quickActionRTE = wireRichTextEditor({
+    bodyId:"qaNote", scopeEl:document.getElementById("qaToolbar"),
+    linkBtnId:"qaLinkBtn", imageBtnId:"qaImageBtn", imageInputId:"qaImageInput"
+  });
+  const closeModal = ()=> overlay.remove();
+  document.getElementById("qaClose").addEventListener("click", closeModal);
+  document.getElementById("qaCancel").addEventListener("click", closeModal);
+  overlay.addEventListener("click", (e)=>{ if(e.target === overlay) closeModal(); });
+  document.getElementById("qaConfirm").addEventListener("click", async ()=>{
+    const confirmBtn = document.getElementById("qaConfirm");
+    const assigneeInput = document.getElementById("qaAssigneeInput");
+    const assigneeEmail = assigneeInput ? assigneeInput.value.trim() : "";
+    if(info.isAssign && !assigneeEmail){ toast("Enter who you're assigning this to", true); return; }
+    if(info.isAssign && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assigneeEmail)){ toast("Enter a valid email address", true); return; }
+    if(quickActionRTE && quickActionRTE.hasPendingUploads()){
+      confirmBtn.disabled = true; confirmBtn.textContent = "Waiting for attachment…";
+      await quickActionRTE.waitForUploads();
+      confirmBtn.disabled = false; confirmBtn.textContent = "Confirm";
+    }
+    const noteHtml = document.getElementById("qaNote").innerHTML.trim();
+    const noteText = document.getElementById("qaNote").innerText.trim();
+    const attachments = quickActionRTE ? quickActionRTE.getAttachments() : [];
+    const known = CONTACTS.find(c=>c.email.toLowerCase()===(AUTH_SESSION.email||"").toLowerCase());
+    const senderName = (known && known.name) || AUTH_SESSION.email;
+    confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
+    try{
+      const r = await authApiPostCall_("applyQuickAction", {
+        token: AUTH_SESSION.token, quickAction: quickToken, assigneeEmail, noteHtml, noteText, senderName, attachments
+      });
+      toast(r && r.debug ? `Done — ${r.debug}` : "Done");
+      closeModal();
+    }catch(err){
+      toast(err.message || "Couldn't complete this Quick Action", true);
+      confirmBtn.disabled = false; confirmBtn.textContent = "Confirm";
+    }
+  });
+}
+// Called once at boot — a Quick Action link always lands on the dashboard's root with this param,
+// never something navigated to from inside the app, so it's only ever relevant on first load.
+function maybeHandlePendingQuickAction_(){
+  const token = new URLSearchParams(location.search).get("quickAction");
+  if(!token) return;
+  history.replaceState(null, "", location.pathname); // strip it so a refresh doesn't re-trigger an already-used token
+  if(AUTH_SESSION && AUTH_SESSION.token) openQuickActionModal_(token);
+  else setTimeout(()=> toast("Log into the dashboard, then click the Quick Action link again", true), 500);
 }
 /* ---- Collects every unique page URL already loaded across your categories (no Apps Script
    needed — reuses the same data getData() already fetched for Website Stats/each section) ---- */
@@ -5195,7 +5390,8 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
     overlay = document.getElementById("statusNoteOverlay");
     statusNoteRTE = wireRichTextEditor({
       bodyId:"statusNoteText", scopeEl:document.getElementById("statusNoteToolbar"),
-      linkBtnId:"statusNoteLinkBtn", imageBtnId:"statusNoteImageBtn", imageInputId:"statusNoteImageInput"
+      linkBtnId:"statusNoteLinkBtn", imageBtnId:"statusNoteImageBtn", imageInputId:"statusNoteImageInput",
+      ccPicker: ()=>statusNoteCcPicker
     });
     statusNoteToPicker = createChipPicker(
       { chips:"statusNoteTo_chips", input:"statusNoteTo_input", suggest:"statusNoteTo_suggest", picker:"statusNoteTo_picker" }, [], false
@@ -5304,6 +5500,7 @@ async function renderRequirementsTable(sec){
   const el = document.getElementById("content");
   el.innerHTML = sectionShell(sec, false);
   const listWrap = document.getElementById("listWrap");
+  function scrollToTop(){ document.querySelector(".content").scrollIntoView({behavior:"smooth", block:"start"}); }
   const cfg = CONFIG.sheets.requirementsLog;
   if(!cfg || !cfg.sheetId){
     listWrap.innerHTML = emptyStateHTML(
@@ -6023,7 +6220,7 @@ function init(){
   document.getElementById("requestOverlay").addEventListener("click", (e)=>{ if(e.target.id==="requestOverlay") closeRequestModal(); });
   document.getElementById("requestForm").addEventListener("submit", submitRequest);
   document.getElementById("menuBtn").addEventListener("click", ()=> document.getElementById("sidebar").classList.toggle("open"));
-  REQUEST_DESC_RTE = wireRichTextEditor();
+  REQUEST_DESC_RTE = wireRichTextEditor({ ccPicker: ()=>ccPicker });
   wireRequestFormDependencies();
 
   navigate("home");
@@ -6083,6 +6280,7 @@ if(AUTH_SESSION){
 } else {
   showAuthGate_();
 }
+maybeHandlePendingQuickAction_();
 </script>
 </body>
 </html>

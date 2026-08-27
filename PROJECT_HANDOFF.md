@@ -1094,6 +1094,91 @@ have been affected by the original fix. Lesson: a CSS change scoped to a shared 
 checking against every structural variant that class is used in, not just the one modal it was
 written for. Committed and pushed separately from the batch above (`ba35c71`).
 
+## Quick Actions v2 — login-gated, richer confirm step, Assign to Someone, @mentions (2026-08-27)
+
+The user tried the first Quick Actions build live and asked for real changes once they saw it
+working: drop the "In Progress" button (Completed only), restrict who can act to six named people,
+attribute the status to whoever actually acted, add an "Assign to Someone" action with a note +
+attachments, and separately, let both rich-text editors (request form, status/revert note) @mention
+a contact by typing "@Name". This round rebuilds Quick Actions around dashboard login instead of a
+bare emailed link, which turned out to be the only way to genuinely satisfy the access-control ask.
+
+**Access control — why the original bare-GET design had to change.** V1's design (a GET link →
+confirm page → second GET) had *no way at all* to know who was clicking, by construction — that
+was the whole point of it being link-based. The user's requirement ("only these 6 people, and they
+should be an active dashboard user — no separate login step") can only be satisfied by a real
+session check, and the only place with a real session is the *dashboard*, not this Apps Script Web
+App. So Quick Action links now point at `DASHBOARD_URL` (a new Code.gs constant) instead of this
+Web App directly; `doGet`'s old `quickStatus` handling is now just `redirectToDashboard_()`, a
+one-line bounce carrying the same token to `?quickAction=<token>` on the dashboard. The dashboard
+checks the token via two new authenticated actions — `quickActionInfo` (read-only, populates the
+confirm modal) and `applyQuickAction` (consumes it) — both gated by `requireQuickActionAllowed_`
+(`requireSession_` + a fixed `QUICK_ACTION_ALLOWED_EMAILS` Set: Jasmeet Kaur, Lalit Sanjiv Rade,
+Sudesh Jadhav, Chirag Prajapati, Omkar Sharma, Ishaan — mirrored client-side too, for a fast
+same-page rejection before the round trip even happens; the *server* copy is the one that actually
+matters). No login step is injected into this flow anywhere — if `AUTH_SESSION` is already valid
+and allowed, the confirm modal just opens; if not, a toast says so and nothing else happens (see
+`maybeHandlePendingQuickAction_`, called once at boot from a `?quickAction=` URL param). This also
+let the old two-hop-GET LockService dance be deleted entirely — replaced by the same
+lock-then-consume pattern, just triggered from an authenticated POST instead of a bare link click,
+which is simpler and was always the more natural fit.
+
+**"Assign to Someone"** is a second kind of Quick Action token (`ASSIGN_ACTION_MARKER = "Assign"`,
+a sentinel value in the same `Status` column real statuses use — distinguishable since it's never a
+`REQUEST_STATUS_OPTIONS` value), one per request rather than per target. The assign confirm modal
+swaps the note-only layout for a free-text "Assign to (email)" field per the user's explicit call
+("the assignee will add the email id... not a Contacts dropdown") — deliberately not the CONTACTS
+chip-picker used everywhere else. `applyAssignment_` (parallel to `applyStatusUpdate_`) writes a new
+self-healing "Assigned To" column and emails the assignee directly (To), CC'ing whoever was already
+on the request so the thread stays informed, using a new `assignmentEmailHtml_` template matching
+the existing branded shell.
+
+**Richer confirm step**: both Quick Action types (mark-completed and assign) now show a real modal
+on the dashboard — not a static Apps-Script-rendered page — with the same rich-text note +
+image/PDF attachment capability as the status modal (`openQuickActionModal_`, reusing
+`wireRichTextEditor` verbatim). This was the natural consequence of routing through the dashboard
+for login anyway: the existing note/attachment machinery was just sitting right there to reuse,
+rather than needing a hand-rolled upload form inside a constrained `HtmlService` page.
+
+**Attribution** ("New Status should mention who marked it via Quick Actions") falls out of the same
+login requirement — `senderName` is resolved from `AUTH_SESSION.email` against the dashboard's own
+`CONTACTS` list (same resolution `openStatusNoteModal_` already uses) and threaded through to
+`statusEmailHtml_`'s existing "Message by {sender name}" heading — no separate mechanism needed.
+
+**@mentions** — `wireRichTextEditor` gained inline `@Name` autocomplete (matching `CONTACTS`),
+wired into both the request form's description and the status modal's note field via a new
+`ccPicker` config option. It's a *getter function* (`ccPicker: ()=>ccPicker` /
+`ccPicker: ()=>statusNoteCcPicker`), not the picker instance itself — at the point
+`wireRichTextEditor` is actually called, neither module-level chip-picker variable has been created
+yet (both are lazily created on that modal's first open, same as the RTE itself), so passing the
+live value directly would capture `undefined` forever. Detection triggers on an "@" not immediately
+preceded by a letter/digit (so typing a real email address inline, e.g. replying with someone's
+address in the text, never falsely opens the dropdown), and picking a match inserts a styled
+non-editable `<span class="rte-mention">` chip *and* adds that person to the editor's CC list —
+mentioning someone in text they'd never otherwise see wouldn't actually reach them by itself.
+`createChipPicker` gained an `add` method on its returned object (previously only `get`/`reset`)
+for this to call. Not wired into the Quick Action modal's own note field — it has no associated CC
+picker to add to, and wasn't part of what was asked ("for request and revert both").
+
+**Real bug found and fixed during this round's testing, unrelated to the features above**: the
+Requirements Log pagination buttons (`renderRequirementsTable`, from the SS6 batch this session)
+called a `scrollToTop()` that doesn't exist in that function's scope — it's a *local* helper
+private to `renderBlogCards`/the Combined Insights renderer, not a shared/global function, so every
+Prev/Next/First/Last click threw `ReferenceError: scrollToTop is not defined`. Missed the first time
+because that round's testing only checked pagination *state* by calling `draw()` directly, never
+actually clicked the real buttons. Fixed by adding the same one-line local `scrollToTop()` inside
+`renderRequirementsTable` too. Caught by clicking the actual buttons this round, not by re-reading
+the code — a reminder to always exercise the real event-wired path, not just the state it produces.
+
+**Verification**: all of the above tested end-to-end in the browser with `authApiCall_`/
+`authApiPostCall_` mocked — pagination buttons (all four, via real clicks, confirming the fix
+above), @mentions in both editors (dropdown appears on "@Name", stays hidden while typing a plain
+email address, selecting a match inserts the chip and adds the CC), and all three Quick Action
+paths (mark-completed modal, assign modal with its email-required/valid-format guards, and both the
+"wrong person" and "not logged in" rejection paths) — zero console errors across the whole pass.
+`Code.gs` syntax-checked with `node --check`. Not tested against the live backend/real email
+delivery — needs a real click-through after redeploying.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,

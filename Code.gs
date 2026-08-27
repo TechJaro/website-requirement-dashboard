@@ -57,11 +57,33 @@ const ACTION_TOKEN_TTL_DAYS = 30;
 // Must match the dashboard's own COMBINED_SECTION_LABEL (Unified Dashboard.txt) — the one section
 // value that tracks Program Page / Landing Page as two independent statuses.
 const COMBINED_SECTION_LABEL = "Program Pages/Landing Pages";
-// Only the two most common next actions get a one-click email link, to keep the email from turning
-// into a wall of buttons (4 for a combined-section request, since each target gets its own pair) —
-// every other status (At Risk/Delayed/Terminated/back to Not Started) still goes through the
-// dashboard, same as today.
-const QUICK_ACTION_STATUSES = ["In Progress","Completed"];
+// Only "Completed" gets a one-click email link (dropped "In Progress" per feedback — it wasn't
+// actually useful as a one-click action) — every other status still goes through the dashboard.
+const QUICK_ACTION_STATUSES = ["Completed"];
+// Quick Actions (both "Mark Completed" and "Assign to Someone") are restricted to this specific
+// list of people, by explicit request — everyone else gets a clear rejection rather than being
+// able to act. Enforced by requiring an actual, currently-valid dashboard session (requireSession_)
+// whose email is in this set — there is deliberately no separate "log in to use this link" step:
+// if the browser already has a valid session, it's accepted; if not, the action is just refused
+// (see requireQuickActionAllowed_) rather than prompting a login inline.
+const QUICK_ACTION_ALLOWED_EMAILS = new Set([
+  "jasmeet.kaur@jaro.in",   // Jasmeet Kaur
+  "lalit.rade@jaro.in",     // Lalit Sanjiv Rade
+  "sudesh@runtime-solutions.com", // Sudesh Jadhav
+  "chirag@runtime-solutions.com", // Chirag Prajapati
+  "runtimeomkar@gmail.com", // Omkar Sharma
+  "ishaan.b@jaro.in",       // Ishaan
+]);
+function isQuickActionAllowed_(email){ return QUICK_ACTION_ALLOWED_EMAILS.has((email||"").trim().toLowerCase()); }
+function requireQuickActionAllowed_(token){
+  const session = requireSession_(token);
+  if(!isQuickActionAllowed_(session.Email)) throw new Error("Only specific team members can use Quick Actions.");
+  return session;
+}
+// The dashboard's own site — Quick Action email links land here (not directly on this Web App)
+// so that "is this person actually logged into the dashboard" can be checked at all: the Web App
+// itself has no session of its own to check against a bare, unauthenticated email click.
+const DASHBOARD_URL = "https://website-requirement-dashboard.vercel.app";
 const USERS_HEADER = ["Email","Role","PasswordHash","Salt","Status","CreatedAt","LastLogin"];
 const SESSIONS_HEADER = ["Token","Email","Role","Name","ExpiresAt"];
 const OTPS_HEADER = ["Email","Purpose","Code","ExpiresAt","SetupToken"];
@@ -190,10 +212,11 @@ function doPost(e){
 */
 function doGet(e){
   const params = (e && e.parameter) || {};
-  // One-click status links from a "New Request Raised" email land here directly — a plain page
-  // view, not a JSONP/dispatch_ call, since there's no logged-in session and the caller is a human
-  // clicking a link in Gmail, not the dashboard's own JS.
-  if(params.quickStatus) return renderQuickStatusPage_(params.quickStatus.toString(), params.confirm === "1");
+  // One-click Quick Action links from a "New Request Raised" email land here first, but this Web
+  // App has no session of its own to check — only the dashboard site does. So this just bounces
+  // straight to the dashboard with the same token, where AUTH_SESSION (or its absence) can actually
+  // be checked before anything is shown.
+  if(params.quickAction) return redirectToDashboard_("?quickAction=" + encodeURIComponent(params.quickAction.toString()));
   const callback = (params.callback || "").toString();
   let body = {};
   try{ body = params.payload ? JSON.parse(params.payload) : {}; }
@@ -251,6 +274,8 @@ function dispatchAction_(body){
     case "setUserRole": return handleSetUserRole_(body);
     case "submitRequest": return handleSubmitRequest_(body);
     case "updateStatus": return handleUpdateStatus_(body);
+    case "quickActionInfo": return handleQuickActionInfo_(body);
+    case "applyQuickAction": return handleApplyQuickAction_(body);
     case "uploadChunk": return handleUploadChunk_(body); // unused by the current front end — see the "Attachments v2" comment above assembleAttachments_
     case "checkFormUpload": return handleCheckFormUpload_(body);
     case "listRequirements": return handleListRequirements_(body);
@@ -1196,15 +1221,16 @@ function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, n
   }
   return { ok:true, debug: debugLines.join(" | ") };
 }
-/* ---- One-click status updates from inside the "New Request Raised" email itself ----
-   Generates a short-lived, single-use token per quick action and appends it to the ActionTokens
-   sheet; embedded as plain links in the email (see buildQuickActionLinks_). Clicking one is a GET
-   with no session at all — the token itself is the only credential. Deliberately two hops (a GET
-   that only shows a confirm page, then a second GET from the button on that page that actually
-   applies the change) rather than one: a bare single-hop link would silently fire if an email
-   provider's link-scanner prefetches links found directly in the email body to check them for
-   malware — a well-known gotcha for any one-click email action. Nothing mutates until the second,
-   confirm-page-only link is followed, which a body-scanner has no reason to ever discover. */
+/* ---- One-click actions from inside the "New Request Raised" email itself ----
+   Generates a short-lived, single-use token per action (per-target "Mark Completed", plus one
+   whole-request "Assign to Someone") and appends it to the ActionTokens sheet; embedded as plain
+   links in the email (see buildQuickActionLinks_). Clicking one lands on the DASHBOARD (not this
+   Web App directly — see DASHBOARD_URL/redirectToDashboard_), which is what actually lets "is this
+   person allowed" be checked: the dashboard already has a real login session to check against,
+   this Web App on its own has no way to know who's clicking a bare emailed link. The dashboard
+   then calls quickActionInfo (read-only, to show what the token is for) and applyQuickAction
+   (actually consumes it) below like any other authenticated action. */
+const ASSIGN_ACTION_MARKER = "Assign"; // sentinel Status value in ActionTokens marking an "Assign to Someone" token, distinct from a real REQUEST_STATUS_OPTIONS value
 function buildQuickActionLinks_(requestId, section){
   const isCombined = section === COMBINED_SECTION_LABEL;
   const targets = isCombined ? ["Program Page","Landing Page"] : [""];
@@ -1213,88 +1239,180 @@ function buildQuickActionLinks_(requestId, section){
   // upload-chunk cleanup elsewhere in this file — avoids rescanning the whole sheet per token.
   const cutoff = Date.now() - ACTION_TOKEN_TTL_DAYS*86400000;
   keepRowsWhere_(sheet, r => new Date(r[4]).getTime() >= cutoff);
-  const baseUrl = ScriptApp.getService().getUrl();
   const now = new Date().toISOString();
+  const linkFor = token => DASHBOARD_URL + "/?quickAction=" + encodeURIComponent(token);
   const buttons = [];
   targets.forEach(target=>{
     QUICK_ACTION_STATUSES.forEach(status=>{
       const token = Utilities.getUuid();
       sheet.appendRow([token, requestId, status, target, now]);
-      const url = baseUrl + "?quickStatus=" + encodeURIComponent(token);
       const label = target ? `Mark ${target} ${status}` : `Mark ${status}`;
-      const color = status === "Completed" ? "#1a9c5c" : "#0029A6";
-      buttons.push(`<a href="${url}" target="_blank" rel="noopener" style="display:inline-block;background:${color};color:#fff;` +
+      buttons.push(`<a href="${linkFor(token)}" target="_blank" rel="noopener" style="display:inline-block;background:#1a9c5c;color:#fff;` +
         `text-decoration:none;font-weight:700;font-size:12.5px;padding:9px 16px;border-radius:8px;margin:4px">${escHtml_(label)}</a>`);
     });
   });
+  // One "Assign to Someone" token for the whole request (not per-target) — same allowlist as the
+  // status buttons above; who to assign to is picked on the dashboard confirm step, not baked into
+  // the link, since that's only known at click time.
+  const assignToken = Utilities.getUuid();
+  sheet.appendRow([assignToken, requestId, ASSIGN_ACTION_MARKER, "", now]);
+  buttons.push(`<a href="${linkFor(assignToken)}" target="_blank" rel="noopener" style="display:inline-block;background:#0029A6;color:#fff;` +
+    `text-decoration:none;font-weight:700;font-size:12.5px;padding:9px 16px;border-radius:8px;margin:4px">Assign to Someone</a>`);
   return `
     <div style="text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid #eef0f3">
       <div style="font-size:11px;color:#5b6472;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Quick Actions</div>
       ${buttons.join("")}
     </div>`;
 }
-function htmlPage_(title, message, buttonUrl, buttonLabel){
-  const button = buttonUrl
-    ? `<a href="${buttonUrl}" style="display:inline-block;margin-top:22px;background:#0029A6;color:#fff;text-decoration:none;` +
-      `font-weight:700;font-size:14px;padding:12px 26px;border-radius:8px">${escHtml_(buttonLabel)}</a>`
-    : "";
-  const html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escHtml_(title)}</title></head>
-  <body style="font-family:Verdana,Geneva,sans-serif;background:#f5f7fb;margin:0;padding:40px 20px">
-    <div style="max-width:420px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
-      <div style="background:#0029A6;padding:18px 24px">
-        <div style="color:#FFCF24;font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase">Jaro Dashboard</div>
-      </div>
-      <div style="padding:28px 24px;text-align:center">
-        <h2 style="margin:0 0 12px;font-size:18px;color:#111">${escHtml_(title)}</h2>
-        <p style="margin:0;font-size:14px;color:#333;line-height:1.5">${message}</p>
-        ${button}
-      </div>
-    </div>
-  </body></html>`;
-  return HtmlService.createHtmlOutput(html).setTitle(title);
+function redirectToDashboard_(queryString){
+  const url = DASHBOARD_URL + "/" + queryString;
+  const html = `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${escHtml_(url)}">` +
+    `<script>location.replace(${JSON.stringify(url)});</script></head>` +
+    `<body style="font-family:Verdana,Geneva,sans-serif;padding:40px;text-align:center;color:#5b6472">` +
+    `Redirecting to the dashboard… If nothing happens, <a href="${escHtml_(url)}">click here</a>.</body></html>`;
+  return HtmlService.createHtmlOutput(html);
 }
-function renderQuickStatusPage_(token, confirmed){
-  const tokenSheet = getOrCreateSheet_("ActionTokens", ACTION_TOKENS_HEADER);
-  const found = findRowByColumn_(tokenSheet, "Token", token);
-  if(!found) return htmlPage_("Link already used", "This quick-action link has already been used, or isn't valid. Open the dashboard to check the current status.");
+// Read-only lookup used to populate the dashboard's confirm modal — doesn't consume the token, so
+// it's safe to call as many times as the page re-renders.
+function handleQuickActionInfo_(body){
+  requireQuickActionAllowed_(body.token);
+  const found = findRowByColumn_(getOrCreateSheet_("ActionTokens", ACTION_TOKENS_HEADER), "Token", (body.quickAction||"").toString());
+  if(!found) throw new Error("This Quick Action link has already been used, or isn't valid.");
   const th = found.headers;
-  const requestId = found.data[th.indexOf("Request ID")];
   const status = found.data[th.indexOf("Status")];
   const target = (found.data[th.indexOf("Target")] || "").toString();
+  const requestId = found.data[th.indexOf("Request ID")];
   const createdAt = found.data[th.indexOf("CreatedAt")];
-  if(new Date(createdAt).getTime() < Date.now() - ACTION_TOKEN_TTL_DAYS*86400000){
-    tokenSheet.deleteRow(found.row);
-    return htmlPage_("Link expired", `This quick-action link is more than ${ACTION_TOKEN_TTL_DAYS} days old and has expired. Open the dashboard to update the status instead.`);
-  }
-  const reqSheet = getRequestsSheet_();
-  const reqFound = findRowByColumn_(reqSheet, "Request ID", requestId);
-  if(!reqFound) return htmlPage_("Request not found", "That request couldn't be found — it may have been removed from the sheet.");
-  const label = target ? `${target} — ${status}` : status;
-  if(!confirmed){
-    // GET-only, deliberately not applying anything yet — see the comment above buildQuickActionLinks_.
-    const subject = reqFound.data[reqFound.headers.indexOf("Subject")] || "this request";
-    const confirmUrl = ScriptApp.getService().getUrl() + "?quickStatus=" + encodeURIComponent(token) + "&confirm=1";
-    return htmlPage_("Confirm status update", `Mark <b>${escHtml_(subject)}</b> as <b>${escHtml_(label)}</b>?`, confirmUrl, "Confirm");
-  }
-  // Consume the token under a lock: re-check-and-delete atomically so a double-click on the confirm
-  // button (or a client retry on a slow response) can't apply the same update twice, and can't race
-  // two concurrent deletes into removing the wrong row after Sheets shifts rows up on the first one.
+  if(new Date(createdAt).getTime() < Date.now() - ACTION_TOKEN_TTL_DAYS*86400000) throw new Error("This Quick Action link has expired.");
+  const reqFound = findRowByColumn_(getRequestsSheet_(), "Request ID", requestId);
+  if(!reqFound) throw new Error("That request couldn't be found — it may have been removed from the sheet.");
+  const g = name => reqFound.data[reqFound.headers.indexOf(name)];
+  return {
+    ok:true, isAssign: status === ASSIGN_ACTION_MARKER, status, target,
+    subject: g("Subject")||"", university: g("University")||"", program: g("Program")||"", section: g("Section")||""
+  };
+}
+// Actually applies the action — status change or assignment, whichever the token was minted for.
+function handleApplyQuickAction_(body){
+  const session = requireQuickActionAllowed_(body.token);
+  const tokenSheet = getOrCreateSheet_("ActionTokens", ACTION_TOKENS_HEADER);
+  // Consume the token under a lock: re-check-and-delete atomically so a double-click on Confirm (or
+  // a client retry on a slow response) can't apply the same action twice, and can't race two
+  // concurrent deletes into removing the wrong row after Sheets shifts rows up on the first delete.
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
-  let stillValid;
+  let found;
   try{
-    stillValid = findRowByColumn_(tokenSheet, "Token", token);
-    if(stillValid) tokenSheet.deleteRow(stillValid.row);
+    found = findRowByColumn_(tokenSheet, "Token", (body.quickAction||"").toString());
+    if(found) tokenSheet.deleteRow(found.row);
   } finally {
     lock.releaseLock();
   }
-  if(!stillValid) return htmlPage_("Already handled", "This update was already applied — no further action needed.");
+  if(!found) throw new Error("This Quick Action link has already been used, or isn't valid.");
+  const th = found.headers;
+  const status = found.data[th.indexOf("Status")];
+  const target = (found.data[th.indexOf("Target")] || "").toString();
+  const requestId = found.data[th.indexOf("Request ID")];
+  const createdAt = found.data[th.indexOf("CreatedAt")];
+  if(new Date(createdAt).getTime() < Date.now() - ACTION_TOKEN_TTL_DAYS*86400000) throw new Error("This Quick Action link has expired.");
+  const reqSheet = getRequestsSheet_();
+  const reqFound = findRowByColumn_(reqSheet, "Request ID", requestId);
+  if(!reqFound) throw new Error("That request couldn't be found — it may have been removed from the sheet.");
+  const uploadIds = Array.isArray(body.attachmentUploadIds) ? body.attachmentUploadIds : [];
+  const directAttachments = Array.isArray(body.attachments) ? body.attachments : [];
+  let attachments;
   try{
-    applyStatusUpdate_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, status, target, "", "", null, null, [], "Jaro Web Pages Team");
+    attachments = assembleAttachments_(uploadIds).concat(directAttachments.map(validateDirectAttachment_));
   }catch(err){
-    return htmlPage_("Status saved, email failed", escHtml_((err && err.message) || "The status was saved, but the notification email couldn't be sent."));
+    throw new Error("Couldn't attach the uploaded file: " + ((err && err.message) || err));
   }
-  return htmlPage_("Done", `Marked as <b>${escHtml_(label)}</b> — the requester has been notified.`);
+  const noteHtml = (body.noteHtml||"").toString();
+  const noteText = (body.noteText||"").toString();
+  const senderName = (body.senderName||"").toString().trim() || session.Email;
+  let result;
+  if(status === ASSIGN_ACTION_MARKER){
+    const assigneeEmail = (body.assigneeEmail||"").toString().trim();
+    if(!assigneeEmail) throw new Error("Enter the email of who you're assigning this to.");
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assigneeEmail)) throw new Error("Enter a valid email address to assign this to.");
+    result = applyAssignment_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, assigneeEmail, noteHtml, noteText, attachments, senderName);
+  } else {
+    result = applyStatusUpdate_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, status, target, noteHtml, noteText, null, null, attachments, senderName);
+  }
+  uploadIds.forEach(deleteFormFile_);
+  return result;
+}
+// Parallel to applyStatusUpdate_, but for "Assign to Someone" — writes a self-healing "Assigned To"
+// column instead of a status, and emails the assignee directly (CC'ing whoever was already on the
+// request, so the rest of the thread stays in the loop) instead of the requester-notification email.
+function applyAssignment_(sheet, headers, sheetRow, rowData, assigneeEmail, noteHtml, noteText, attachments, assignerName){
+  const assignedToCol = ensureColumn_(sheet, headers, "Assigned To");
+  sheet.getRange(sheetRow, assignedToCol + 1).setValue(assigneeEmail);
+  const get = name => rowData[headers.indexOf(name)];
+  const messageId = (get("Gmail Message ID") || "").toString().trim();
+  const threadId = (get("Gmail Thread ID") || "").toString().trim();
+  const payload = {
+    university:get("University"), program:get("Program"), section:get("Section"), subject:get("Subject"),
+    type:get("Request Type"), priority:get("Priority"), link:get("Related Link")
+  };
+  const html = rewireInlineImages_(assignmentEmailHtml_(payload, assigneeEmail, assignerName, noteHtml, noteText), attachments);
+  const cc = [(get("To")||"").toString(), (get("Cc")||"").toString()].filter(Boolean).join(", ");
+  const debugLines = [`row=${sheetRow}`, `threadId=${threadId || "(empty)"}`, `messageId=${messageId || "(empty)"}`, `assignee=${assigneeEmail}`];
+  try{
+    if(threadId){
+      const th = messageId ? getOriginalThreadingHeaders_(messageId) : { inReplyTo:"", references:"" };
+      const sent = sendGmailMessage_({
+        threadId: threadId, to: assigneeEmail, cc: cc, subject: "Re: " + (payload.subject || "Your request"),
+        htmlBody: html, inReplyTo: th.inReplyTo, references: th.references, attachments
+      });
+      debugLines.push("path=gmail-api-threaded", `sentThreadId=${(sent && sent.threadId) || "(unknown)"}`);
+    } else {
+      const options = { htmlBody: html, name: "Jaro Web Pages Dashboard" };
+      if(cc) options.cc = cc;
+      if(attachments.length) options.attachments = attachments.map(a => Utilities.newBlob(Utilities.base64Decode(a.base64), a.mimeType, a.filename));
+      GmailApp.sendEmail(assigneeEmail, `Re: ${payload.subject||"Your request"}`, "This email requires HTML to view.", options);
+      debugLines.push("path=fresh-email-fallback (no Gmail Thread ID stored on this row)");
+    }
+  }catch(err){
+    debugLines.push(`error=${(err && err.message) || err}`);
+    const friendly = friendlyGmailApiError_(err);
+    throw new Error("Assigned, but the notification email failed: " + friendly.message + " [" + debugLines.join(" | ") + "]");
+  }
+  return { ok:true, debug: debugLines.join(" | ") };
+}
+function assignmentEmailHtml_(payload, assigneeEmail, assignerName, noteHtml, noteText){
+  const rows = [
+    ["University", payload.university], ["Program", payload.program], ["Section", payload.section],
+    ["Request Type", payload.type], ["Priority", payload.priority],
+    ["Related Programme Page Link", payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"],
+    ["Subject", payload.subject],
+  ].map(([label,val])=>`<tr>
+      <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${escHtml_(label)}</td>
+      <td style="padding:7px 14px;font-size:13px;color:#111;border-bottom:1px solid #eef0f3">${val || "—"}</td>
+    </tr>`).join("");
+  const noteInner = (noteHtml && noteHtml.trim()) ? noteHtml
+    : (noteText && noteText.trim()) ? escHtml_(noteText).replace(/\n/g,"<br>") : "";
+  const noteBlock = noteInner ? `
+    <div style="font-size:13px;color:#333;margin-top:16px">
+      <div style="font-weight:700;margin-bottom:8px">Message by ${escHtml_(assignerName || "the sender")}</div>
+      <div style="line-height:1.5">${noteInner}</div>
+    </div>` : "";
+  return `
+<div style="font-family:Verdana,Geneva,sans-serif;max-width:600px;margin:0 auto">
+  <div style="background:#0029A6;padding:20px 26px;border-radius:12px 12px 0 0">
+    <div style="color:#FFCF24;font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase">Jaro Dashboard</div>
+    <div style="color:#fff;font-weight:700;font-size:19px;margin-top:6px">Request Assigned To You</div>
+  </div>
+  <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:22px 26px">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px">${rows}</table>
+    ${noteBlock}
+    <div style="text-align:center;padding:14px;background:#f5f7fb;border-radius:10px;margin-top:16px">
+      <div style="font-size:11px;color:#5b6472;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Assigned To</div>
+      <div style="font-size:18px;font-weight:800;color:#0029A6">${escHtml_(assigneeEmail)}</div>
+      <div style="font-size:11px;color:#5b6472;margin-top:6px">by ${escHtml_(assignerName || "a teammate")}</div>
+    </div>
+  </div>
+  <p style="font-size:11px;color:#9aa1ab;margin:14px 4px 0">Sent from the Jaro Web Pages Dashboard</p>
+</div>`;
 }
 // Support sees the Requirements Log, but only the rows they themselves raised — Admin/Super Admin
 // see everything. Filtered server-side (not just hidden in the UI) so a Support session genuinely
