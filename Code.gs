@@ -47,7 +47,21 @@ const SPREADSHEET_ID = "1JGsWhpTOalVOPoO0CwlAaCCgPMVv0ExSYTxrRErCVV0"; // same a
 const SESSION_TTL_HOURS = 12;
 const OTP_TTL_MINUTES = 2.5; // 2 minutes 30 seconds
 const REQUEST_LOG_HEADER = ["Timestamp","University","Program","Request Type","Priority","Requested By","Email",
-  "Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key","Gmail Message ID","Gmail Thread ID","Status Applies To"];
+  "Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key","Gmail Message ID","Gmail Thread ID","Status Applies To","Request ID"];
+// Stable per-request id, set once at submission and never reused — unlike a raw sheet row number,
+// it stays valid even if rows are later inserted/deleted/manually sorted in Google Sheets. Used to
+// look up the right row when a one-click email action link (see ActionTokens below) is finally
+// clicked, possibly weeks after the row's physical position may have shifted.
+const ACTION_TOKENS_HEADER = ["Token","Request ID","Status","Target","CreatedAt"];
+const ACTION_TOKEN_TTL_DAYS = 30;
+// Must match the dashboard's own COMBINED_SECTION_LABEL (Unified Dashboard.txt) — the one section
+// value that tracks Program Page / Landing Page as two independent statuses.
+const COMBINED_SECTION_LABEL = "Program Pages/Landing Pages";
+// Only the two most common next actions get a one-click email link, to keep the email from turning
+// into a wall of buttons (4 for a combined-section request, since each target gets its own pair) —
+// every other status (At Risk/Delayed/Terminated/back to Not Started) still goes through the
+// dashboard, same as today.
+const QUICK_ACTION_STATUSES = ["In Progress","Completed"];
 const USERS_HEADER = ["Email","Role","PasswordHash","Salt","Status","CreatedAt","LastLogin"];
 const SESSIONS_HEADER = ["Token","Email","Role","Name","ExpiresAt"];
 const OTPS_HEADER = ["Email","Purpose","Code","ExpiresAt","SetupToken"];
@@ -176,6 +190,10 @@ function doPost(e){
 */
 function doGet(e){
   const params = (e && e.parameter) || {};
+  // One-click status links from a "New Request Raised" email land here directly — a plain page
+  // view, not a JSONP/dispatch_ call, since there's no logged-in session and the caller is a human
+  // clicking a link in Gmail, not the dashboard's own JS.
+  if(params.quickStatus) return renderQuickStatusPage_(params.quickStatus.toString(), params.confirm === "1");
   const callback = (params.callback || "").toString();
   let body = {};
   try{ body = params.payload ? JSON.parse(params.payload) : {}; }
@@ -820,11 +838,11 @@ function handleSetUserRole_(body){
 }
 
 /* ---- Requests ---- */
-function requestEmailHtml_(payload, headingText){
+function requestEmailHtml_(payload, headingText, quickActionsHtml){
   const rows = [
     ["University", payload.university], ["Program", payload.program], ["Section", payload.section],
     ["Request Type", payload.type], ["Priority", payload.priority],
-    ["Related Link", payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"]
+    ["Related Programme Page Link", payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"]
   ].map(([label,val])=>`<tr>
       <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${escHtml_(label)}</td>
       <td style="padding:7px 14px;font-size:13px;color:#111;border-bottom:1px solid #eef0f3">${val || "—"}</td>
@@ -839,9 +857,10 @@ function requestEmailHtml_(payload, headingText){
     <p style="font-size:13px;color:#333;margin:0 0 16px">Raised by <b>${escHtml_(payload.name)}</b> (${escHtml_(payload.email)})</p>
     <table style="width:100%;border-collapse:collapse;margin-bottom:18px">${rows}</table>
     <div style="font-size:13px;color:#333">
-      <div style="font-weight:700;margin-bottom:8px">Description</div>
+      <div style="font-weight:700;margin-bottom:8px">Message</div>
       <div style="line-height:1.5">${payload.descriptionHtml && payload.descriptionHtml.trim() ? payload.descriptionHtml : escHtml_(payload.descriptionText||"").replace(/\\n/g,"<br>")}</div>
     </div>
+    ${quickActionsHtml || ""}
   </div>
   <p style="font-size:11px;color:#9aa1ab;margin:14px 4px 0">Subject: ${escHtml_(payload.subject)} · Sent from the Jaro Web Pages Dashboard</p>
 </div>`;
@@ -855,12 +874,16 @@ function requestEmailHtml_(payload, headingText){
    self-contained record even if someone hasn't scrolled back to the original message.
    noteHtml/noteText: noteHtml is the rich-text (links/bold/pasted screenshots) note typed into the
    status modal's editor; noteText is its plain-text fallback used only if noteHtml is empty. */
-function statusEmailHtml_(payload, status, noteHtml, noteText){
+// requesterName/senderName: display names for the "Message by ..." headings below — see
+// handleUpdateStatus_ for where these come from (requesterName straight off the sheet row's
+// "Requested By" column; senderName passed by the front end, resolved from its own contacts list,
+// falling back to the raw session email if no match is found there).
+function statusEmailHtml_(payload, status, noteHtml, noteText, requesterName, senderName){
   const rows = [
     ["University", payload.university], ["Program", payload.program], ["Section", payload.section],
-    ...(payload.appliesTo ? [["Applies To", `<b>${escHtml_(payload.appliesTo)}</b>`]] : []),
+    ...(payload.target ? [["Applies To", `<b>${escHtml_(payload.target)}</b>`]] : []),
     ["Request Type", payload.type], ["Priority", payload.priority],
-    ["Related Link", payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"],
+    ["Related Programme Page Link", payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"],
     ["Subject", payload.subject],
   ].map(([label,val])=>`<tr>
       <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${escHtml_(label)}</td>
@@ -868,14 +891,14 @@ function statusEmailHtml_(payload, status, noteHtml, noteText){
     </tr>`).join("");
   const descriptionBlock = payload.description ? `
     <div style="font-size:13px;color:#333;margin-top:16px">
-      <div style="font-weight:700;margin-bottom:8px">Original Description</div>
+      <div style="font-weight:700;margin-bottom:8px">Message by ${escHtml_(requesterName || "the requester")}</div>
       <div style="line-height:1.5">${escHtml_(payload.description).replace(/\n/g,"<br>")}</div>
     </div>` : "";
   const noteInner = (noteHtml && noteHtml.trim()) ? noteHtml
     : (noteText && noteText.trim()) ? escHtml_(noteText).replace(/\n/g,"<br>") : "";
   const noteBlock = noteInner ? `
     <div style="font-size:13px;color:#333;margin-top:16px">
-      <div style="font-weight:700;margin-bottom:8px">Note</div>
+      <div style="font-weight:700;margin-bottom:8px">Message by ${escHtml_(senderName || "the sender")}</div>
       <div style="line-height:1.5">${noteInner}</div>
     </div>` : "";
   return `
@@ -886,12 +909,12 @@ function statusEmailHtml_(payload, status, noteHtml, noteText){
   </div>
   <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:22px 26px">
     <table style="width:100%;border-collapse:collapse;margin-bottom:18px">${rows}</table>
-    <div style="text-align:center;padding:14px;background:#f5f7fb;border-radius:10px">
+    ${descriptionBlock}
+    ${noteBlock}
+    <div style="text-align:center;padding:14px;background:#f5f7fb;border-radius:10px;margin-top:16px">
       <div style="font-size:11px;color:#5b6472;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">New Status</div>
       <div style="font-size:20px;font-weight:800;color:#0029A6">${escHtml_(status)}</div>
     </div>
-    ${descriptionBlock}
-    ${noteBlock}
   </div>
   <p style="font-size:11px;color:#9aa1ab;margin:14px 4px 0">Sent from the Jaro Web Pages Dashboard</p>
 </div>`;
@@ -927,7 +950,16 @@ function handleSubmitRequest_(body){
   payload.subject = subject;
   const to = (payload.to && payload.to.length) ? payload.to.join(",") : "lalit.rade@jaro.in";
   const cc = (payload.cc||[]).join(",");
-  let html = requestEmailHtml_(payload, "New Request Raised");
+  // Generated upfront, independent of the row it'll end up in (that row doesn't exist yet — the
+  // email has to be built and sent before appendRow runs, same as it always has). This is what a
+  // one-click status link clicked weeks from now looks the request back up by, instead of a raw
+  // row number that a manual sort/insert/delete in Google Sheets could quietly invalidate.
+  const requestId = Utilities.getUuid();
+  // Best-effort: a problem generating the quick-action links (e.g. a transient Sheets error) should
+  // never block the actual request from going out — the email just ships without that block.
+  let quickActionsHtml = "";
+  try{ quickActionsHtml = buildQuickActionLinks_(requestId, payload.section || ""); }catch(err){}
+  let html = requestEmailHtml_(payload, "New Request Raised", quickActionsHtml);
   const uploadIds = Array.isArray(payload.attachmentUploadIds) ? payload.attachmentUploadIds : [];
   const directAttachments = Array.isArray(payload.attachments) ? payload.attachments : [];
   let attachments;
@@ -951,6 +983,9 @@ function handleSubmitRequest_(body){
     payload.descriptionText||"", (payload.to||[]).join(", "), (payload.cc||[]).join(", "), "Not Started", payload.threadKey||"",
     sent.id, sent.threadId
   ]);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const requestIdCol = ensureColumn_(sheet, headers, "Request ID");
+  sheet.getRange(sheet.getLastRow(), requestIdCol + 1).setValue(requestId);
   return { ok:true };
 }
 /* ---- Threaded status-update replies with fully custom recipients ----
@@ -1067,7 +1102,7 @@ function friendlyGmailApiError_(err){
   return friendlyGmailError_(err);
 }
 function handleUpdateStatus_(body){
-  requireAdmin_(body.token);
+  const session = requireAdmin_(body.token);
   const sheetRow = +body.sheetRow;
   const status = body.status;
   const noteHtml = (body.noteHtml || "").toString();
@@ -1077,7 +1112,6 @@ function handleUpdateStatus_(body){
   const headers = values[0];
   const rowData = values[sheetRow - 1];
   if(!rowData) throw new Error("That request row couldn't be found.");
-  const get = (name)=> rowData[headers.indexOf(name)];
   const uploadIds = Array.isArray(body.attachmentUploadIds) ? body.attachmentUploadIds : [];
   const directAttachments = Array.isArray(body.attachments) ? body.attachments : [];
   let attachments;
@@ -1086,32 +1120,47 @@ function handleUpdateStatus_(body){
   }catch(err){
     throw new Error("Couldn't attach the uploaded file: " + ((err && err.message) || err));
   }
-  sheet.getRange(sheetRow, headers.indexOf("Status") + 1).setValue(status);
-  // "Applies To" (Program Page / Landing Page / Both) — only meaningful for a request raised
-  // against the merged "Program Pages/Landing Pages" section, where a single request can cover
-  // either or both and one Status shouldn't silently imply both are done. Empty/omitted for every
-  // other section. ensureColumn_ self-heals the sheet's header row if this column isn't there yet
-  // (see its comment) instead of silently failing to record it.
-  const appliesTo = (body.appliesTo || "").toString().trim();
-  if(appliesTo){
-    const appliesToCol = ensureColumn_(sheet, headers, "Status Applies To");
-    sheet.getRange(sheetRow, appliesToCol + 1).setValue(appliesTo);
+  const target = (body.target || "").toString().trim();
+  const senderName = (body.senderName || "").toString().trim() || session.Name || session.Email;
+  const result = applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, body.to, body.cc, attachments, senderName);
+  uploadIds.forEach(deleteFormFile_); // only after a confirmed send, so a failed send can be retried without re-uploading
+  return result;
+}
+// Shared core: writes the status (to the shared Status column, or a target's own dedicated column
+// for a combined Program Pages/Landing Pages request) and sends the status-update notification
+// email. Used by both handleUpdateStatus_ (the dashboard's status modal — real session, optional
+// note, editable To/Cc, possible attachments) and renderQuickStatusPage_ (a one-click email action
+// link — no session, no note, no attachments, To/Cc always fall back to the row's own stored
+// values) — the two differ only in where their arguments come from, not in what actually happens.
+function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, to, cc, attachments, senderName){
+  // A request raised against the merged "Program Pages/Landing Pages" section tracks Program Page
+  // and Landing Page as two independent statuses — in practice one often ships well before the
+  // other, so a single shared Status shouldn't silently imply both are done. Each gets its own
+  // self-healing column (ensureColumn_ adds it to the header row the first time it's needed).
+  // Every other section keeps writing the one shared Status column exactly as before.
+  if(target){
+    const targetCol = ensureColumn_(sheet, headers, target + " Status");
+    sheet.getRange(sheetRow, targetCol + 1).setValue(status);
+  } else {
+    sheet.getRange(sheetRow, headers.indexOf("Status") + 1).setValue(status);
   }
+  const get = (name)=> rowData[headers.indexOf(name)];
   const email = get("Email");
   const messageId = (get("Gmail Message ID") || "").toString().trim();
   const threadId = (get("Gmail Thread ID") || "").toString().trim();
   if(!email) return { ok:true }; // nothing to notify
+  const requesterName = (get("Requested By") || "").toString().trim();
   const payload = {
     university:get("University"), program:get("Program"), section:get("Section"), subject:get("Subject"),
     type:get("Request Type"), priority:get("Priority"), link:get("Related Link"), description:get("Description"),
-    appliesTo: appliesTo
+    target: target
   };
-  const html = rewireInlineImages_(statusEmailHtml_(payload, status, noteHtml, noteText), attachments);
-  // Recipients: whatever the Admin picked in the status modal's own Send To/CC fields, editable
-  // per update — falls back to the row's original To/Cc (or just the requester) if those come
-  // through empty for any reason.
-  const to = (Array.isArray(body.to) && body.to.length) ? body.to.join(", ") : ((get("To") || email || "").toString());
-  const cc = (Array.isArray(body.cc) && body.cc.length) ? body.cc.join(", ") : (get("Cc") || "").toString();
+  const html = rewireInlineImages_(statusEmailHtml_(payload, status, noteHtml, noteText, requesterName, senderName), attachments);
+  // Recipients: whatever was explicitly picked (the dashboard's status modal's own Send To/CC
+  // fields) — falls back to the row's original To/Cc (or just the requester) if those come through
+  // empty, which is always the case for the quick-link path (there is no modal to pick them in).
+  const toStr = (Array.isArray(to) && to.length) ? to.join(", ") : ((get("To") || email || "").toString());
+  const ccStr = (Array.isArray(cc) && cc.length) ? cc.join(", ") : (get("Cc") || "").toString();
   // Cloud Logging/Executions has proven unreliable to read in practice (empty "No logs available"
   // even for completed executions) — so instead of relying on that, the diagnostic trail is built
   // up here as plain text and handed straight back in the response, where the dashboard can show
@@ -1124,7 +1173,7 @@ function handleUpdateStatus_(body){
       const th = messageId ? getOriginalThreadingHeaders_(messageId) : { inReplyTo:"", references:"" };
       debugLines.push(`inReplyTo=${th.inReplyTo || "(empty — original Message-ID header lookup failed)"}`);
       const sent = sendGmailMessage_({
-        threadId: threadId, to: to, cc: cc, subject: "Re: " + (payload.subject || "Your request"),
+        threadId: threadId, to: toStr, cc: ccStr, subject: "Re: " + (payload.subject || "Your request"),
         htmlBody: html, inReplyTo: th.inReplyTo, references: th.references, attachments
       });
       debugLines.push("path=gmail-api-threaded", `sentThreadId=${(sent && sent.threadId) || "(unknown)"}`);
@@ -1133,9 +1182,9 @@ function handleUpdateStatus_(body){
       // falls back to a fresh email; this one genuinely can't be placed in the original thread
       // since there's no thread on record for it.
       const options = { htmlBody: html, name: "Jaro Web Pages Dashboard" };
-      if(cc) options.cc = cc;
+      if(ccStr) options.cc = ccStr;
       if(attachments.length) options.attachments = attachments.map(a => Utilities.newBlob(Utilities.base64Decode(a.base64), a.mimeType, a.filename));
-      GmailApp.sendEmail(to, `Re: ${payload.subject||"Your request"}`, "This email requires HTML to view.", options);
+      GmailApp.sendEmail(toStr, `Re: ${payload.subject||"Your request"}`, "This email requires HTML to view.", options);
       debugLines.push("path=fresh-email-fallback (no Gmail Thread ID stored on this row)");
     }
   }catch(err){
@@ -1145,19 +1194,136 @@ function handleUpdateStatus_(body){
     const friendly = friendlyGmailApiError_(err);
     throw new Error("Status saved, but the notification email failed: " + friendly.message + " [" + debugLines.join(" | ") + "]");
   }
-  uploadIds.forEach(deleteFormFile_); // only after a confirmed send, so a failed send can be retried without re-uploading
   return { ok:true, debug: debugLines.join(" | ") };
+}
+/* ---- One-click status updates from inside the "New Request Raised" email itself ----
+   Generates a short-lived, single-use token per quick action and appends it to the ActionTokens
+   sheet; embedded as plain links in the email (see buildQuickActionLinks_). Clicking one is a GET
+   with no session at all — the token itself is the only credential. Deliberately two hops (a GET
+   that only shows a confirm page, then a second GET from the button on that page that actually
+   applies the change) rather than one: a bare single-hop link would silently fire if an email
+   provider's link-scanner prefetches links found directly in the email body to check them for
+   malware — a well-known gotcha for any one-click email action. Nothing mutates until the second,
+   confirm-page-only link is followed, which a body-scanner has no reason to ever discover. */
+function buildQuickActionLinks_(requestId, section){
+  const isCombined = section === COMBINED_SECTION_LABEL;
+  const targets = isCombined ? ["Program Page","Landing Page"] : [""];
+  const sheet = getOrCreateSheet_("ActionTokens", ACTION_TOKENS_HEADER);
+  // Opportunistic sweep of expired tokens, same "once per batch, not per token" pattern used for
+  // upload-chunk cleanup elsewhere in this file — avoids rescanning the whole sheet per token.
+  const cutoff = Date.now() - ACTION_TOKEN_TTL_DAYS*86400000;
+  keepRowsWhere_(sheet, r => new Date(r[4]).getTime() >= cutoff);
+  const baseUrl = ScriptApp.getService().getUrl();
+  const now = new Date().toISOString();
+  const buttons = [];
+  targets.forEach(target=>{
+    QUICK_ACTION_STATUSES.forEach(status=>{
+      const token = Utilities.getUuid();
+      sheet.appendRow([token, requestId, status, target, now]);
+      const url = baseUrl + "?quickStatus=" + encodeURIComponent(token);
+      const label = target ? `Mark ${target} ${status}` : `Mark ${status}`;
+      const color = status === "Completed" ? "#1a9c5c" : "#0029A6";
+      buttons.push(`<a href="${url}" target="_blank" rel="noopener" style="display:inline-block;background:${color};color:#fff;` +
+        `text-decoration:none;font-weight:700;font-size:12.5px;padding:9px 16px;border-radius:8px;margin:4px">${escHtml_(label)}</a>`);
+    });
+  });
+  return `
+    <div style="text-align:center;margin-top:18px;padding-top:16px;border-top:1px solid #eef0f3">
+      <div style="font-size:11px;color:#5b6472;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Quick Actions</div>
+      ${buttons.join("")}
+    </div>`;
+}
+function htmlPage_(title, message, buttonUrl, buttonLabel){
+  const button = buttonUrl
+    ? `<a href="${buttonUrl}" style="display:inline-block;margin-top:22px;background:#0029A6;color:#fff;text-decoration:none;` +
+      `font-weight:700;font-size:14px;padding:12px 26px;border-radius:8px">${escHtml_(buttonLabel)}</a>`
+    : "";
+  const html = `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escHtml_(title)}</title></head>
+  <body style="font-family:Verdana,Geneva,sans-serif;background:#f5f7fb;margin:0;padding:40px 20px">
+    <div style="max-width:420px;margin:0 auto;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08)">
+      <div style="background:#0029A6;padding:18px 24px">
+        <div style="color:#FFCF24;font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase">Jaro Dashboard</div>
+      </div>
+      <div style="padding:28px 24px;text-align:center">
+        <h2 style="margin:0 0 12px;font-size:18px;color:#111">${escHtml_(title)}</h2>
+        <p style="margin:0;font-size:14px;color:#333;line-height:1.5">${message}</p>
+        ${button}
+      </div>
+    </div>
+  </body></html>`;
+  return HtmlService.createHtmlOutput(html).setTitle(title);
+}
+function renderQuickStatusPage_(token, confirmed){
+  const tokenSheet = getOrCreateSheet_("ActionTokens", ACTION_TOKENS_HEADER);
+  const found = findRowByColumn_(tokenSheet, "Token", token);
+  if(!found) return htmlPage_("Link already used", "This quick-action link has already been used, or isn't valid. Open the dashboard to check the current status.");
+  const th = found.headers;
+  const requestId = found.data[th.indexOf("Request ID")];
+  const status = found.data[th.indexOf("Status")];
+  const target = (found.data[th.indexOf("Target")] || "").toString();
+  const createdAt = found.data[th.indexOf("CreatedAt")];
+  if(new Date(createdAt).getTime() < Date.now() - ACTION_TOKEN_TTL_DAYS*86400000){
+    tokenSheet.deleteRow(found.row);
+    return htmlPage_("Link expired", `This quick-action link is more than ${ACTION_TOKEN_TTL_DAYS} days old and has expired. Open the dashboard to update the status instead.`);
+  }
+  const reqSheet = getRequestsSheet_();
+  const reqFound = findRowByColumn_(reqSheet, "Request ID", requestId);
+  if(!reqFound) return htmlPage_("Request not found", "That request couldn't be found — it may have been removed from the sheet.");
+  const label = target ? `${target} — ${status}` : status;
+  if(!confirmed){
+    // GET-only, deliberately not applying anything yet — see the comment above buildQuickActionLinks_.
+    const subject = reqFound.data[reqFound.headers.indexOf("Subject")] || "this request";
+    const confirmUrl = ScriptApp.getService().getUrl() + "?quickStatus=" + encodeURIComponent(token) + "&confirm=1";
+    return htmlPage_("Confirm status update", `Mark <b>${escHtml_(subject)}</b> as <b>${escHtml_(label)}</b>?`, confirmUrl, "Confirm");
+  }
+  // Consume the token under a lock: re-check-and-delete atomically so a double-click on the confirm
+  // button (or a client retry on a slow response) can't apply the same update twice, and can't race
+  // two concurrent deletes into removing the wrong row after Sheets shifts rows up on the first one.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  let stillValid;
+  try{
+    stillValid = findRowByColumn_(tokenSheet, "Token", token);
+    if(stillValid) tokenSheet.deleteRow(stillValid.row);
+  } finally {
+    lock.releaseLock();
+  }
+  if(!stillValid) return htmlPage_("Already handled", "This update was already applied — no further action needed.");
+  try{
+    applyStatusUpdate_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, status, target, "", "", null, null, [], "Jaro Web Pages Team");
+  }catch(err){
+    return htmlPage_("Status saved, email failed", escHtml_((err && err.message) || "The status was saved, but the notification email couldn't be sent."));
+  }
+  return htmlPage_("Done", `Marked as <b>${escHtml_(label)}</b> — the requester has been notified.`);
 }
 // Support sees the Requirements Log, but only the rows they themselves raised — Admin/Super Admin
 // see everything. Filtered server-side (not just hidden in the UI) so a Support session genuinely
 // never receives anyone else's request data, regardless of what the client does with it.
+// Filters (search text, Month, Date) and pagination are all applied here, not in the browser —
+// this used to ship every column of every row on every visit, which is what actually made the
+// Requirements Log tab feel slow once it grew; now only one 20-row page ever goes over the wire.
 function handleListRequirements_(body){
   const session = requireSession_(body.token);
   const sheet = getRequestsSheet_();
-  const rows = sheetRowsAsObjects_(sheet);
-  if(session.Role === "Admin") return { ok:true, rows: rows };
-  const mine = rows.filter(r => (r.Email||"").toString().trim().toLowerCase() === session.Email.toLowerCase());
-  return { ok:true, rows: mine };
+  let rows = sheetRowsAsObjects_(sheet);
+  if(session.Role !== "Admin"){
+    rows = rows.filter(r => (r.Email||"").toString().trim().toLowerCase() === session.Email.toLowerCase());
+  }
+  const month = (body.month || "").toString().trim(); // "YYYY-MM"
+  const date = (body.date || "").toString().trim();   // "YYYY-MM-DD"
+  const q = (body.q || "").toString().trim().toLowerCase();
+  if(month) rows = rows.filter(r => (r.Timestamp||"").toString().slice(0,7) === month);
+  if(date) rows = rows.filter(r => (r.Timestamp||"").toString().slice(0,10) === date);
+  if(q) rows = rows.filter(r => JSON.stringify(r).toLowerCase().includes(q));
+  // Sorted explicitly by Timestamp, not just reversed sheet-row order — row order stops being a
+  // reliable proxy for chronological order the moment anyone manually sorts/filters the sheet
+  // itself in Google Sheets, which reverse() would then silently get wrong.
+  rows = rows.slice().sort((a,b) => new Date(b.Timestamp||0) - new Date(a.Timestamp||0));
+  const total = rows.length;
+  const pageSize = Math.max(1, Math.min(+body.pageSize || 20, 100));
+  const page = Math.max(1, +body.page || 1);
+  const start = (page - 1) * pageSize;
+  return { ok:true, rows: rows.slice(start, start + pageSize), total: total };
 }
 
 /* ---- "What's Trending" (Home page) — any logged-in role can read it (Support sees Home too),

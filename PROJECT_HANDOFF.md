@@ -929,3 +929,164 @@ repo and blocks the deployment outright — structural, not a one-off, so it wou
 restriction is scoped to private repos, and per the user's choice, made after weighing it against
 the other two options (upgrading to Pro, ruled out on cost; or having the user push future changes
 under their own identity, workable but adds friction to every round of changes going forward).
+
+## Six-item polish batch + independent per-target statuses (2026-08-27)
+
+Requested together after confirming Attachments v5 worked in production: Requirements Log speed,
+a Program Page vs. Landing Page status split, a cropped status modal, two email label renames, a
+status-email reorder, and Requirements Log pagination/filters. Also answered: whether status
+updates could be driven from the email chain itself (see that section below) — not built, an
+assessment only, per what was actually asked.
+
+**Program Page / Landing Page now track fully independent statuses**, superseding the older
+single "Status Applies To" tag idea. A row whose Section is the merged `"Program Pages/Landing
+Pages"` (`COMBINED_SECTION_LABEL`) gets **two** status controls instead of one
+(`perTargetStatusHtml_`, called from `requestStatusSelectHtml_`/`requestStatusBadgeHtml_`), each
+writing to its own self-healing sheet column (`"Program Page Status"` / `"Landing Page Status"`,
+created on first write via `ensureColumn_` — same self-healing pattern as everything else in this
+sheet, no migration script). `openStatusNoteModal_` no longer has an "Applies To" selector at all;
+it now takes a `target` ("Program Page" / "Landing Page" / "" for every other section) straight
+from which of the two dropdowns was changed, and the modal title reflects it (`Mark Program Page
+as "..."`). `targetStatusFallback_` keeps pre-existing rows (which only ever had one shared Status
++ an optional "Status Applies To" tag from the earlier design) displaying sensibly under the new
+two-badge UI without a migration: a target's dedicated column wins if present, else it falls back
+to the row's old shared Status when "Status Applies To" says that update covered this target (or
+wasn't recorded at all — showing it for both is the more honest default than showing neither).
+Code.gs's `handleUpdateStatus_` mirrors this: writes to the target's dedicated column when
+`body.target` is set, else the shared "Status" column exactly as before.
+
+**Status-update email sender name**: `AUTH_SESSION.name` turned out to just be the login email
+(Code.gs's login handlers never populate a real display name) — so `senderName` for the "Message
+by {senderName}" heading is resolved client-side against the existing `CONTACTS` array (the same
+one the To/CC chip pickers already use), falling back to the raw email if the current user isn't
+in that list. Passed through to `updateRequestStatus_` → `handleUpdateStatus_` → `statusEmailHtml_`
+as an explicit param; `requesterName` for the "Message by {requesterName}" heading comes straight
+off the sheet row's "Requested By" column server-side, no client involvement needed there.
+
+**Requirements Log pagination is server-side, not just client-side** — this is what actually
+answers the "taking too much time to load" complaint, not merely the pagination ask. The tab was
+re-fetching and re-transmitting *every column of every row* on every visit through the slower
+JSONP/Apps-Script transport (unlike the other category tabs, which read their sheet directly via
+the Google Sheets API and are fine to fetch in full); a growing log made that payload the actual
+bottleneck, not rendering cost. `handleListRequirements_` now applies Support's own-rows
+filtering, then optional `month`/`date`/`q` filters, then reverses to newest-first, then slices to
+one `pageSize`-row page (default/max requested 20, capped at 100) — and returns `{rows, total}`
+instead of the full set. `renderRequirementsTable` drives it with a small pager (`« First / ←
+Prev / Page X of Y / Next → / Last »`, same `.pager` markup `renderBlogCards` already established)
+and two new filter inputs (`<input type="month">`, `<input type="date">`) inserted into the
+existing `.filterbar` alongside the free-text search box — all three re-trigger a fresh
+server-side fetch and reset to page 1. The misleading "Sign in with Google if prompted…" loading
+copy (never applicable here — this tab authenticates via the dashboard's own session token, not
+Google OAuth) is gone, replaced with a plain "Loading…" that now shows on every page/filter
+change, not just the first load. Side benefit: the idempotency cache in `dispatch_()` had a
+standing comment noting `listRequirements`'s full-sheet payload was sometimes too large to cache
+(`CacheService`'s ~100KB entry limit) — a per-page response comfortably fits, so retries on this
+action are now actually cached instead of silently falling through to a recompute every time.
+
+**Status modal CSS fix (SS3)** — `.modal` gained `max-height:90vh;display:flex;flex-direction:
+column` and `.modal-body` gained `overflow-y:auto;flex:1 1 auto;min-height:0`, so a modal taller
+than the viewport (the status modal, especially with the note editor open) keeps its header and
+Cancel/Send Update footer pinned in view with only the body scrolling internally, instead of
+relying on the whole overlay's own scroll and losing the footer off-screen on shorter windows.
+
+**Email copy (SS4/SS5)** — `requestEmailHtml_`: "Related Link" → "Related Programme Page Link",
+"Description" → "Message". `statusEmailHtml_`: "Original Description" → "Message by {requester
+name}", "Note" → "Message by {sender name}", and the "New Status" block now renders *after* both
+message blocks instead of before.
+
+**Verification**: exercised in the browser preview with `authApiCall_`/`authApiPostCall_` mocked
+(no real login/OTP needed for this) — confirmed pagination advances correctly, Month/Date filters
+narrow results and reset to page 1, Clear resets all three filters, a non-combined row's modal
+shows no target in its title and sends `target:""`, a combined row's Program/Landing dropdowns
+open independently with the correct title and send the right `target`, and `senderName` resolves
+to the real CONTACTS name ("Lalit Sanjiv Rade") rather than the raw email. The modal CSS fix was
+confirmed visually (screenshot) — header and footer stayed pinned with the body scrolling, even at
+a viewport far smaller than a real laptop screen. `Code.gs` was syntax-checked with `node --check`
+(copied to a `.js` file first — Node refuses the `.gs` extension directly). Not tested against the
+live Apps Script backend/real Gmail — that still needs a real redeploy + live click-through.
+
+**Found in passing, not fixed here (flagged as a separate task instead, to keep this batch's diff
+scoped to what was asked):** `requestEmailHtml_`'s description block uses `.replace(/\\n/g,
+"<br>")` — a regex matching a literal backslash+n, not an actual newline — so multi-line request
+descriptions likely lose their line breaks in the "New Request Raised" email. `statusEmailHtml_`'s
+equivalent lines use the correct single-backslash `/\n/g`, so this is scoped to just that one line
+and pre-dates this batch (not something introduced by today's changes).
+
+**Status updates from the email chain itself — assessed, not built, per what was actually asked.**
+Apps Script has no native "a reply arrived" trigger — the two realistic options: (1) a time-driven
+trigger (e.g. every 5–15 min) running `GmailApp.search()` for new replies on tracked threads,
+parsing out a recognized status keyword from the reply body — real latency (not instant), and
+reply-text parsing is inherently a little fragile (typos, quoted-text noise, forwarding). (2)
+Unique per-status action links embedded in the status-update email itself (e.g. "Mark Completed"
+as a link to the Web App with a signed one-time token) — instant and unambiguous, no parsing, but
+it's a click-a-link-that-opens-a-page flow, not "reply to the email" in the literal sense the
+question asked. Recommended (2) if the goal is a fast, reliable one-click update, or (1) only if
+replying with plain text in Gmail itself is a hard requirement — not started either way pending
+the user's pick.
+
+## One-click status updates from the "New Request Raised" email (2026-08-27)
+
+Answers the feasibility question above — built, not just assessed, once the user confirmed they
+wanted option (1) (action links) after seeing the write-up. Two small "Mark In Progress" / "Mark
+Completed" buttons (four, in two labeled pairs, for a combined Program Pages/Landing Pages
+request — one pair per target) now appear at the bottom of the "New Request Raised" email, letting
+whoever receives it flip status without opening the dashboard at all. Every other status (At Risk/
+Delayed/Terminated/back to Not Started) still requires the dashboard — only the two most common
+next-actions get a link, to keep the email from turning into a wall of buttons.
+
+**Mechanism**: a new `ActionTokens` sheet (`Token, Request ID, Status, Target, CreatedAt`) holds
+one single-use, 30-day-expiring token per button, generated at request-submission time
+(`buildQuickActionLinks_`) and swept opportunistically the same "once per batch" way upload-chunk
+cleanup already works in this file. Clicking a link is a bare GET with no session — the token
+itself is the only credential, handled by a new branch at the very top of `doGet` (`?quickStatus=
+<token>`), entirely bypassing the JSONP/`dispatch_` action-routing path used by everything else.
+
+**Deliberately two hops, not one**: the first GET only renders a branded confirm page ("Mark X as
+Completed?") — nothing mutates yet. Only a second GET, from that page's own "Confirm" button
+(`&confirm=1`), actually applies the change. A bare single-hop link would silently fire if an email
+provider's link-scanner prefetches links straight out of the email body to check them for malware —
+a well-known gotcha for any one-click email action — and a scanner has no reason to also crawl the
+link found *on* the resulting page. The consume step (re-check-token-then-delete) runs inside
+`LockService.getScriptLock()` so a double-click or a client retry on a slow response can't apply
+the same update twice or race two concurrent deletes into removing the wrong row after Sheets
+shifts everything up by one on the first delete.
+
+**Requests are now looked up by a stable "Request ID" (new column, self-healing via
+`ensureColumn_`, a fresh UUID generated at submission time)**, not by raw sheet row number — unlike
+the dashboard's own status modal (which always re-fetches a fresh row number right before use),
+these tokens can sit unused in an inbox for weeks, long enough for a manual sort/insert/delete in
+Google Sheets to quietly invalidate a stored row number. `applyStatusUpdate_` was extracted out of
+`handleUpdateStatus_` as the shared core (write the status column, build and send the notification
+email) so both this new path and the dashboard's own modal call the exact same logic — they differ
+only in *where* their status/target/recipients come from, not in what actually happens.
+
+**Known, accepted trade-off — flagged to the user, not silently shipped**: today, being CC'd on a
+request email grants zero capability (you'd still need an actual Admin login to change anything).
+With this feature, being on the To/Cc list becomes *sufficient* to flip status via the buttons, no
+login or Admin-role check at all — the token itself is the only gate. This matches the existing
+design intent of that email (Send-To is already fixed to "whoever should act on this request" —
+that's the whole point of the routing), and the blast radius per token is narrow (one specific
+status, on one specific request, single-use, 30-day expiry) — but it's a real, if bounded, widening
+of who can act compared to today, worth knowing rather than discovering later. Not enforced against
+the "Dashboard Users" sheet's actual Admin list, since one shared email body goes to every To/Cc
+recipient alike — restricting it per-recipient would need sending different bodies to different
+people, a much bigger change than what was asked for here.
+
+**Verification**: syntax-checked with `node --check` only (same limitation as the rest of this
+batch — Apps Script itself can't be run outside the actual editor). Not yet exercised end-to-end
+against a real deployment; needs a real "raise a request → click a quick-action link → confirm →
+verify the sheet and the requester's notification email" pass after redeploying.
+
+## Immediate next action
+
+Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,
+`handleListRequirements_`, `statusEmailHtml_`'s "Applies To" row, plus the new one-click
+quick-action-link system above) with the standing instruction:
+paste into the Apps Script editor (the tech@jaro.in-owned project, opened from **"Jaro Dashboard —
+Requirements & Insights"**) and redeploy (Deploy → Manage deployments → New version) before any of
+this batch is live. `index.html` was resynced from `Unified Dashboard.txt` (copied wholesale, diff
+confirmed identical) — commit + push still needs the user's explicit go-ahead per this session's
+own safety rules (pushing is a "shared/visible" action), not assumed from earlier pushes this
+project. Both the `C:\Users\user\Downloads\Website Requirement Dashboard` and `D:\JARO EDUCATION -
+LALIT\Website Requirement Dashboard` copies need this same sync — only the Downloads copy was
+edited this round.
