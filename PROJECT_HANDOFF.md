@@ -1077,6 +1077,23 @@ batch — Apps Script itself can't be run outside the actual editor). Not yet ex
 against a real deployment; needs a real "raise a request → click a quick-action link → confirm →
 verify the sheet and the requester's notification email" pass after redeploying.
 
+## Real bug fixed: Raise a Request modal silently clipped instead of scrolling (2026-08-27)
+
+Caught by the user immediately after the batch above went live. Root cause: the SS3 modal-CSS fix
+made `.modal-body`'s scroll depend on being a *direct flex child* of `.modal` (now `display:flex;
+flex-direction:column`) — true for every modal in this file except the request form, whose
+`.modal-body`/`.modal-foot` sit inside a `<form>`. That `<form>`, being a plain block element, isn't
+a flex item's scrollable child of anything — it just rendered at its full natural height, and
+`.modal`'s own `overflow:hidden` (there since before this session, for watermark clipping) silently
+cut off whatever didn't fit, with no scrollbar at all. Fixed with one more scoped rule, `.modal >
+form{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}`, making the
+form part of the same flex chain so `.modal-body`'s existing scroll rules finally apply to it.
+Verified in the browser (not just visually — scrollTop genuinely moves and sticks). Confirmed via
+grep this is the only modal in the file with a `<form>` wrapping its body, so no other modal should
+have been affected by the original fix. Lesson: a CSS change scoped to a shared class needs
+checking against every structural variant that class is used in, not just the one modal it was
+written for. Committed and pushed separately from the batch above (`ba35c71`).
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,
