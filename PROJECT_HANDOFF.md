@@ -1212,6 +1212,32 @@ side of this (buildQuickActionLinks_ skipping the Landing Page button) was revie
 independently exercised in a live email — same "needs a real click-through after redeploying"
 caveat as everything else Quick-Actions-related this session.
 
+## "Notify" — an FYI action that isn't a request (2026-08-27)
+
+New button in the request form, next to Submit Request: same form, same fields, same rich-text/
+attachment/@mention capability, but submitting via "Notify" does *not* create a Requirements Log
+row — no Status, no Quick Actions on the email (nothing to mark complete for an FYI). Admin/Super
+Admin only: the button is hidden client-side for Support (`applyRoleGating_`) and `Code.gs`'s
+`handleSubmitNotification_` requires `requireAdmin_` too, so it can't be reached by a raw API call
+either. Always broadcasts to every current Admin/Super Admin account — resolved fresh from the
+Dashboard Users sheet each send (`Role === "Admin" && Status === "Active"`), not the section-fixed
+"Send To" the request form otherwise shows, per explicit instruction that this goes to the whole
+admin team regardless of section. Still logged to its own new "Notifications" sheet (self-created
+via `getOrCreateSheet_`) purely as an audit trail — never surfaced anywhere in the dashboard UI.
+Reuses `requestEmailHtml_` as-is (just a different heading, "Program Notification") rather than a
+new template, and reuses the exact same attachment/Gmail-send pipeline as a real request.
+
+Also added `meghna.l@jaro.in` ("Meghna") to `CONTACTS` — she now shows up everywhere that list is
+used (To/CC pickers, @mention autocomplete, Assign to Someone's suggestions).
+
+**Verification**: confirmed in the browser that the button is hidden for a Support session and
+visible for Admin, and that clicking it (with the full form filled in) builds the correct payload
+with no `to` field (recipients are resolved server-side, not client-side) and the right `cc`/
+message/attachments shape. Confirmed Meghna resolves correctly from `CONTACTS`. `Code.gs`
+syntax-checked with `node --check`. Not tested against the live backend — needs a real send after
+redeploying to confirm the "all current Active Admins" recipient resolution actually pulls the
+right list from the real Dashboard Users sheet.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,

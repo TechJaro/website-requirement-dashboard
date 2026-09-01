@@ -1047,6 +1047,10 @@ body.auth-locked #app{display:none}
       </div>
       <div class="modal-foot">
         <button type="button" class="btn" id="cancelRequestBtn">Cancel</button>
+        <button type="button" class="btn" id="notifyRequestBtn" style="display:none" title="Send this as an FYI to the admin team — no request is logged, no status to track">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span id="notifyRequestLabel">Notify</span>
+        </button>
         <button type="submit" class="btn primary" id="submitRequestBtn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" id="submitRequestIcon"><path d="m22 2-7 20-4-9-9-4 20-7Z"/></svg>
           <span id="submitRequestLabel">Submit Request</span>
@@ -3236,6 +3240,7 @@ async function navigate(route){
    ================================================================================================ */
 const CONTACTS = [
   { name:"Lalit Sanjiv Rade", email:"lalit.rade@jaro.in" },
+  { name:"Meghna", email:"meghna.l@jaro.in" },
   { name:"Nidhi Parikh", email:"nidhi.p@jaro.in" },
   { name:"Jasmeet Kaur", email:"jasmeet.kaur@jaro.in" },
   { name:"Omkar Sharma", email:"omkar17.runtime@gmail.com" },
@@ -4064,6 +4069,75 @@ async function submitRequest(e){
     submitBtn.disabled = false;
     document.getElementById("submitRequestIcon").outerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" id="submitRequestIcon"><path d="m22 2-7 20-4-9-9-4 20-7Z"/></svg>';
     labelEl.textContent = "Submit Request";
+  }
+}
+// "Notify" — same form, same fields, but not a trackable request: no Requirements Log row, no
+// Status, no Quick Actions on the email (there's nothing to mark complete). Just an FYI email to
+// the whole admin team, for something worth flagging that isn't actually asking for work to be
+// done. Admin/Super Admin only — the button itself is hidden for Support (applyRoleGating_), and
+// Code.gs enforces the same restriction server-side so it can't be reached by a raw API call.
+let NOTIFICATION_SUBMIT_IN_FLIGHT = false;
+async function submitNotification_(){
+  if(NOTIFICATION_SUBMIT_IN_FLIGHT || REQUEST_SUBMIT_IN_FLIGHT) return;
+  if(REQUEST_DESC_RTE && REQUEST_DESC_RTE.hasPendingUploads()){
+    const notifyBtn = document.getElementById("notifyRequestBtn");
+    const notifyLabel = document.getElementById("notifyRequestLabel");
+    const prevLabel = notifyLabel.textContent;
+    notifyBtn.disabled = true; notifyLabel.textContent = "Waiting for attachment…";
+    await REQUEST_DESC_RTE.waitForUploads();
+    notifyBtn.disabled = false; notifyLabel.textContent = prevLabel;
+  }
+  const descHtml = document.getElementById("rf_desc").innerHTML.trim();
+  const descText = document.getElementById("rf_desc").innerText.trim();
+  if(!descText && !/<img/.test(descHtml)){ toast("Please add a message to notify about", true); return; }
+  const uniWrap = document.getElementById("rf_university_wrap");
+  const progWrap = document.getElementById("rf_program_wrap");
+  if(uniWrap.style.display !== "none" && !document.getElementById("rf_university").value.trim()){
+    toast("Please add the University / Institute", true); return;
+  }
+  if(progWrap.style.display !== "none" && !document.getElementById("rf_program").value.trim()){
+    toast("Please add the Program Name", true); return;
+  }
+  const subject = document.getElementById("rf_subject").value.trim();
+  if(!subject){ toast("Please add a subject", true); return; }
+  const ccList = ccPicker ? ccPicker.get() : [];
+  const payload = {
+    name: document.getElementById("rf_name").value.trim(),
+    email: getCurrentUserEmail_(),
+    team: document.getElementById("rf_team").value.trim(),
+    section: document.getElementById("rf_section").value,
+    university: document.getElementById("rf_university").value.trim(),
+    program: document.getElementById("rf_program").value.trim(),
+    type: document.getElementById("rf_type").value,
+    priority: document.querySelector('input[name="rf_priority"]:checked').value,
+    link: document.getElementById("rf_link").value.trim(),
+    subject: subject,
+    // No "to" — Notify always broadcasts to every current Admin/Super Admin, resolved server-side
+    // from the Dashboard Users sheet, not the section-fixed "Send To" shown in the form (that field
+    // is for real requests; the admin team gets every notification regardless of section).
+    cc: ccList.map(c=>c.email),
+    descriptionHtml: descHtml,
+    descriptionText: descText,
+    attachments: REQUEST_DESC_RTE ? REQUEST_DESC_RTE.getAttachments() : [],
+  };
+  NOTIFICATION_SUBMIT_IN_FLIGHT = true;
+  const notifyBtn = document.getElementById("notifyRequestBtn");
+  const notifyLabel = document.getElementById("notifyRequestLabel");
+  notifyBtn.disabled = true;
+  notifyLabel.textContent = "Sending…";
+  try{
+    if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
+    await authApiPostCall_("submitNotification", { token: AUTH_SESSION.token, payload });
+    toast("Notification sent to the admin team!");
+    closeRequestModal();
+    resetRequestForm();
+  }catch(err){
+    toast(err.message ? `Couldn't send automatically (${err.message}) — opening email instead` : "Couldn't send automatically — opening email instead", true);
+    mailtoFallback(payload);
+  }finally{
+    NOTIFICATION_SUBMIT_IN_FLIGHT = false;
+    notifyBtn.disabled = false;
+    notifyLabel.textContent = "Notify";
   }
 }
 function resetRequestForm(){
@@ -6086,6 +6160,8 @@ function applyRoleGating_(){
   if(requestActivityWrap) requestActivityWrap.style.display = admin ? "" : "none";
   const formMappingsCoveragePanel = document.getElementById("formMappingsCoveragePanel");
   if(formMappingsCoveragePanel) formMappingsCoveragePanel.style.display = admin ? "" : "none";
+  const notifyBtn = document.getElementById("notifyRequestBtn");
+  if(notifyBtn) notifyBtn.style.display = admin ? "flex" : "none";
   // Belt-and-braces: if a Support session is ever sitting on a restricted route (e.g. a stale
   // deep link), bounce back to Home rather than just hiding the nav item.
   if(!admin && SUPPORT_HIDDEN_NAV.includes(currentRoute)) navigate("home");
@@ -6230,6 +6306,7 @@ function init(){
   document.getElementById("cancelRequestBtn").addEventListener("click", closeRequestModal);
   document.getElementById("requestOverlay").addEventListener("click", (e)=>{ if(e.target.id==="requestOverlay") closeRequestModal(); });
   document.getElementById("requestForm").addEventListener("submit", submitRequest);
+  document.getElementById("notifyRequestBtn").addEventListener("click", submitNotification_);
   document.getElementById("menuBtn").addEventListener("click", ()=> document.getElementById("sidebar").classList.toggle("open"));
   REQUEST_DESC_RTE = wireRichTextEditor({ ccPicker: ()=>ccPicker });
   wireRequestFormDependencies();

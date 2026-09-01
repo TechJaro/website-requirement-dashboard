@@ -273,6 +273,7 @@ function dispatchAction_(body){
     case "resetUserPassword": return handleResetUserPassword_(body);
     case "setUserRole": return handleSetUserRole_(body);
     case "submitRequest": return handleSubmitRequest_(body);
+    case "submitNotification": return handleSubmitNotification_(body);
     case "updateStatus": return handleUpdateStatus_(body);
     case "quickActionInfo": return handleQuickActionInfo_(body);
     case "applyQuickAction": return handleApplyQuickAction_(body);
@@ -1011,6 +1012,55 @@ function handleSubmitRequest_(body){
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const requestIdCol = ensureColumn_(sheet, headers, "Request ID");
   sheet.getRange(sheet.getLastRow(), requestIdCol + 1).setValue(requestId);
+  return { ok:true };
+}
+const NOTIFICATIONS_HEADER = ["Timestamp","University","Program","Request Type","Priority","Section","Sent By","Email","Subject","Message","To","Cc","Gmail Message ID","Gmail Thread ID"];
+// "Notify" — the same request form, but deliberately NOT a request: no Requirements Log row, no
+// Status, no Quick Actions on the email (there's nothing to mark complete for an FYI). Admin/Super
+// Admin only (requireAdmin_, matching the button being hidden client-side for Support — enforced
+// here too so it can't be reached by a raw API call), and always broadcasts to every current
+// Admin/Super Admin account rather than the usual section-fixed recipients, per explicit request:
+// "the notification will go to all if admin or superadmin raises any notification". Still logged
+// to its own sheet (not the Requests sheet) purely for an audit trail — never surfaced in the
+// Requirements Log or any status workflow.
+function handleSubmitNotification_(body){
+  const session = requireAdmin_(body.token);
+  const payload = body.payload || {};
+  payload.email = session.Email;
+  payload.name = payload.name || session.Email;
+  const subject = payload.subject || "Program Notification";
+  payload.subject = subject;
+  // Resolved fresh from the Dashboard Users sheet each send, not a hardcoded list — stays correct
+  // as Admins are added/removed, rather than silently going stale.
+  const usersSheet = getOrCreateSheet_("Dashboard Users", USERS_HEADER);
+  const allAdmins = sheetRowsAsObjects_(usersSheet)
+    .filter(u => u.Role === "Admin" && u.Status === "Active")
+    .map(u => u.Email);
+  const to = (allAdmins.length ? allAdmins : ["lalit.rade@jaro.in"]).join(",");
+  const cc = (payload.cc||[]).join(",");
+  let html = requestEmailHtml_(payload, "Program Notification");
+  const uploadIds = Array.isArray(payload.attachmentUploadIds) ? payload.attachmentUploadIds : [];
+  const directAttachments = Array.isArray(payload.attachments) ? payload.attachments : [];
+  let attachments;
+  try{
+    attachments = assembleAttachments_(uploadIds).concat(directAttachments.map(validateDirectAttachment_));
+  }catch(err){
+    throw new Error("Couldn't attach the uploaded file: " + ((err && err.message) || err));
+  }
+  html = rewireInlineImages_(html, attachments);
+  let sent;
+  try{
+    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments });
+  }catch(err){
+    throw friendlyGmailApiError_(err);
+  }
+  uploadIds.forEach(deleteFormFile_);
+  const sheet = getOrCreateSheet_("Notifications", NOTIFICATIONS_HEADER);
+  sheet.appendRow([
+    new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
+    payload.section||"", payload.name||"", payload.email||"", subject, payload.descriptionText||"",
+    allAdmins.join(", "), (payload.cc||[]).join(", "), sent.id, sent.threadId
+  ]);
   return { ok:true };
 }
 /* ---- Threaded status-update replies with fully custom recipients ----
