@@ -1179,6 +1179,39 @@ paths (mark-completed modal, assign modal with its email-required/valid-format g
 `Code.gs` syntax-checked with `node --check`. Not tested against the live backend/real email
 delivery — needs a real click-through after redeploying.
 
+## Assign-to suggestions, "Not Applicable" status, Admissions-type exclusion (2026-08-27)
+
+Three follow-ups after the user tried Quick Actions v2 live: the OAuth `origin_mismatch` error on
+Page + SEO Insights turned out to be unrelated to any of this (a stale Google Cloud OAuth client
+still scoped to an old Vercel domain from before the tech@jaro.in migration — needs a Cloud Console
+fix, not a code change, so not touched here). Three real changes:
+
+- **Assign to Someone now suggests from Contacts** while typing (`<input list="qaAssigneeList">` +
+  a `<datalist>`, same native-HTML pattern the request form's Subject field already uses) — still
+  free text, not restricted to the list, per the earlier explicit call that this shouldn't be a
+  Contacts-only picker.
+- **New "Not Applicable" status**, added to `REQUEST_STATUS_OPTIONS`/`REQUEST_STATUS_COLORS`
+  (muted gray, distinct from every real in-progress-style color) — selectable anywhere Status is,
+  not tied to anything specific.
+- **Open Admissions / Close Admissions never apply to Landing Pages.** These two request types only
+  ever concern the Program Page (there's no such thing as a Landing Page "admissions" status) — a
+  combined-section request of either type now locks its Landing Page slot to a read-only "Not
+  Applicable" badge (`perTargetStatusHtml_`'s new `landingNotApplicable` branch) instead of an
+  editable dropdown, and `buildQuickActionLinks_` (Code.gs) skips generating a Landing Page
+  "Mark Completed" quick-action token/button entirely for these — mirrored via a matching
+  `ADMISSIONS_ONLY_PROGRAM_TYPES` Set on both sides, same "must match" pattern already used for
+  `COMBINED_SECTION_LABEL`. Every other request type is unaffected — both targets still get their
+  own independent, fully editable status and quick-action button.
+
+**Verification**: rendered `requestStatusSelectHtml_` directly against a mock combined-section row
+for both an Open Admissions type (confirmed: Landing Page renders as a static "Not Applicable"
+badge, not a `<select>`; Program Page still renders as a normal editable dropdown whose options
+include the new "Not Applicable" choice) and a normal type (confirmed: both targets still render as
+editable dropdowns, unaffected). `Code.gs` syntax-checked with `node --check`. The quick-action-link
+side of this (buildQuickActionLinks_ skipping the Landing Page button) was reviewed but not
+independently exercised in a live email — same "needs a real click-through after redeploying"
+caveat as everything else Quick-Actions-related this session.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,

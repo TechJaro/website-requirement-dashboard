@@ -983,7 +983,7 @@ function handleSubmitRequest_(body){
   // Best-effort: a problem generating the quick-action links (e.g. a transient Sheets error) should
   // never block the actual request from going out — the email just ships without that block.
   let quickActionsHtml = "";
-  try{ quickActionsHtml = buildQuickActionLinks_(requestId, payload.section || ""); }catch(err){}
+  try{ quickActionsHtml = buildQuickActionLinks_(requestId, payload.section || "", payload.type || ""); }catch(err){}
   let html = requestEmailHtml_(payload, "New Request Raised", quickActionsHtml);
   const uploadIds = Array.isArray(payload.attachmentUploadIds) ? payload.attachmentUploadIds : [];
   const directAttachments = Array.isArray(payload.attachments) ? payload.attachments : [];
@@ -1231,9 +1231,15 @@ function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, n
    then calls quickActionInfo (read-only, to show what the token is for) and applyQuickAction
    (actually consumes it) below like any other authenticated action. */
 const ASSIGN_ACTION_MARKER = "Assign"; // sentinel Status value in ActionTokens marking an "Assign to Someone" token, distinct from a real REQUEST_STATUS_OPTIONS value
-function buildQuickActionLinks_(requestId, section){
+// Open/Close Admissions only ever concerns the Program Page — Landing Pages don't carry admission
+// status — so a combined-section request of either type never gets a Landing Page quick-action
+// button at all. Must match the dashboard's own ADMISSIONS_ONLY_PROGRAM_TYPES.
+const ADMISSIONS_ONLY_PROGRAM_TYPES = new Set(["Open Admissions","Close Admissions"]);
+function buildQuickActionLinks_(requestId, section, requestType){
   const isCombined = section === COMBINED_SECTION_LABEL;
-  const targets = isCombined ? ["Program Page","Landing Page"] : [""];
+  const targets = isCombined
+    ? (ADMISSIONS_ONLY_PROGRAM_TYPES.has(requestType) ? ["Program Page"] : ["Program Page","Landing Page"])
+    : [""];
   const sheet = getOrCreateSheet_("ActionTokens", ACTION_TOKENS_HEADER);
   // Opportunistic sweep of expired tokens, same "once per batch, not per token" pattern used for
   // upload-chunk cleanup elsewhere in this file — avoids rescanning the whole sheet per token.
