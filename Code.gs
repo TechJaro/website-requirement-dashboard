@@ -864,11 +864,27 @@ function handleSetUserRole_(body){
 }
 
 /* ---- Requests ---- */
+// Must match the dashboard's own SECTIONS_NO_UNI_PROGRAM/SECTIONS_UNI_ONLY (Unified Dashboard.txt)
+// — which fields the request form shows/hides per section, so the email never shows a field the
+// form itself never collected for that category.
+const SECTIONS_NO_UNI_PROGRAM = ["Page Library","B2B Pages","Location Pages","Blogs","Free Course Pages","Pillar Pages"];
+const SECTIONS_UNI_ONLY = ["University Pages"];
 function requestEmailHtml_(payload, headingText, quickActionsHtml){
+  const section = payload.section || "";
+  const isCombined = section === COMBINED_SECTION_LABEL;
+  // Neither list claims this section — same "show both" default the form itself falls back to.
+  const isDefaultSection = !SECTIONS_NO_UNI_PROGRAM.includes(section) && !SECTIONS_UNI_ONLY.includes(section);
+  const showUniversity = isCombined || SECTIONS_UNI_ONLY.includes(section) || isDefaultSection;
+  const showProgram = isCombined || isDefaultSection;
   const rows = [
-    ["University", payload.university], ["Program", payload.program], ["Section", payload.section],
+    ...(showUniversity ? [["University", payload.university]] : []),
+    ...(showProgram ? [["Program", payload.program]] : []),
+    ["Section", payload.section],
     ["Request Type", payload.type], ["Priority", payload.priority],
-    ["Related Programme Page Link", payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"]
+    // "Related Programme Page Link" only actually means that for Program/Landing Pages — every
+    // other category isn't necessarily a "programme page" at all (a blog post, a B2B page, ...).
+    [isCombined ? "Related Programme Page Link" : "Related Link",
+      payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"]
   ].map(([label,val])=>`<tr>
       <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${escHtml_(label)}</td>
       <td style="padding:7px 14px;font-size:13px;color:#111;border-bottom:1px solid #eef0f3">${val || "—"}</td>
@@ -905,11 +921,19 @@ function requestEmailHtml_(payload, headingText, quickActionsHtml){
 // "Requested By" column; senderName passed by the front end, resolved from its own contacts list,
 // falling back to the raw session email if no match is found there).
 function statusEmailHtml_(payload, status, noteHtml, noteText, requesterName, senderName){
+  const section = payload.section || "";
+  const isCombined = section === COMBINED_SECTION_LABEL;
+  const isDefaultSection = !SECTIONS_NO_UNI_PROGRAM.includes(section) && !SECTIONS_UNI_ONLY.includes(section);
+  const showUniversity = isCombined || SECTIONS_UNI_ONLY.includes(section) || isDefaultSection;
+  const showProgram = isCombined || isDefaultSection;
   const rows = [
-    ["University", payload.university], ["Program", payload.program], ["Section", payload.section],
+    ...(showUniversity ? [["University", payload.university]] : []),
+    ...(showProgram ? [["Program", payload.program]] : []),
+    ["Section", payload.section],
     ...(payload.target ? [["Applies To", `<b>${escHtml_(payload.target)}</b>`]] : []),
     ["Request Type", payload.type], ["Priority", payload.priority],
-    ["Related Programme Page Link", payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"],
+    [isCombined ? "Related Programme Page Link" : "Related Link",
+      payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"],
     ["Subject", payload.subject],
   ].map(([label,val])=>`<tr>
       <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${escHtml_(label)}</td>
@@ -1436,10 +1460,18 @@ function applyAssignment_(sheet, headers, sheetRow, rowData, assigneeEmail, note
   return { ok:true, debug: debugLines.join(" | ") };
 }
 function assignmentEmailHtml_(payload, assigneeEmail, assignerName, noteHtml, noteText){
+  const section = payload.section || "";
+  const isCombined = section === COMBINED_SECTION_LABEL;
+  const isDefaultSection = !SECTIONS_NO_UNI_PROGRAM.includes(section) && !SECTIONS_UNI_ONLY.includes(section);
+  const showUniversity = isCombined || SECTIONS_UNI_ONLY.includes(section) || isDefaultSection;
+  const showProgram = isCombined || isDefaultSection;
   const rows = [
-    ["University", payload.university], ["Program", payload.program], ["Section", payload.section],
+    ...(showUniversity ? [["University", payload.university]] : []),
+    ...(showProgram ? [["Program", payload.program]] : []),
+    ["Section", payload.section],
     ["Request Type", payload.type], ["Priority", payload.priority],
-    ["Related Programme Page Link", payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"],
+    [isCombined ? "Related Programme Page Link" : "Related Link",
+      payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"],
     ["Subject", payload.subject],
   ].map(([label,val])=>`<tr>
       <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${escHtml_(label)}</td>

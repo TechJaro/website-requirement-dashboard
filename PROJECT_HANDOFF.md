@@ -1238,6 +1238,61 @@ syntax-checked with `node --check`. Not tested against the live backend — need
 redeploying to confirm the "all current Active Admins" recipient resolution actually pulls the
 right list from the real Dashboard Users sheet.
 
+## Request email fixes for every category except Program Pages/Landing Pages (2026-08-31)
+
+User caught these from a real delivered B2B Pages request email. All four fixes are scoped by the
+same two lists (`SECTIONS_NO_UNI_PROGRAM`/`SECTIONS_UNI_ONLY`) the request form itself already used
+to show/hide the University/Program fields — now mirrored into `Code.gs` too (same "must match"
+comment pattern as `COMBINED_SECTION_LABEL`), so the email always matches what the form actually
+collected instead of assuming every request looks like a Program/Landing Pages one.
+
+1. **"Related Programme Page Link" → "Related Link"** for every section except the combined
+   Program Pages/Landing Pages one (that's the one case where "programme page" is actually
+   accurate). Applied to `requestEmailHtml_`, `statusEmailHtml_`, and `assignmentEmailHtml_` — all
+   three had the same hardcoded label.
+2. **University/Program rows are omitted from the email** for a section that doesn't show that
+   field on the form (`SECTIONS_NO_UNI_PROGRAM` hides both; `SECTIONS_UNI_ONLY` hides just Program)
+   — previously always rendered both rows, showing "—" for a field that was never collected. Same
+   three functions.
+3. **@mentions now render as blue text in the actual delivered email**, not just inside the
+   dashboard's own editor. The mention span only had a CSS class (`.rte-mention`) — that's fine
+   in-app (the dashboard's stylesheet is loaded), but an emailed message is a standalone HTML
+   document with no access to that stylesheet, so the class silently did nothing once delivered.
+   Fixed by giving the span an inline `style="color:#0029A6;font-weight:600"` too (same blue as
+   every other email template), and simplified the look from a filled pill (background + padding)
+   to plain colored bold text — closer to what was asked ("similar to our Gmail") and more
+   consistently supported across email clients than a pill.
+4. **Subject line now includes the section for every category except Program/Landing Pages**:
+   `{Type} - {Section} - {Title}`, where Title is University for `SECTIONS_UNI_ONLY` or Program for
+   everything else (`buildRequestSubject`, rewritten). Program/Landing Pages keeps its original,
+   untouched University+Program format. Wired the section dropdown's own `change` handler to also
+   call `maybeSuggestSubject()`, so picking a section updates the live subject suggestion the same
+   way editing University/Program/Type already did.
+
+**Real bug found and fixed while verifying #4**: a Program title passed through from a specific
+page's own "Raise a Request" button (`raiseBtn()` → `openRequestModal({section, program})`, e.g.
+opening it from a B2B page's own card) was being silently wiped by `updateUniProgVisibility()`
+immediately after being set — that function unconditionally cleared University/Program whenever
+the section hides them, with no distinction between "the user could have typed something here
+before switching" (should clear) and "this value was locked in as part of why the modal opened at
+all" (should survive, even though the row is hidden — it's still what the subject's Title needs).
+Fixed by only clearing a field when it isn't `disabled` — a locked/prefilled field keeps its value
+invisibly, an editable one gets cleared same as before. Without this, item 4 above could never
+actually produce a title for a `SECTIONS_NO_UNI_PROGRAM` category no matter how the subject-builder
+was written, since the value feeding it would already be gone by submit time.
+
+**Verification**: `buildRequestSubject` tested directly against the user's own two examples — both
+matched verbatim (`"[Jaro Dashboard] Update Existing Page - B2B Pages - IIFL"` and `"...Content /
+Meta Change - University Pages - Amity University"`), Program/Landing Pages' format confirmed
+unchanged, and a no-title fallback confirmed clean (no dangling separator). Confirmed in the
+browser: a card-prefilled B2B request keeps its Program value (disabled, hidden, but present) and
+produces the correct subject; a fully generic form switching to B2B correctly clears a manually-
+typed Program value instead of leaking it through hidden. Confirmed the mention span carries the
+inline style after insertion. `Code.gs` syntax-checked with `node --check`. The email-template
+side (rows/label conditionals in Code.gs) was reviewed carefully but — same as everything else
+Code.gs this session — not exercised against a real send; needs a real request raised against a
+non-Program/Landing category after redeploying.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,

@@ -510,7 +510,7 @@ td.link-cell a:hover{text-decoration:underline}
 .mention-suggest-item:hover{background:var(--blue-tint-06)}
 .mention-suggest-item b{font-weight:600}
 .mention-suggest-item span{font-size:11px;color:var(--ink-50)}
-.rte-mention{background:var(--blue-tint-10);color:var(--blue);border-radius:4px;padding:1px 5px;font-weight:600}
+.rte-mention{color:var(--blue);font-weight:600}
 .field-hint{font-size:11px;color:var(--blue);margin-top:6px;font-weight:500}
 
 /* ---------- PER-ITEM "RAISE A REQUEST" MINI BUTTON ---------- */
@@ -3429,13 +3429,20 @@ function updateUniProgVisibility(){
   const uniWrap = document.getElementById("rf_university_wrap");
   const progWrap = document.getElementById("rf_program_wrap");
   if(!uniWrap || !progWrap) return;
+  const uniEl = document.getElementById("rf_university");
+  const progEl = document.getElementById("rf_program");
+  // A disabled field is a locked prefill from the specific page/card "Raise a Request" was opened
+  // from (see openRequestModal) — that value still identifies which page this is about (used for
+  // the email subject's title even when the section hides the row from the visible email body), so
+  // hiding the field here shouldn't also wipe it. A field the user could actually type into gets
+  // cleared, so nothing stale and invisible rides along if they switch section mid-edit.
   if(SECTIONS_UNI_ONLY.includes(section)){
     uniWrap.style.display = ""; progWrap.style.display = "none";
-    document.getElementById("rf_program").value = "";
+    if(!progEl.disabled) progEl.value = "";
   } else if(SECTIONS_NO_UNI_PROGRAM.includes(section)){
     uniWrap.style.display = "none"; progWrap.style.display = "none";
-    document.getElementById("rf_university").value = "";
-    document.getElementById("rf_program").value = "";
+    if(!uniEl.disabled) uniEl.value = "";
+    if(!progEl.disabled) progEl.value = "";
   } else {
     uniWrap.style.display = ""; progWrap.style.display = "";
   }
@@ -3484,7 +3491,7 @@ function openRequestModal(prefill){
     if(p.university) refreshProgramOptionsFor(p.university);
     const subjectEl = document.getElementById("rf_subject");
     if(subjectEl && !subjectEl.value.trim() && (p.university || p.program)){
-      subjectEl.value = LAST_SUBJECT_SUGGESTION = buildRequestSubject({ university: p.university||"", program: p.program||"", type: document.getElementById("rf_type").value });
+      subjectEl.value = LAST_SUBJECT_SUGGESTION = buildRequestSubject({ university: p.university||"", program: p.program||"", type: document.getElementById("rf_type").value, section: wantedSection });
     }
   });
   if(!toPicker) toPicker = createChipPicker("to", ["lalit.rade@jaro.in"], true);
@@ -3552,18 +3559,22 @@ function shortProgramName(program, university){
 }
 function buildRequestSubject(payload){
   const shortProg = shortProgramName(payload.program, payload.university);
-  // Program/Landing Pages (payload.university set) keep the original University-scoped format.
-  // Every other category has no university — those used to fall back to just the Request Type
-  // with nothing else ("[Dashboard] Content / Meta Change"), which read as bare-generic on the
-  // resulting emails. Now leads with whatever page/item title was passed through (see the
-  // raiseBtn() calls in renderFlatCards/renderLocations/renderFreeCourses/renderBlogCards/
-  // renderUnique — each now supplies its own title as `program`), falling back to just the type
-  // when a request was raised generically with no specific page selected.
-  if(payload.university){
-    const bits = [payload.type||"Requirement", payload.university, shortProg].filter(Boolean);
+  const type = payload.type || "Requirement";
+  // Program Pages/Landing Pages keeps its own established University-scoped format, unchanged.
+  if(payload.section === COMBINED_SECTION_LABEL || (!payload.section && payload.university)){
+    const bits = [type, payload.university, shortProg].filter(Boolean);
     return `[Jaro Dashboard] ${bits.join(" — ")}`;
   }
-  const bits = [shortProg, payload.type||"Requirement"].filter(Boolean);
+  // Every other category: "{Type} - {Section} - {Title}", where Title is whichever of
+  // University/Program actually applies to that section (see SECTIONS_UNI_ONLY/
+  // SECTIONS_NO_UNI_PROGRAM) — University Pages uses University; everything else uses whatever
+  // page/item title was passed through (see the raiseBtn() calls in renderFlatCards/
+  // renderLocations/renderFreeCourses/renderBlogCards/renderUnique — each supplies its own title
+  // as `program`, even for a section whose form hides that field, since it's still the one thing
+  // that actually identifies which page this is about). Section is always included now, even with
+  // no title at all, so the subject still reads clearly rather than falling back to just the type.
+  const title = SECTIONS_UNI_ONLY.includes(payload.section) ? payload.university : shortProg;
+  const bits = [type, payload.section, title].filter(Boolean);
   return `[Jaro Dashboard] ${bits.join(" - ")}`;
 }
 
@@ -3938,6 +3949,11 @@ function wireRichTextEditor(ids){
     mentionRange.deleteContents();
     const span = document.createElement("span");
     span.className = "rte-mention";
+    // Inline, not just the class — this HTML can end up embedded straight into an emailed message,
+    // where an external stylesheet's class never applies (Gmail and most clients strip <style>/
+    // classes from anything but the message's own inline styles). Same blue as the rest of the
+    // branded email templates (#0029A6), so a mention still reads as "tagged" once delivered.
+    span.setAttribute("style", "color:#0029A6;font-weight:600");
     span.contentEditable = "false";
     span.textContent = "@" + (contact.name || contact.email);
     mentionRange.insertNode(span);
@@ -6321,7 +6337,7 @@ function wireRequestFormDependencies(){
   const subjectEl = document.getElementById("rf_subject");
   const sectionEl = document.getElementById("rf_section");
 
-  sectionEl.addEventListener("change", ()=>{ updateUniProgVisibility(); updateSendToForSection_(); });
+  sectionEl.addEventListener("change", ()=>{ updateUniProgVisibility(); updateSendToForSection_(); maybeSuggestSubject(); });
   uniEl.addEventListener("input", ()=>{ refreshProgramOptionsFor(uniEl.value); maybeSuggestSubject(); });
   progEl.addEventListener("input", ()=>{
     maybeSuggestSubject();
@@ -6348,7 +6364,7 @@ function wireRequestFormDependencies(){
   // ever been in that field — and stops the instant the user actually edits it by hand.
   function maybeSuggestSubject(){
     if(subjectEl.value.trim() && subjectEl.value !== LAST_SUBJECT_SUGGESTION) return;
-    const suggestion = buildRequestSubject({ university: uniEl.value.trim(), program: progEl.value.trim(), type: typeEl.value });
+    const suggestion = buildRequestSubject({ university: uniEl.value.trim(), program: progEl.value.trim(), type: typeEl.value, section: sectionEl.value });
     if(uniEl.value.trim() || progEl.value.trim() || typeEl.value){
       subjectEl.value = suggestion;
       LAST_SUBJECT_SUGGESTION = suggestion;
