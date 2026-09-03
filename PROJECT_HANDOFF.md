@@ -1340,6 +1340,47 @@ already do. The backend merge logic was reviewed carefully (not independently un
 harness for that here) but not exercised against a real send. `Code.gs` syntax-checked with
 `node --check`.
 
+## Category column, "On Hold" status, and an admin-only send-email toggle (2026-08-31)
+
+Three more from the same conversation:
+
+- **Category column** in the Requirements Log table — shows `row["Section"]` (the same value
+  already used for per-target routing/exclusions elsewhere), between Program and Type.
+- **"On Hold"** added to `REQUEST_STATUS_OPTIONS`/`REQUEST_STATUS_COLORS` (purple, distinct from
+  every other status color) — frontend-only, `Code.gs` has never had its own copy of this enum
+  (statuses are just free-text values it writes as-is).
+- **"Send email notification" checkbox**, Admin/Super-Admin-only, in both places a status gets
+  marked: the dashboard's own status modal and the Quick Action confirm modal. Lets an Admin record
+  a status (e.g. Not Applicable) without notifying anyone, when that's not actually needed. Not
+  shown at all for Assign to Someone specifically — an assignment with no notification would never
+  reach the person it's assigning, defeating the entire point of that action.
+
+**Enforcement is asymmetric between the two entry points, deliberately**: `handleUpdateStatus_`
+trusts `body.sendEmail` directly, since `requireAdmin_` already guarantees the session's Role is
+"Admin" before that point is ever reached. `handleApplyQuickAction_` can't do the same —
+`requireQuickActionAllowed_` only guarantees the session's email is on the fixed Quick Actions
+allowlist, not that it's actually an Admin-role account — so it only honors `sendEmail:false` when
+`session.Role === "Admin"` too, silently ignoring the request (email still sends) otherwise. Failing
+open to *sending* the email is the deliberately safe default if this check is ever wrong, rather
+than an update going out silently un-notified.
+
+`applyStatusUpdate_` gained a `sendEmail` parameter — still writes the status regardless, only
+skips building/sending the notification (returns `{ok:true, debug:"email skipped by request"}`).
+The dashboard modal's own "Add at least one recipient" validation is skipped when the checkbox is
+unchecked, since it's meaningless once nothing is going to be sent — and the modal's subtitle text
+flips to "No email will be sent — only the status will be updated" so what's about to happen is
+never ambiguous from what's already on screen.
+
+**Verification**: confirmed in the browser — the Category column renders with the right value in
+the right position; "On Hold" appears as a real dropdown option; unchecking "Send email
+notification" in the status modal updates the subtitle live and doesn't block submission on an
+empty Send To; the Quick Action modal shows the checkbox for a status mark and omits it entirely
+for Assign to Someone; both modals correctly produce `sendEmail:false` in their POST payload when
+unchecked. The Role-gate logic in `handleApplyQuickAction_` was checked with a standalone
+simulation of all four cases (Admin skip honored, non-Admin skip ignored, omitted defaults to
+send, explicit true sends) — all four behaved as intended. `Code.gs` syntax-checked with
+`node --check`; not exercised against the live backend.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,

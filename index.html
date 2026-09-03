@@ -4339,7 +4339,7 @@ async function submitRequestDirect_(payload){
    sheet row itself and replies in-thread via GmailApp (far more reliable than hand-building
    In-Reply-To/References headers client-side), with a status email styled to match the original
    "New Request Raised" template instead of the old plain one-liner. ---- */
-async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, cc, target, senderName, attachments}){
+async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, cc, target, senderName, sendEmail, attachments}){
   if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
   // noteHtml carries formatting/links/pasted screenshots from the status modal's rich text editor;
   // noteText is the plain-text fallback Code.gs uses if noteHtml is empty (e.g. a fresh <br>-only div).
@@ -4348,7 +4348,7 @@ async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, c
   // To/Cc if these come through empty for some reason).
   // Real direct POST now (authApiPostCall_) — see its own comment above submitRequestDirect_'s
   // call. No URL-length ceiling to strip pasted screenshots against anymore.
-  return await authApiPostCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml: noteHtml || "", noteText: noteText || "", to: to || [], cc: cc || [], target: target || "", senderName: senderName || "", attachments: attachments || [] });
+  return await authApiPostCall_("updateStatus", { token: AUTH_SESSION.token, sheetRow, status, noteHtml: noteHtml || "", noteText: noteText || "", to: to || [], cc: cc || [], target: target || "", senderName: senderName || "", sendEmail: sendEmail !== false, attachments: attachments || [] });
 }
 /* ---- Quick Action confirm modal — reached only via a "?quickAction=<token>" link in the "New
    Request Raised" email (Mark Completed / Assign to Someone). Deliberately no login step is built
@@ -4396,7 +4396,11 @@ async function openQuickActionModal_(quickToken){
             <label>Assign to (email)</label>
             <input type="email" id="qaAssigneeInput" list="qaAssigneeList" placeholder="name@jaro.in" autocomplete="off">
             <datalist id="qaAssigneeList">${CONTACTS.map(c=>`<option value="${esc(c.email)}">${esc(c.name)}</option>`).join("")}</datalist>
-          </div>` : ""}
+          </div>` : `
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer">
+            <input type="checkbox" id="qaSendEmail" checked style="width:16px;height:16px;cursor:pointer">
+            Send email notification
+          </label>`}
           <div class="field">
             <label>CC (optional)</label>
             <div class="chip-picker" id="qaCc_picker">
@@ -4455,10 +4459,14 @@ async function openQuickActionModal_(quickToken){
     const cc = qaCcPicker.get().map(c=>c.email);
     const known = CONTACTS.find(c=>c.email.toLowerCase()===(AUTH_SESSION.email||"").toLowerCase());
     const senderName = (known && known.name) || AUTH_SESSION.email;
+    // Not shown at all for Assign to Someone (see the modal-body markup above) — an assignment
+    // with no notification would never actually reach the person it's assigning.
+    const sendEmailBox = document.getElementById("qaSendEmail");
+    const sendEmail = sendEmailBox ? sendEmailBox.checked : true;
     confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
     try{
       const r = await authApiPostCall_("applyQuickAction", {
-        token: AUTH_SESSION.token, quickAction: quickToken, assigneeEmail, noteHtml, noteText, senderName, cc, attachments
+        token: AUTH_SESSION.token, quickAction: quickToken, assigneeEmail, noteHtml, noteText, senderName, sendEmail, cc, attachments
       });
       toast(r && r.debug ? `Done — ${r.debug}` : "Done");
       closeModal();
@@ -5366,10 +5374,11 @@ async function renderRequirementsGateOrTable(sec){
   input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
   input.focus();
 }
-const REQUEST_STATUS_OPTIONS = ["Not Started","In Progress","At Risk","Delayed","Completed","Terminated","Not Applicable"];
+const REQUEST_STATUS_OPTIONS = ["Not Started","In Progress","At Risk","Delayed","On Hold","Completed","Terminated","Not Applicable"];
 const REQUEST_STATUS_COLORS = {
   "Not Started":{bg:"var(--ink-35)",fg:"#fff"}, "In Progress":{bg:"var(--blue)",fg:"#fff"},
   "At Risk":{bg:"#8a6800",fg:"#fff"}, "Delayed":{bg:"var(--red)",fg:"#fff"},
+  "On Hold":{bg:"#6b46c1",fg:"#fff"},
   "Completed":{bg:"#1b9c58",fg:"#fff"}, "Terminated":{bg:"var(--black)",fg:"#fff"},
   "Not Applicable":{bg:"#eef0f3",fg:"var(--ink-50)"}
 };
@@ -5468,6 +5477,10 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
             </button>
           </div>
           <div class="modal-body" style="display:grid;gap:14px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer">
+              <input type="checkbox" id="statusNoteSendEmail" checked style="width:16px;height:16px;cursor:pointer">
+              Send email notification
+            </label>
             <div class="field">
               <label>Send To</label>
               <div class="chip-picker" id="statusNoteTo_picker" style="background:var(--canvas)">
@@ -5519,9 +5532,18 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
   document.getElementById("statusNoteTitle").textContent = target
     ? `Mark ${target} as "${newStatus}"`
     : `Mark as "${newStatus}"`;
-  document.getElementById("statusNoteSubtitle").textContent = email
-    ? `This will email ${email} and everyone else on the original request thread — edit below if needed`
-    : "This will email everyone on the original request thread — edit below if needed";
+  const sendEmailBox = document.getElementById("statusNoteSendEmail");
+  sendEmailBox.checked = true;
+  const subtitleEl = document.getElementById("statusNoteSubtitle");
+  const updateSubtitle = ()=>{
+    subtitleEl.textContent = !sendEmailBox.checked
+      ? "No email will be sent — only the status will be updated"
+      : email
+        ? `This will email ${email} and everyone else on the original request thread — edit below if needed`
+        : "This will email everyone on the original request thread — edit below if needed";
+  };
+  updateSubtitle();
+  sendEmailBox.onchange = updateSubtitle;
   // Pre-filled with whoever was on the original request's To/Cc, since that's the thread this
   // update is going into — but freely editable, so the Admin can add or drop recipients for this
   // particular update without that changing who's on the underlying request thread.
@@ -5556,7 +5578,7 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
     const noteText = textEl.innerText.trim();
     const toEmails = statusNoteToPicker.get().map(c=>c.email);
     const ccEmails = statusNoteCcPicker.get().map(c=>c.email);
-    if(!toEmails.length){ toast("Add at least one recipient in 'Send To'", true); return; }
+    if(sendEmailBox.checked && !toEmails.length){ toast("Add at least one recipient in 'Send To'", true); return; }
     confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
     sel.disabled = true;
     try{
@@ -5566,7 +5588,8 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
       const myEmail = getCurrentUserEmail_();
       const known = CONTACTS.find(c=>c.email.toLowerCase()===myEmail.toLowerCase());
       const senderName = (known && known.name) || myEmail;
-      const r = await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails, target: target || "", senderName, attachments });
+      const sendEmail = sendEmailBox.checked;
+      const r = await updateRequestStatus_({ sheetRow, status: newStatus, noteHtml, noteText, to: toEmails, cc: ccEmails, target: target || "", senderName, sendEmail, attachments });
       const c = REQUEST_STATUS_COLORS[newStatus] || REQUEST_STATUS_COLORS["Not Started"];
       sel.style.background = c.bg; sel.style.color = c.fg;
       // Surfacing Code.gs's debug trail directly here — Google's own Executions/Cloud Logging
@@ -5667,17 +5690,18 @@ async function renderRequirementsTable(sec){
       ${pagerHTML}
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Raised</th><th>University</th><th>Program</th><th>Type</th><th>Priority</th><th>Requested By</th><th>Status</th></tr></thead>
+          <thead><tr><th>Raised</th><th>University</th><th>Program</th><th>Category</th><th>Type</th><th>Priority</th><th>Requested By</th><th>Status</th></tr></thead>
           <tbody>
             ${items.map(row=>`<tr>
               <td class="cell-muted">${esc((row["Timestamp"]||"").toString().slice(0,16))}</td>
               <td>${esc(row["University"]||"—")}</td>
               <td>${esc(row["Program"]||"—")}</td>
+              <td class="cell-muted">${esc(row["Section"]||"—")}</td>
               <td>${esc(row["Request Type"]||"—")}</td>
               <td>${esc(row["Priority"]||"—")}</td>
               <td class="cell-muted">${esc(row["Requested By"]||row["Email"]||"—")}</td>
               <td>${isAdmin_() ? requestStatusSelectHtml_(row) : requestStatusBadgeHtml_(row)}${appliesToTagHtml_(row)}</td>
-            </tr>`).join("") || `<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--ink-35)">No requests raised yet</td></tr>`}
+            </tr>`).join("") || `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--ink-35)">No requests raised yet</td></tr>`}
           </tbody>
         </table>
       </div>

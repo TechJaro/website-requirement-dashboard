@@ -1221,7 +1221,11 @@ function handleUpdateStatus_(body){
   }
   const target = (body.target || "").toString().trim();
   const senderName = (body.senderName || "").toString().trim() || session.Name || session.Email;
-  const result = applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, body.to, body.cc, attachments, senderName);
+  // requireAdmin_ above already guarantees this session's Role is "Admin" (or the Super Admin
+  // overlay on top of one), so body.sendEmail can be trusted directly here — unlike
+  // handleApplyQuickAction_, which isn't necessarily talking to an Admin-role account.
+  const sendEmail = body.sendEmail !== false;
+  const result = applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, body.to, body.cc, attachments, senderName, sendEmail);
   uploadIds.forEach(deleteFormFile_); // only after a confirmed send, so a failed send can be retried without re-uploading
   return result;
 }
@@ -1231,7 +1235,7 @@ function handleUpdateStatus_(body){
 // note, editable To/Cc, possible attachments) and renderQuickStatusPage_ (a one-click email action
 // link — no session, no note, no attachments, To/Cc always fall back to the row's own stored
 // values) — the two differ only in where their arguments come from, not in what actually happens.
-function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, to, cc, attachments, senderName){
+function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, to, cc, attachments, senderName, sendEmail){
   // A request raised against the merged "Program Pages/Landing Pages" section tracks Program Page
   // and Landing Page as two independent statuses — in practice one often ships well before the
   // other, so a single shared Status shouldn't silently imply both are done. Each gets its own
@@ -1248,6 +1252,13 @@ function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, n
   const messageId = (get("Gmail Message ID") || "").toString().trim();
   const threadId = (get("Gmail Thread ID") || "").toString().trim();
   if(!email) return { ok:true }; // nothing to notify
+  // Status is already written above regardless — this only skips the notification email, for when
+  // an Admin wants to record a status without alerting anyone (e.g. marking something Not
+  // Applicable that was never really "in progress" to begin with). Admin/Super-Admin-only by
+  // request — callers are responsible for only passing sendEmail:false when the session's Role is
+  // actually "Admin" (see handleUpdateStatus_/handleApplyQuickAction_), since this function has no
+  // session of its own to check.
+  if(sendEmail === false) return { ok:true, debug: "email skipped by request" };
   const requesterName = (get("Requested By") || "").toString().trim();
   const payload = {
     university:get("University"), program:get("Program"), section:get("Section"), subject:get("Subject"),
@@ -1424,6 +1435,13 @@ function handleApplyQuickAction_(body){
   // silently drop whoever the original requester had already CC'd.
   const rowCc = (reqFound.data[reqFound.headers.indexOf("Cc")] || "").toString().split(",").map(s=>s.trim()).filter(Boolean);
   const mergedCc = rowCc.concat(Array.isArray(body.cc) ? body.cc : []);
+  // Skipping the notification email is Admin/Super-Admin-only, by request — requireQuickActionAllowed_
+  // only guarantees this session's email is on the Quick Actions allowlist, not that it's actually
+  // an Admin-role account, so unlike handleUpdateStatus_ this can't just trust body.sendEmail as-is.
+  // Doesn't apply to Assign to Someone at all — an assignment with no notification would never
+  // reach the person it's assigning, defeating the entire point of that action.
+  const skipRequestedByAdmin = body.sendEmail === false && session.Role === "Admin";
+  const sendEmail = !skipRequestedByAdmin;
   let result;
   if(status === ASSIGN_ACTION_MARKER){
     const assigneeEmail = (body.assigneeEmail||"").toString().trim();
@@ -1431,7 +1449,7 @@ function handleApplyQuickAction_(body){
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assigneeEmail)) throw new Error("Enter a valid email address to assign this to.");
     result = applyAssignment_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, assigneeEmail, noteHtml, noteText, attachments, senderName, Array.isArray(body.cc) ? body.cc : []);
   } else {
-    result = applyStatusUpdate_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, status, target, noteHtml, noteText, null, mergedCc, attachments, senderName);
+    result = applyStatusUpdate_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, status, target, noteHtml, noteText, null, mergedCc, attachments, senderName, sendEmail);
   }
   uploadIds.forEach(deleteFormFile_);
   return result;
