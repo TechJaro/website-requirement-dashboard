@@ -4398,6 +4398,15 @@ async function openQuickActionModal_(quickToken){
             <datalist id="qaAssigneeList">${CONTACTS.map(c=>`<option value="${esc(c.email)}">${esc(c.name)}</option>`).join("")}</datalist>
           </div>` : ""}
           <div class="field">
+            <label>CC (optional)</label>
+            <div class="chip-picker" id="qaCc_picker">
+              <div class="chip-list" id="qaCc_chips"></div>
+              <input type="text" id="qaCc_input" placeholder="Type a name/email or pick below…" autocomplete="off">
+              <div class="chip-suggest" id="qaCc_suggest"></div>
+            </div>
+            <div style="font-size:11px;color:var(--ink-35);margin-top:4px">Added on top of whoever was already on this request's thread</div>
+          </div>
+          <div class="field">
             <label>Message (optional)</label>
             <div class="rte-toolbar" id="qaToolbar">
               <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/></svg></button>
@@ -4417,9 +4426,13 @@ async function openQuickActionModal_(quickToken){
       </div>
     </div>`);
   const overlay = document.getElementById("quickActionOverlay");
+  const qaCcPicker = createChipPicker(
+    { chips:"qaCc_chips", input:"qaCc_input", suggest:"qaCc_suggest", picker:"qaCc_picker" }, [], false
+  );
   quickActionRTE = wireRichTextEditor({
     bodyId:"qaNote", scopeEl:document.getElementById("qaToolbar"),
-    linkBtnId:"qaLinkBtn", imageBtnId:"qaImageBtn", imageInputId:"qaImageInput"
+    linkBtnId:"qaLinkBtn", imageBtnId:"qaImageBtn", imageInputId:"qaImageInput",
+    ccPicker: ()=>qaCcPicker
   });
   const closeModal = ()=> overlay.remove();
   document.getElementById("qaClose").addEventListener("click", closeModal);
@@ -4439,12 +4452,13 @@ async function openQuickActionModal_(quickToken){
     const noteHtml = document.getElementById("qaNote").innerHTML.trim();
     const noteText = document.getElementById("qaNote").innerText.trim();
     const attachments = quickActionRTE ? quickActionRTE.getAttachments() : [];
+    const cc = qaCcPicker.get().map(c=>c.email);
     const known = CONTACTS.find(c=>c.email.toLowerCase()===(AUTH_SESSION.email||"").toLowerCase());
     const senderName = (known && known.name) || AUTH_SESSION.email;
     confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
     try{
       const r = await authApiPostCall_("applyQuickAction", {
-        token: AUTH_SESSION.token, quickAction: quickToken, assigneeEmail, noteHtml, noteText, senderName, attachments
+        token: AUTH_SESSION.token, quickAction: quickToken, assigneeEmail, noteHtml, noteText, senderName, cc, attachments
       });
       toast(r && r.debug ? `Done — ${r.debug}` : "Done");
       closeModal();

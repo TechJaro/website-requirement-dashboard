@@ -1293,6 +1293,53 @@ side (rows/label conditionals in Code.gs) was reviewed carefully but — same as
 Code.gs this session — not exercised against a real send; needs a real request raised against a
 non-Program/Landing category after redeploying.
 
+## Real bug fixed: status updates could silently leave the requester off the email (2026-08-31)
+
+Caught by the user from a real Quick Action use: Nidhi raised a Program/Landing Pages request, it
+went to Lalit+Jasmeet (the fixed admin recipients for that section — see `fixedRecipientsFor_` on
+the dashboard), and when Lalit marked it Completed via Quick Actions, the status email went to
+"me and Jasmeet" again — Nidhi, the actual requester, was never on it.
+
+Root cause: `applyStatusUpdate_`'s recipient fallback was `explicit-to || row's-stored-To ||
+requester`, in that priority order. For Program/Landing Pages the row's stored "To" is *always*
+the fixed admin team (never the requester — she was never on the original request's To/Cc to begin
+with, only the "Email"/"Requested By" columns), so the fallback chain never reached the requester
+at all once a row's own To was non-empty, which is the normal case for every request in this
+system. This wasn't new to Quick Actions — the dashboard's own status modal had the exact same gap
+— just far less likely to surface there, since that modal's Send To field starts pre-filled with
+the requester's email as one of its options (still overwritable, but visible and easy to leave in
+place); Quick Actions has no such modal, so there was never a chance to notice or correct it.
+
+Fixed by always including the requester in the final recipient list, appended if not already
+present, regardless of which of explicit-to/row's-To/fallback-to-requester produced the rest of the
+list — verified against four cases (Quick Action with the admin-team row To, a dashboard-modal
+explicit To missing the requester, one already including her, and no row To at all) with a
+standalone simulation of the merge logic; all four produced the expected list with no duplicates.
+
+## CC field added to the Quick Action confirm modal (2026-08-31)
+
+Companion request from the same conversation: "additionally" CC extra people when marking a status
+or assigning from Quick Actions, matching the dashboard's own status modal (which already has this
+— `statusNoteCc_picker`, unchanged). New `qaCc_picker` chip-picker in `openQuickActionModal_`
+(same `createChipPicker` component, same markup, as every other CC field in this file), wired into
+the note's rich-text editor for @mention-adds-to-CC too, same as the other two editors.
+
+Threaded through as `body.cc` → `handleApplyQuickAction_`. Merged additively, not as a replacement,
+on the *backend* rather than relying on the modal to pre-fill the row's existing Cc (it doesn't —
+unlike the dashboard's own status modal, there's no "open a specific row" moment to pre-fill from):
+`applyStatusUpdate_`'s own cc parameter still means "this is the final Cc list" as it always has
+(the dashboard modal already sends the row's Cc pre-filled as chips, so that contract didn't need
+to change), so `handleApplyQuickAction_` computes `row's Cc + typed extra` itself before calling
+it. `applyAssignment_` already unconditionally included the row's To+Cc in its own Cc line, so it
+just needed the extra list appended to that same join — genuinely a smaller change there.
+
+**Verification**: confirmed in the browser that the CC field renders, that typing/adding an email
+lands in the `cc` array of the `applyQuickAction` POST body, and that mentioning someone in the
+note (`@Meghna`) also adds them as a CC chip, exactly like the request form and status modal
+already do. The backend merge logic was reviewed carefully (not independently unit-tested — no
+harness for that here) but not exercised against a real send. `Code.gs` syntax-checked with
+`node --check`.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,

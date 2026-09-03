@@ -1255,10 +1255,16 @@ function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, n
     target: target
   };
   const html = rewireInlineImages_(statusEmailHtml_(payload, status, noteHtml, noteText, requesterName, senderName), attachments);
-  // Recipients: whatever was explicitly picked (the dashboard's status modal's own Send To/CC
-  // fields) — falls back to the row's original To/Cc (or just the requester) if those come through
-  // empty, which is always the case for the quick-link path (there is no modal to pick them in).
-  const toStr = (Array.isArray(to) && to.length) ? to.join(", ") : ((get("To") || email || "").toString());
+  // Recipients: whatever was explicitly picked (the dashboard's status modal's own Send To
+  // field), or the row's original To (falling back to just the requester if that's empty too) —
+  // but the requester is always included regardless of which of those applies, even if they
+  // weren't already in the list. A status update is the one email in this whole system that's
+  // actually *for* them; for Program/Landing Pages specifically, the row's stored "To" is always
+  // the fixed admin team (Lalit+Jasmeet, never the requester — see fixedRecipientsFor_ on the
+  // dashboard), so falling back to it alone was silently leaving the requester off every time.
+  const toList = (Array.isArray(to) && to.length) ? to.slice() : (get("To") || email || "").toString().split(",").map(s=>s.trim()).filter(Boolean);
+  if(email && !toList.some(e=>e.toLowerCase()===email.toLowerCase())) toList.push(email);
+  const toStr = toList.join(", ");
   const ccStr = (Array.isArray(cc) && cc.length) ? cc.join(", ") : (get("Cc") || "").toString();
   // Cloud Logging/Executions has proven unreliable to read in practice (empty "No logs available"
   // even for completed executions) — so instead of relying on that, the diagnostic trail is built
@@ -1409,14 +1415,23 @@ function handleApplyQuickAction_(body){
   const noteHtml = (body.noteHtml||"").toString();
   const noteText = (body.noteText||"").toString();
   const senderName = (body.senderName||"").toString().trim() || session.Email;
+  // Extra people typed into the confirm modal's own CC field, added on top of the row's own
+  // stored Cc — not instead of it. Computed here (rather than inside applyStatusUpdate_/
+  // applyAssignment_, both of which treat an explicit cc array as a full replacement of the row's
+  // Cc, matching the dashboard's own status modal where the CC field starts pre-filled with the
+  // row's Cc so typing more there is *already* additive) because the quick-action confirm modal
+  // has no such pre-fill — its CC field starts empty, so without merging here, using it would
+  // silently drop whoever the original requester had already CC'd.
+  const rowCc = (reqFound.data[reqFound.headers.indexOf("Cc")] || "").toString().split(",").map(s=>s.trim()).filter(Boolean);
+  const mergedCc = rowCc.concat(Array.isArray(body.cc) ? body.cc : []);
   let result;
   if(status === ASSIGN_ACTION_MARKER){
     const assigneeEmail = (body.assigneeEmail||"").toString().trim();
     if(!assigneeEmail) throw new Error("Enter the email of who you're assigning this to.");
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assigneeEmail)) throw new Error("Enter a valid email address to assign this to.");
-    result = applyAssignment_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, assigneeEmail, noteHtml, noteText, attachments, senderName);
+    result = applyAssignment_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, assigneeEmail, noteHtml, noteText, attachments, senderName, Array.isArray(body.cc) ? body.cc : []);
   } else {
-    result = applyStatusUpdate_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, status, target, noteHtml, noteText, null, null, attachments, senderName);
+    result = applyStatusUpdate_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, status, target, noteHtml, noteText, null, mergedCc, attachments, senderName);
   }
   uploadIds.forEach(deleteFormFile_);
   return result;
@@ -1424,7 +1439,7 @@ function handleApplyQuickAction_(body){
 // Parallel to applyStatusUpdate_, but for "Assign to Someone" — writes a self-healing "Assigned To"
 // column instead of a status, and emails the assignee directly (CC'ing whoever was already on the
 // request, so the rest of the thread stays in the loop) instead of the requester-notification email.
-function applyAssignment_(sheet, headers, sheetRow, rowData, assigneeEmail, noteHtml, noteText, attachments, assignerName){
+function applyAssignment_(sheet, headers, sheetRow, rowData, assigneeEmail, noteHtml, noteText, attachments, assignerName, extraCc){
   const assignedToCol = ensureColumn_(sheet, headers, "Assigned To");
   sheet.getRange(sheetRow, assignedToCol + 1).setValue(assigneeEmail);
   const get = name => rowData[headers.indexOf(name)];
@@ -1435,7 +1450,9 @@ function applyAssignment_(sheet, headers, sheetRow, rowData, assigneeEmail, note
     type:get("Request Type"), priority:get("Priority"), link:get("Related Link")
   };
   const html = rewireInlineImages_(assignmentEmailHtml_(payload, assigneeEmail, assignerName, noteHtml, noteText), attachments);
-  const cc = [(get("To")||"").toString(), (get("Cc")||"").toString()].filter(Boolean).join(", ");
+  // Extra CC (from the quick-action confirm modal's own CC field) is added on top of whoever was
+  // already on the original request's To/Cc — never a replacement of them.
+  const cc = [(get("To")||"").toString(), (get("Cc")||"").toString()].concat(Array.isArray(extraCc) ? extraCc : []).filter(Boolean).join(", ");
   const debugLines = [`row=${sheetRow}`, `threadId=${threadId || "(empty)"}`, `messageId=${messageId || "(empty)"}`, `assignee=${assigneeEmail}`];
   try{
     if(threadId){
