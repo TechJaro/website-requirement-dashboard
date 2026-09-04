@@ -47,7 +47,7 @@ const SPREADSHEET_ID = "1JGsWhpTOalVOPoO0CwlAaCCgPMVv0ExSYTxrRErCVV0"; // same a
 const SESSION_TTL_HOURS = 12;
 const OTP_TTL_MINUTES = 2.5; // 2 minutes 30 seconds
 const REQUEST_LOG_HEADER = ["Timestamp","University","Program","Request Type","Priority","Requested By","Email",
-  "Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key","Gmail Message ID","Gmail Thread ID","Status Applies To","Request ID"];
+  "Team","Section","Related Link","Subject","Description","To","Cc","Status","Thread Key","Gmail Message ID","Gmail Thread ID","Status Applies To","Request ID","Description HTML"];
 // Stable per-request id, set once at submission and never reused — unlike a raw sheet row number,
 // it stays valid even if rows are later inserted/deleted/manually sorted in Google Sheets. Used to
 // look up the right row when a one-click email action link (see ActionTokens below) is finally
@@ -939,10 +939,18 @@ function statusEmailHtml_(payload, status, noteHtml, noteText, requesterName, se
       <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${escHtml_(label)}</td>
       <td style="padding:7px 14px;font-size:13px;color:#111;border-bottom:1px solid #eef0f3">${val || "—"}</td>
     </tr>`).join("");
-  const descriptionBlock = payload.description ? `
+  // Prefers the original rich HTML (tables, colored highlights, bold — see handleSubmitRequest_'s
+  // "Description HTML" column) over the plain-text "Description" column, same fallback order
+  // requestEmailHtml_ already uses for the same content on the original request email. Older rows
+  // from before "Description HTML" existed simply don't have it, so they fall back to the plain
+  // text exactly as before — no migration needed.
+  const descriptionInner = (payload.descriptionHtml && payload.descriptionHtml.trim())
+    ? payload.descriptionHtml
+    : escHtml_(payload.description||"").replace(/\n/g,"<br>");
+  const descriptionBlock = (payload.description || payload.descriptionHtml) ? `
     <div style="font-size:13px;color:#333;margin-top:16px">
       <div style="font-weight:700;margin-bottom:8px">Message by ${escHtml_(requesterName || "the requester")}</div>
-      <div style="line-height:1.5">${escHtml_(payload.description).replace(/\n/g,"<br>")}</div>
+      <div style="line-height:1.5">${descriptionInner}</div>
     </div>` : "";
   const noteInner = (noteHtml && noteHtml.trim()) ? noteHtml
     : (noteText && noteText.trim()) ? escHtml_(noteText).replace(/\n/g,"<br>") : "";
@@ -1036,6 +1044,17 @@ function handleSubmitRequest_(body){
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const requestIdCol = ensureColumn_(sheet, headers, "Request ID");
   sheet.getRange(sheet.getLastRow(), requestIdCol + 1).setValue(requestId);
+  // The "Description" column above only ever holds plain text (descriptionText) — a status-update
+  // reply's own "Message by {requester}" block used to read that column back and lost every bit of
+  // formatting a rich message actually had (tables, colored highlights, bold), even though the
+  // original request email itself never had this problem (it uses payload.descriptionHtml
+  // directly, fresh, before any of this round-trips through the sheet). Stored here too so
+  // statusEmailHtml_ can reuse the exact same "prefer the HTML, fall back to escaped plain text"
+  // pattern requestEmailHtml_ already uses.
+  if(payload.descriptionHtml && payload.descriptionHtml.trim()){
+    const descHtmlCol = ensureColumn_(sheet, headers, "Description HTML");
+    sheet.getRange(sheet.getLastRow(), descHtmlCol + 1).setValue(payload.descriptionHtml);
+  }
   return { ok:true };
 }
 const NOTIFICATIONS_HEADER = ["Timestamp","University","Program","Request Type","Priority","Section","Sent By","Email","Subject","Message","To","Cc","Gmail Message ID","Gmail Thread ID"];
@@ -1263,7 +1282,7 @@ function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, n
   const payload = {
     university:get("University"), program:get("Program"), section:get("Section"), subject:get("Subject"),
     type:get("Request Type"), priority:get("Priority"), link:get("Related Link"), description:get("Description"),
-    target: target
+    descriptionHtml:get("Description HTML"), target: target
   };
   const html = rewireInlineImages_(statusEmailHtml_(payload, status, noteHtml, noteText, requesterName, senderName), attachments);
   // Recipients: whatever was explicitly picked (the dashboard's status modal's own Send To

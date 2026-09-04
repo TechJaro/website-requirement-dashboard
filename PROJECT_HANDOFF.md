@@ -1381,6 +1381,38 @@ simulation of all four cases (Admin skip honored, non-Admin skip ignored, omitte
 send, explicit true sends) — all four behaved as intended. `Code.gs` syntax-checked with
 `node --check`; not exercised against the live backend.
 
+## Real bug fixed: a requester's rich-formatted message lost all formatting in status-update emails (2026-08-31)
+
+Caught by the user from a real reply: Meghna's original request had a genuinely formatted message
+(a table for the instalment plan, colored highlight spans, bold headers) that rendered perfectly in
+the "New Request Raised" email — but the same content, re-shown under "Message by Meghna" in the
+*status-update* email once Lalit marked it Completed, came out as flat, unstyled text with no table
+and no highlights at all ("scattered").
+
+Root cause: the Requests sheet's "Description" column only ever stores *plain text*
+(`payload.descriptionText`, i.e. `.innerText` off the rich-text editor) — the rich HTML version
+(`payload.descriptionHtml`) is built fresh at submission time and used once for the original email,
+then thrown away, never written anywhere. `requestEmailHtml_` (the original email) never hit this,
+since it uses `payload.descriptionHtml` directly while it's still fresh in memory. `statusEmailHtml_`
+has no such luxury — by the time a status gets updated, possibly weeks later, all it has to work
+with is whatever's in the sheet, which was always plain text only.
+
+Fixed by also storing the rich HTML in a new self-healing "Description HTML" column (same
+post-append `ensureColumn_` pattern already used for "Request ID"), and having `statusEmailHtml_`'s
+`descriptionBlock` prefer it when present — the *exact* same "HTML if we have it, else escaped
+plain text" fallback `requestEmailHtml_` already uses for the same content. Rows raised before this
+existed simply don't have the column populated, so they fall back to plain text exactly as before —
+no migration, no data loss, nothing silently breaks for old rows.
+
+**Verification**: reviewed the full fallback chain carefully (matches `requestEmailHtml_`'s already-
+proven pattern token-for-token) and confirmed `get("Description HTML")` returns `undefined` safely
+(not a crash) for a row/sheet where that column doesn't exist yet, correctly falling through to the
+plain-text path. `Code.gs` syntax-checked with `node --check`. This is backend-only — no frontend
+change was needed (the frontend already sends `descriptionHtml` at submission time; it just wasn't
+being kept). Not exercised against a real send — needs a real request with genuine rich formatting
+(a table, a highlight) marked through a real status update after redeploying, to confirm the email
+actually renders it now.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,
