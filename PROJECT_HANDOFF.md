@@ -1413,6 +1413,43 @@ being kept). Not exercised against a real send — needs a real request with gen
 (a table, a highlight) marked through a real status update after redeploying, to confirm the email
 actually renders it now.
 
+## Request form: stop showing yourself as a recipient, "Other" section/type, narrower required fields (2026-08-31)
+
+Four request-form fixes, all frontend-only — `Code.gs` untouched this round, no redeploy needed.
+
+**Send To no longer includes yourself.** `updateSendToForSection_` used to populate Send To purely
+from `fixedRecipientsFor_(section)` with no awareness of who was actually logged in — so Lalit
+raising a Program/Landing Pages request saw "Send To: Lalit Sanjiv Rade, Jasmeet Kaur", i.e.
+himself. Now filters the current user's own email out of that list; if that would leave nobody at
+all (true for every section except Program Pages/Landing Pages, where Lalit is the *sole* fixed
+recipient), falls back to the other established admin (Jasmeet) rather than leaving Send To empty
+and blocking submission. `resetRequestForm`'s own post-submit reset had the identical bug in
+miniature — it hardcoded Send To back to Lalit's email regardless of who'd just submitted — now
+resets to empty and lets the next `openRequestModal`/section pick repopulate it correctly.
+
+**"Other" added to both Related Section and Request Type**, each revealing an optional free-text
+field (`rf_section_other`/`rf_type_other`) when selected. The typed text becomes the actual stored
+section/type if provided; left blank, it falls back to the literal word "Other" rather than
+blocking submission — matches the same "optional elaboration" framing as this batch's other
+"Other" field. `resetRequestForm` explicitly hides both on reset, since native `form.reset()` only
+clears values, not the inline `display` state this file manages by hand for conditional fields.
+
+**University/Program are only actually required for Program Pages/Landing Pages now** — every
+other section that still shows them (University Pages' University field, "General / Not sure", or
+"Other") can be submitted blank. The required-asterisk spans next to each label
+(`rf_university_req`/`rf_program_req`) toggle alongside this in `updateUniProgVisibility` (already
+the one place this file computes per-section field behavior), so the visible `*` never lies about
+what's actually enforced.
+
+**Verification**: all four checked directly in the browser — Send To correctly drops Lalit for
+Program/Landing (leaving Jasmeet) and falls back to Jasmeet for a section where he's normally the
+sole recipient; the same in reverse for Jasmeet; unaffected for a third party (Nidhi) raising the
+same request, confirming the fix is scoped to "exclude yourself," not a broader behavior change.
+"Other" reveals its text field for both Section and Type; a full submission with both left blank
+correctly falls back to the literal word "Other" with University/Program submitted empty and
+unblocked; a second submission with both filled in correctly used the typed custom text instead.
+No `Code.gs` changes this round.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,

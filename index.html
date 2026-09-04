@@ -966,6 +966,7 @@ body.auth-locked #app{display:none}
             <label>Related Section *</label>
             <select id="rf_section" required></select>
             <div id="rf_section_hint" style="font-size:11px;color:var(--ink-35);margin-top:4px;display:none">Locked to the category you raised this from</div>
+            <input type="text" id="rf_section_other" placeholder="Describe the category (optional)" style="margin-top:8px;display:none">
           </div>
         </div>
         <div class="form-grid">
@@ -989,12 +990,12 @@ body.auth-locked #app{display:none}
         </div>
         <div class="form-grid">
           <div class="field" id="rf_university_wrap">
-            <label>University / Institute *</label>
+            <label>University / Institute <span id="rf_university_req" style="color:var(--red)">*</span></label>
             <input type="text" id="rf_university" list="rf_university_list" placeholder="e.g. IIT Bombay">
             <datalist id="rf_university_list"></datalist>
           </div>
           <div class="field" id="rf_program_wrap">
-            <label>Program Name *</label>
+            <label>Program Name <span id="rf_program_req" style="color:var(--red)">*</span></label>
             <input type="text" id="rf_program" list="rf_program_list" placeholder="e.g. Certificate Course in ...">
             <datalist id="rf_program_list"></datalist>
           </div>
@@ -1014,6 +1015,7 @@ body.auth-locked #app{display:none}
               <option>Close Admissions</option>
               <option>Other</option>
             </select>
+            <input type="text" id="rf_type_other" placeholder="Describe the request type (optional)" style="margin-top:8px;display:none">
           </div>
           <div class="field">
             <label>Priority *</label>
@@ -3362,7 +3364,8 @@ function populateSectionDropdown(){
   const rest = NAV_ORDER.filter(k => k!=="program" && k!=="landing").map(k=>SECTIONS[k].label);
   sel.innerHTML = `<option value="">Select a section</option><option>General / Not sure</option>` +
     `<option>Program Pages/Landing Pages</option>` +
-    rest.map(l=>`<option>${l}</option>`).join("");
+    rest.map(l=>`<option>${l}</option>`).join("") +
+    `<option>Other</option>`;
 }
 /* "Send To" is fixed by section, not user-editable — Program Pages/Landing Pages always goes to
    both Lalit and Jasmeet; every other section goes to Lalit only. Anyone who needs to loop in
@@ -3373,8 +3376,19 @@ function fixedRecipientsFor_(section){
   return FIXED_RECIPIENTS_BY_SECTION_[section] || DEFAULT_FIXED_RECIPIENT_;
 }
 function updateSendToForSection_(){
+  if(!toPicker) return;
   const section = document.getElementById("rf_section").value;
-  if(toPicker) toPicker.reset(fixedRecipientsFor_(section));
+  const myEmail = (getCurrentUserEmail_()||"").toLowerCase();
+  // Excludes whoever's actually logged in and raising this — Send To is "who should be told about
+  // this," and that was showing the raiser's own name whenever they happened to be one of the
+  // fixed recipients for the section (every Program/Landing Pages request Lalit or Jasmeet raised
+  // themselves, for instance), which doesn't make sense: you don't need to be notified of your own
+  // request. Falls back to the other established admin if excluding yourself would otherwise leave
+  // nobody at all (the case where you're the *sole* fixed recipient for this section, true for
+  // every section except Program Pages/Landing Pages).
+  let recipients = fixedRecipientsFor_(section).filter(e => e.toLowerCase() !== myEmail);
+  if(!recipients.length) recipients = ["jasmeet.kaur@jaro.in"].filter(e => e.toLowerCase() !== myEmail);
+  toPicker.reset(recipients);
 }
 
 let PROGRAM_ROWS_CACHE = null;
@@ -3446,6 +3460,17 @@ function updateUniProgVisibility(){
   } else {
     uniWrap.style.display = ""; progWrap.style.display = "";
   }
+  // Only Program Pages/Landing Pages actually requires these two — every other section that shows
+  // them (University Pages' University field, or the "show both" default for General/Not sure and
+  // anything else unlisted) can leave them blank.
+  const required = section === COMBINED_SECTION_LABEL;
+  const uniReq = document.getElementById("rf_university_req");
+  const progReq = document.getElementById("rf_program_req");
+  if(uniReq) uniReq.style.display = required ? "" : "none";
+  if(progReq) progReq.style.display = required ? "" : "none";
+  // "Other" section: an optional free-text field to say what it actually is.
+  const otherField = document.getElementById("rf_section_other");
+  if(otherField) otherField.style.display = section === "Other" ? "" : "none";
 }
 // Program Pages and Landing Pages were merged into one "Program Pages/Landing Pages" dropdown
 // option (see populateSectionDropdown) — normalize either raw label to that merged value so opening
@@ -4034,26 +4059,40 @@ async function submitRequest(e){
   const toList = toPicker ? toPicker.get() : [];
   const ccList = ccPicker ? ccPicker.get() : [];
   if(!toList.length){ toast("Please add at least one recipient in 'Send To'", true); return; }
+  const sectionValue = document.getElementById("rf_section").value;
+  // University/Program are only actually required for Program Pages/Landing Pages — every other
+  // section can leave them blank even while the fields are still shown (see updateUniProgVisibility's
+  // required-asterisk toggle, which reflects this same rule visually).
+  const uniProgRequired = sectionValue === COMBINED_SECTION_LABEL;
   const uniWrap = document.getElementById("rf_university_wrap");
   const progWrap = document.getElementById("rf_program_wrap");
-  if(uniWrap.style.display !== "none" && !document.getElementById("rf_university").value.trim()){
+  if(uniProgRequired && uniWrap.style.display !== "none" && !document.getElementById("rf_university").value.trim()){
     toast("Please add the University / Institute", true); return;
   }
-  if(progWrap.style.display !== "none" && !document.getElementById("rf_program").value.trim()){
+  if(uniProgRequired && progWrap.style.display !== "none" && !document.getElementById("rf_program").value.trim()){
     toast("Please add the Program Name", true); return;
   }
   const subject = document.getElementById("rf_subject").value.trim();
   if(!subject){ toast("Please add a subject", true); return; }
+  // "Other" (section or request type): the free-text elaboration is optional, so this falls back
+  // to the literal word "Other" rather than blocking submission when it's left blank.
+  const section = sectionValue === "Other"
+    ? (document.getElementById("rf_section_other").value.trim() || "Other")
+    : sectionValue;
+  const typeValue = document.getElementById("rf_type").value;
+  const type = typeValue === "Other"
+    ? (document.getElementById("rf_type_other").value.trim() || "Other")
+    : typeValue;
   const payload = {
     name: document.getElementById("rf_name").value.trim(),
     // Identity now comes from the dashboard's own login session, not a typed "Work Email" field —
     // nobody can submit a request under someone else's address.
     email: getCurrentUserEmail_(),
     team: document.getElementById("rf_team").value.trim(),
-    section: document.getElementById("rf_section").value,
+    section: section,
     university: document.getElementById("rf_university").value.trim(),
     program: document.getElementById("rf_program").value.trim(),
-    type: document.getElementById("rf_type").value,
+    type: type,
     priority: document.querySelector('input[name="rf_priority"]:checked').value,
     link: document.getElementById("rf_link").value.trim(),
     subject: subject,
@@ -4107,25 +4146,34 @@ async function submitNotification_(){
   const descHtml = document.getElementById("rf_desc").innerHTML.trim();
   const descText = document.getElementById("rf_desc").innerText.trim();
   if(!descText && !/<img/.test(descHtml)){ toast("Please add a message to notify about", true); return; }
+  const sectionValue = document.getElementById("rf_section").value;
+  const uniProgRequired = sectionValue === COMBINED_SECTION_LABEL;
   const uniWrap = document.getElementById("rf_university_wrap");
   const progWrap = document.getElementById("rf_program_wrap");
-  if(uniWrap.style.display !== "none" && !document.getElementById("rf_university").value.trim()){
+  if(uniProgRequired && uniWrap.style.display !== "none" && !document.getElementById("rf_university").value.trim()){
     toast("Please add the University / Institute", true); return;
   }
-  if(progWrap.style.display !== "none" && !document.getElementById("rf_program").value.trim()){
+  if(uniProgRequired && progWrap.style.display !== "none" && !document.getElementById("rf_program").value.trim()){
     toast("Please add the Program Name", true); return;
   }
   const subject = document.getElementById("rf_subject").value.trim();
   if(!subject){ toast("Please add a subject", true); return; }
+  const section = sectionValue === "Other"
+    ? (document.getElementById("rf_section_other").value.trim() || "Other")
+    : sectionValue;
+  const typeValue = document.getElementById("rf_type").value;
+  const type = typeValue === "Other"
+    ? (document.getElementById("rf_type_other").value.trim() || "Other")
+    : typeValue;
   const ccList = ccPicker ? ccPicker.get() : [];
   const payload = {
     name: document.getElementById("rf_name").value.trim(),
     email: getCurrentUserEmail_(),
     team: document.getElementById("rf_team").value.trim(),
-    section: document.getElementById("rf_section").value,
+    section: section,
     university: document.getElementById("rf_university").value.trim(),
     program: document.getElementById("rf_program").value.trim(),
-    type: document.getElementById("rf_type").value,
+    type: type,
     priority: document.querySelector('input[name="rf_priority"]:checked').value,
     link: document.getElementById("rf_link").value.trim(),
     subject: subject,
@@ -4161,7 +4209,12 @@ function resetRequestForm(){
   document.getElementById("requestForm").reset();
   document.getElementById("rf_desc").innerHTML = "";
   document.getElementById("rf_subject_hint").style.display = "none";
-  if(toPicker) toPicker.reset(["lalit.rade@jaro.in"]);
+  document.getElementById("rf_section_other").style.display = "none";
+  document.getElementById("rf_type_other").style.display = "none";
+  // Empty rather than a hardcoded default — native form.reset() above already put Related Section
+  // back to blank, so there's no section yet to compute a real "Send To" from; the next
+  // openRequestModal()/section pick repopulates it correctly via updateSendToForSection_.
+  if(toPicker) toPicker.reset([]);
   if(ccPicker) ccPicker.reset([]);
   LAST_SUBJECT_SUGGESTION = "";
 }
@@ -6390,7 +6443,10 @@ function wireRequestFormDependencies(){
       refreshProgramOptionsFor(uniEl.value);
     }
   });
-  typeEl.addEventListener("change", maybeSuggestSubject);
+  typeEl.addEventListener("change", ()=>{
+    maybeSuggestSubject();
+    document.getElementById("rf_type_other").style.display = typeEl.value === "Other" ? "" : "none";
+  });
   subjectEl.addEventListener("input", checkSubjectMatchesHistory);
 
   // Real bug this fixed: the guard used to be "only suggest while the field is empty", which
