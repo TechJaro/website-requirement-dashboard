@@ -280,6 +280,7 @@ function dispatchAction_(body){
     case "uploadChunk": return handleUploadChunk_(body); // unused by the current front end — see the "Attachments v2" comment above assembleAttachments_
     case "checkFormUpload": return handleCheckFormUpload_(body);
     case "listRequirements": return handleListRequirements_(body);
+    case "listNotifications": return handleListNotifications_(body);
     case "listTrending": return handleListTrending_(body);
     case "setTrending": return handleSetTrending_(body);
     case "checkResult": return handleCheckResult_(body);
@@ -1578,6 +1579,28 @@ function handleListRequirements_(body){
   // Sorted explicitly by Timestamp, not just reversed sheet-row order — row order stops being a
   // reliable proxy for chronological order the moment anyone manually sorts/filters the sheet
   // itself in Google Sheets, which reverse() would then silently get wrong.
+  rows = rows.slice().sort((a,b) => new Date(b.Timestamp||0) - new Date(a.Timestamp||0));
+  const total = rows.length;
+  const pageSize = Math.max(1, Math.min(+body.pageSize || 20, 100));
+  const page = Math.max(1, +body.page || 1);
+  const start = (page - 1) * pageSize;
+  return { ok:true, rows: rows.slice(start, start + pageSize), total: total };
+}
+// Admin/Super Admin only, matching the Notify button that creates these rows in the first place —
+// unlike listRequirements, there's no per-Support-account filtering to layer on: a notification
+// was never scoped to a particular requester's own visibility, it's purely an admin-side audit
+// trail. Same server-side filter/paginate shape as handleListRequirements_, for the same reason
+// (this goes through the slower Apps Script/JSONP path, not a direct Sheets API fetch).
+function handleListNotifications_(body){
+  requireAdmin_(body.token);
+  const sheet = getOrCreateSheet_("Notifications", NOTIFICATIONS_HEADER);
+  let rows = sheetRowsAsObjects_(sheet);
+  const month = (body.month || "").toString().trim();
+  const date = (body.date || "").toString().trim();
+  const q = (body.q || "").toString().trim().toLowerCase();
+  if(month) rows = rows.filter(r => (r.Timestamp||"").toString().slice(0,7) === month);
+  if(date) rows = rows.filter(r => (r.Timestamp||"").toString().slice(0,10) === date);
+  if(q) rows = rows.filter(r => JSON.stringify(r).toLowerCase().includes(q));
   rows = rows.slice().sort((a,b) => new Date(b.Timestamp||0) - new Date(a.Timestamp||0));
   const total = rows.length;
   const pageSize = Math.max(1, Math.min(+body.pageSize || 20, 100));

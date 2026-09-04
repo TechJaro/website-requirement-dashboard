@@ -1450,6 +1450,43 @@ correctly falls back to the literal word "Other" with University/Program submitt
 unblocked; a second submission with both filled in correctly used the typed custom text instead.
 No `Code.gs` changes this round.
 
+## Notifications Log — a real page for the Notify audit trail (2026-08-31)
+
+"Notify" (added earlier this session) always wrote to its own "Notifications" sheet, but that was
+deliberately audit-only at the time — nowhere in the dashboard actually showed it. The user asked
+for that to be viewable, so it's now a real nav item and page, modeled closely on Requirements Log
+(same server-side pagination/Month/Date-filter pattern, same reasoning: this goes through the
+slower Apps Script/JSONP path, not a direct Sheets API fetch) but simpler — no Status column, no
+per-target tracking, no Quick Actions, since a notification was never a trackable request to begin
+with. Columns: Sent, University, Program, Category, Type, Priority, Sent By, Subject.
+
+**New nav item** "Notifications Log" (`data-nav="notificationsLog"`, `id="notificationsNavItem"`),
+sitting right under Requirements Log in the same "Requests" group, gated the same way as "Users":
+hidden client-side for Support (`applyRoleGating_`), a redirect-home if `currentRoute` is
+`notificationsLog` while gating re-applies for a non-Admin (same limited scope as the equivalent
+"users" check — this only actually fires on a view-mode/login transition, not on every navigation;
+see below), and — the check that actually matters regardless of how the route was reached —
+`renderNotificationsLog` itself refuses to show real content for a non-Admin, same as
+`renderUsersTable` already does. Added to `SECTIONS` (`type:"notifications-table"`) and routed
+through the same generic `sec.type` switch in `navigate()` that Requirements Log already uses,
+rather than a `route === "notificationsLog"` special case like "users" gets (that one predates
+having its own `SECTIONS` entry at all — this one has one, so the generic path is the correct fit).
+
+**Backend**: new `handleListNotifications_` (Code.gs), `requireAdmin_`-gated, reading/paginating/
+filtering the "Notifications" sheet — token-for-token the same shape as `handleListRequirements_`,
+minus the per-Support-account row filtering (a notification was never scoped to a particular
+requester's own visibility in the first place, so there's nothing to filter by requester here).
+New `listNotifications` dispatch case.
+
+**Verification**: confirmed in the browser — nav item hidden for a Support session; navigating
+there anyway as Support renders "Admins only" (not real data) via `renderNotificationsLog`'s own
+defensive check, independent of whether the route-level redirect happened to fire; as Admin, the
+page renders with the right headers and correct row/count data from a mocked `listNotifications`
+response, and the Month/Date filters, Clear button, and pager are all present and wired the same
+way Requirements Log's already-proven versions are. `Code.gs` syntax-checked with `node --check`.
+Not exercised against the live backend/real Notifications data — needs a real "send a Notify, then
+check it shows up in the new log" pass after redeploying.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,

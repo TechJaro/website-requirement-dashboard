@@ -872,6 +872,10 @@ body.auth-locked #app{display:none}
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <span>Requirements Log</span>
       </div>
+      <div class="navitem" data-nav="notificationsLog" id="notificationsNavItem" style="display:none">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span>Notifications Log</span>
+      </div>
       <div class="nav-group-label">Insights</div>
       <div class="navitem" data-nav="coreWebVitals">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h7l-1 8 11-14h-7l1-8Z"/></svg>
@@ -1206,6 +1210,7 @@ const SECTIONS = {
   pillar: { key:"pillar", label:"Pillar Pages", desc:"Evergreen pillar & trending-topic pages", icon:"pillar", type:"flat-cards",
     titleField:"Page", linkField:"Webpage Link", tagField:"Column 4", tagFallback:"Pillar Page" },
   requirements: { key:"requirements", label:"Requirements Log", desc:"Every request raised on this dashboard, with live status", icon:"requirements", type:"requirements-table" },
+  notificationsLog: { key:"notificationsLog", label:"Notifications Log", desc:"Every FYI sent via Notify — not a request, just a record of what went out", icon:"bolt", type:"notifications-table" },
   coreWebVitals: { key:"coreWebVitals", label:"Core Web Vitals", desc:"LCP, CLS & INP per page, checked live from PageSpeed Insights on demand", icon:"bolt", type:"core-web-vitals" },
   onPageAudit: { key:"onPageAudit", label:"On-Page Audit", desc:"Title/meta/alt-text/broken-link scan of every page, checked live on demand", icon:"search", type:"on-page-audit" },
   combinedInsights: { key:"combinedInsights", label:"Page + SEO Insights", desc:"GA4 and Search Console data for every page, side by side — sortable, filterable, exportable", icon:"bolt", type:"combined-insights" }
@@ -3232,6 +3237,7 @@ async function navigate(route){
   // users and anyone not logged in away from them), so the second password on top of the login
   // itself was redundant — bypassing straight to the real render function per your request.
   else if(sec.type === "requirements-table") await renderRequirementsTable(sec);
+  else if(sec.type === "notifications-table") await renderNotificationsLog(sec);
   else if(sec.type === "core-web-vitals") await renderCoreWebVitals(sec);
   else if(sec.type === "on-page-audit") await renderOnPageAudit(sec);
   else if(sec.type === "combined-insights") await renderCombinedInsights(sec);
@@ -5783,6 +5789,95 @@ async function renderRequirementsTable(sec){
   dateEl.addEventListener("change", ()=>{ page=1; draw(); });
   clearEl.addEventListener("click", ()=>{ searchEl.value=""; monthEl.value=""; dateEl.value=""; page=1; draw(); });
 }
+/* ---- Read-only audit log for the "Notify" button — no status, no per-target tracking, no quick
+   actions, since a notification was never a trackable request to begin with. Same server-side
+   pagination/filter pattern as Requirements Log, for the same reason (this goes through the Apps
+   Script/JSONP path, not a direct Sheets API fetch). Admin/Super Admin only, matching Notify
+   itself — the nav item is already hidden for Support (applyRoleGating_), this is belt-and-braces
+   in case the route is ever reached some other way. ---- */
+async function fetchNotificationsLogRows_({page, pageSize, q, month, date}){
+  if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
+  const r = await authApiCall_("listNotifications", {
+    token: AUTH_SESSION.token, page: page||1, pageSize: pageSize||20,
+    q: q||"", month: month||"", date: date||""
+  });
+  return { rows: r.rows || [], total: r.total || 0 };
+}
+async function renderNotificationsLog(sec){
+  const el = document.getElementById("content");
+  if(!isAdmin_()){ el.innerHTML = emptyStateHTML("Admins only", "This page is only visible to Admin accounts."); return; }
+  el.innerHTML = sectionShell(sec, false);
+  const listWrap = document.getElementById("listWrap");
+  function scrollToTop(){ document.querySelector(".content").scrollIntoView({behavior:"smooth", block:"start"}); }
+  document.querySelector(".filterbar").insertAdjacentHTML("beforeend", `
+    <input type="month" id="notifMonthFilter" title="Filter by month">
+    <input type="date" id="notifDateFilter" title="Filter by exact date">
+    <button type="button" class="btn" id="notifFilterClear">Clear</button>
+  `);
+  const searchEl = document.getElementById("sec_search");
+  const monthEl = document.getElementById("notifMonthFilter");
+  const dateEl = document.getElementById("notifDateFilter");
+  const clearEl = document.getElementById("notifFilterClear");
+  const pageSize = 20;
+  let page = 1;
+
+  async function draw(){
+    listWrap.innerHTML = `<div style="padding:60px;text-align:center;color:var(--ink-35)">Loading…</div>`;
+    let result;
+    try{
+      result = await fetchNotificationsLogRows_({
+        page, pageSize, q: searchEl.value||"", month: monthEl.value||"", date: dateEl.value||""
+      });
+    }catch(e){
+      listWrap.innerHTML = emptyStateHTML("Couldn't load the Notifications Log", e.message || "Try again in a moment.");
+      document.getElementById("resultCount").textContent = "";
+      return;
+    }
+    setLivePill(true);
+    const items = result.rows;
+    const total = result.total;
+    const totalPages = Math.max(1, Math.ceil(total/pageSize));
+    page = Math.min(Math.max(page,1), totalPages);
+    const pagerHTML = `
+      <div class="pager">
+        <button id="pgFirst" ${page<=1?"disabled":""}>« First</button>
+        <button id="pgPrev" ${page<=1?"disabled":""}>← Prev</button>
+        <span class="pg-info">Page ${page} of ${totalPages}</span>
+        <button id="pgNext" ${page>=totalPages?"disabled":""}>Next →</button>
+        <button id="pgLast" ${page>=totalPages?"disabled":""}>Last »</button>
+      </div>`;
+    listWrap.innerHTML = `
+      ${pagerHTML}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sent</th><th>University</th><th>Program</th><th>Category</th><th>Type</th><th>Priority</th><th>Sent By</th><th>Subject</th></tr></thead>
+          <tbody>
+            ${items.map(row=>`<tr>
+              <td class="cell-muted">${esc((row["Timestamp"]||"").toString().slice(0,16))}</td>
+              <td>${esc(row["University"]||"—")}</td>
+              <td>${esc(row["Program"]||"—")}</td>
+              <td class="cell-muted">${esc(row["Section"]||"—")}</td>
+              <td>${esc(row["Request Type"]||"—")}</td>
+              <td>${esc(row["Priority"]||"—")}</td>
+              <td class="cell-muted">${esc(row["Sent By"]||row["Email"]||"—")}</td>
+              <td>${esc(row["Subject"]||"—")}</td>
+            </tr>`).join("") || `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--ink-35)">No notifications sent yet</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      ${pagerHTML}`;
+    document.getElementById("resultCount").textContent = `${total} notification${total===1?"":"s"}`;
+    listWrap.querySelectorAll("#pgFirst").forEach(b=>b.addEventListener("click", ()=>{page=1; draw(); scrollToTop();}));
+    listWrap.querySelectorAll("#pgPrev").forEach(b=>b.addEventListener("click", ()=>{page--; draw(); scrollToTop();}));
+    listWrap.querySelectorAll("#pgNext").forEach(b=>b.addEventListener("click", ()=>{page++; draw(); scrollToTop();}));
+    listWrap.querySelectorAll("#pgLast").forEach(b=>b.addEventListener("click", ()=>{page=totalPages; draw(); scrollToTop();}));
+  }
+  draw();
+  searchEl.addEventListener("input", debounce(()=>{ page=1; draw(); }, 300));
+  monthEl.addEventListener("change", ()=>{ page=1; draw(); });
+  dateEl.addEventListener("change", ()=>{ page=1; draw(); });
+  clearEl.addEventListener("click", ()=>{ searchEl.value=""; monthEl.value=""; dateEl.value=""; page=1; draw(); });
+}
 
 
 
@@ -6255,6 +6350,7 @@ function applyRoleGating_(){
     document.getElementById("viewAsToggleLabel").textContent = nextLabel;
   }
   document.getElementById("usersNavItem").style.display = admin ? "" : "none";
+  document.getElementById("notificationsNavItem").style.display = admin ? "" : "none";
   document.getElementById("adminGroupLabel").style.display = admin ? "" : "none";
   SUPPORT_HIDDEN_NAV.forEach(navKey=>{
     const item = document.querySelector(`.navitem[data-nav="${navKey}"]`);
@@ -6274,6 +6370,7 @@ function applyRoleGating_(){
   // deep link), bounce back to Home rather than just hiding the nav item.
   if(!admin && SUPPORT_HIDDEN_NAV.includes(currentRoute)) navigate("home");
   if(!admin && currentRoute === "users") navigate("home");
+  if(!admin && currentRoute === "notificationsLog") navigate("home");
 }
 
 /* ---- Admin: Users page — everyone who can sign in, plus a form to invite a new Support user ---- */
@@ -6409,6 +6506,7 @@ function init(){
   document.querySelector('.navitem[data-nav="onPageAudit"]').addEventListener("click", ()=>navigate("onPageAudit"));
   document.querySelector('.navitem[data-nav="combinedInsights"]').addEventListener("click", ()=>navigate("combinedInsights"));
   document.querySelector('.navitem[data-nav="users"]').addEventListener("click", ()=>navigate("users"));
+  document.querySelector('.navitem[data-nav="notificationsLog"]').addEventListener("click", ()=>navigate("notificationsLog"));
   document.getElementById("openRequestBtn").addEventListener("click", ()=>openRequestModal());
   document.getElementById("closeRequestBtn").addEventListener("click", closeRequestModal);
   document.getElementById("cancelRequestBtn").addEventListener("click", closeRequestModal);
