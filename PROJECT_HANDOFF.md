@@ -1487,6 +1487,37 @@ way Requirements Log's already-proven versions are. `Code.gs` syntax-checked wit
 Not exercised against the live backend/real Notifications data — needs a real "send a Notify, then
 check it shows up in the new log" pass after redeploying.
 
+## Real bug fixed: Blogs showed a raw date serial number instead of a real date (2026-09-04)
+
+User caught this from the Blogs page — cards showed "46268" instead of a date. Root cause: the
+Google Sheets API (`loadSheetViaApi`, `valueRenderOption=UNFORMATTED_VALUE`) returns a genuine Date
+cell as its raw serial number (days since 1899-12-30), and `parseRowsToObjects` stringifies every
+cell uniformly (`.toString().trim()`) when building row objects — so by the time
+`row["Published Date"]` reaches anywhere else, it's already the literal text `"46268"`, not a
+number and not a real date string. `renderBlogCards` was just `.slice(0,10)`-ing that text, which
+for a 5-character string is a no-op — hence showing the serial verbatim.
+
+This exact bug class already had a fix elsewhere in the file — `formatClosureDate_` (used for
+"Application Closure Date" and the News banner's date) already detects a bare-integer string in a
+plausible date-serial range and converts it back to a real date. `Published Date` in
+`renderBlogCards` just wasn't using it. Now it does. Also fixed the sort: it was comparing
+`Published Date` with `.localeCompare()`, which sorts a *formatted* date string like "13 Jul 2026"
+as plain text — not chronological order (`"1 Jan 2027"` would sort before `"13 Jul 2026"` in "at
+least it doesn't crash" terms once formatted, but never actually in real date order). New
+`sheetDateSortValue_` — same serial-detection logic as `formatClosureDate_`, but returns a real
+numeric timestamp instead of a display string, since the sort comparator needs something orderable,
+not something readable.
+
+**Verification**: `formatClosureDate_("46268")` confirmed to return `"3 Sept 2026"` (and `"46267"`
+→ `"2 Sept 2026"`, one day earlier, correctly sequential); `sheetDateSortValue_` confirmed to order
+those two correctly; a non-numeric value confirmed to pass through unchanged (no regression for a
+column that's genuinely text); rendered `renderBlogCards` end-to-end against two mock rows with
+serial-number "Published Date" values and confirmed both the displayed date *and* the sort order
+(newest first) were correct together. Grepped the rest of the file for the same
+`.toString().slice(0,10)` / raw `.localeCompare()` pattern against a sheet-API field — nothing else
+turned up affected; every other `.slice(0,10)` site operates on a real JS `Date`/ISO-string value,
+not a raw sheet cell. Frontend-only, no `Code.gs` changes.
+
 ## Immediate next action
 
 Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,

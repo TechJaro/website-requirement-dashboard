@@ -1424,6 +1424,17 @@ function formatClosureDate_(v){
   }
   return s;
 }
+// Sort-comparable counterpart to formatClosureDate_ — that one returns a human-formatted string
+// ("13 Jul 2026"), which doesn't sort correctly as text (lexicographic order isn't chronological
+// order). Same raw-serial-number detection, but returns a numeric timestamp instead.
+function sheetDateSortValue_(v){
+  if(v===undefined || v===null || v==="") return 0;
+  const s = v.toString().trim();
+  const num = /^\d+(\.\d+)?$/.test(s) ? Number(s) : NaN;
+  if(!isNaN(num) && num > 20000 && num < 60000) return Date.UTC(1899,11,30) + Math.round(num)*86400000;
+  const parsed = Date.parse(s);
+  return isNaN(parsed) ? 0 : parsed;
+}
 function initials(name){ return (name||"?").split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase() || "?"; }
 /* ================================================================================================
    UNIVERSITY / INSTITUTE LOGOS — replaces the initials avatar wherever we recognize the name.
@@ -3029,7 +3040,7 @@ async function renderBlogCards(sec){
     const q = (document.getElementById("sec_search").value||"").toLowerCase();
     const cat = catSelect.value;
     let items = data.filter(r => (!cat || r["Category"]===cat) && JSON.stringify(r).toLowerCase().includes(q));
-    items = items.slice().sort((a,b)=> (b["Published Date"]||"").localeCompare(a["Published Date"]||""));
+    items = items.slice().sort((a,b)=> sheetDateSortValue_(b["Published Date"]) - sheetDateSortValue_(a["Published Date"]));
     const totalPages = Math.max(1, Math.ceil(items.length/pageSize));
     page = Math.min(Math.max(page,1), totalPages);
     const pageItems = items.slice((page-1)*pageSize, page*pageSize);
@@ -3052,7 +3063,7 @@ async function renderBlogCards(sec){
           <h4>${esc(row["Title"]||"Untitled Article")}</h4>
           ${isValidLink(row["Meta Title"]) ? `<p>${esc(row["Meta Title"])}</p>` : ""}
           <div class="foot">
-            <span class="cell-muted" style="font-size:11.5px">${esc((row["Published Date"]||"").toString().slice(0,10))}</span>
+            <span class="cell-muted" style="font-size:11.5px">${esc(formatClosureDate_(row["Published Date"]))}</span>
             ${link ? `<a class="link-chip" href="${esc(link)}" target="_blank" rel="noopener">${ic("external")}Read Article</a>` : `<span class="link-chip disabled">${ic("link")}No link yet</span>`}
             ${raiseBtn({ program: row["Title"]||"Untitled Article", section: "Blogs", link: link||"" })}
           </div>
