@@ -2058,6 +2058,22 @@ async function renderHome(){
       </div>
     </div>
 
+    <div id="notificationActivityWrap" style="display:none">
+      <div class="section-head"><div><h2>Notification Activity</h2><div class="meta">Who's sending notifications, live from the Notifications Log — Admins only</div></div></div>
+      <div class="insights-grid" style="margin-bottom:26px">
+        <div class="insight-panel">
+          <h4>Notifications by Sender</h4>
+          <div class="click-hint">Click any slice to see their notifications — a tall bar for one person is worth a look ›</div>
+          <div id="notifSenderBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+        </div>
+        <div class="insight-panel">
+          <h4>Notifications by Page</h4>
+          <div class="click-hint">Click any slice to see those notifications ›</div>
+          <div id="notifPageBreakdown" class="status-breakdown"><div class="insight-loading">Loading…</div></div>
+        </div>
+      </div>
+    </div>
+
     <div class="section-head"><div><h2>Quick Insights</h2><div class="meta">A live snapshot of your program portfolio</div></div></div>
     <div class="insights-grid">
       <div class="insight-panel">
@@ -2144,6 +2160,7 @@ async function renderHome(){
   loadLandingInsights();
   if(isAdmin_()) loadUrlMappingCoverage_();
   if(isAdmin_()) renderRequesterActivity();
+  if(isAdmin_()) renderNotificationActivity();
 }
 const STATUS_COLORS = { open:"#1b9c58", soon:"#8a6800", closed:"var(--red)", draft:"var(--blue)", other:"var(--ink-35)" };
 const TYPE_COLORS = ["var(--blue)","var(--yellow)","var(--red)","#7c5cff","#1b9c58","#8a6800","#0aa5a0"];
@@ -2349,15 +2366,68 @@ async function renderRequesterActivity(){
     // BEFORE wirePageSearch_ prepends the search box, not after — otherwise the search box gets
     // wiped out the instant it's added.
     renderBreakdownBars_(pageEl, entries, "No page-specific requests yet.", "Requests", mapRow);
-    wirePageSearch_(pageEl, entries, mapRow);
+    wirePageSearch_(pageEl, entries, mapRow, "request");
   }
 }
-function wirePageSearch_(container, entries, mapRow){
+// Same idea as renderRequesterActivity above, but for the separate Notifications sheet — Notify
+// is deliberately NOT a request (no Status, no thread, purely an FYI broadcast), so it was never
+// folded into the Requirements Log breakdown; this gives it the identical breakdown-by-sender/
+// breakdown-by-page treatment as its own parallel section instead.
+async function renderNotificationActivity(){
+  const senderEl = document.getElementById("notifSenderBreakdown");
+  const pageEl = document.getElementById("notifPageBreakdown");
+  if(!senderEl && !pageEl) return;
+  let rows;
+  try{
+    const r = await authApiCall_("listNotifications", { token: AUTH_SESSION.token });
+    rows = r.rows || [];
+  }catch(e){
+    if(senderEl) senderEl.innerHTML = `<div class="insight-loading">Couldn't load notification activity.</div>`;
+    if(pageEl) pageEl.innerHTML = `<div class="insight-loading">Couldn't load notification activity.</div>`;
+    return;
+  }
+  if(senderEl && !senderEl.isConnected) return; // navigated away while the fetch was in flight
+  const bySender = new Map(); // email -> { name, rows:[] }
+  rows.forEach(row=>{
+    const email = (row["Email"]||"").toString().trim().toLowerCase() || "unknown";
+    if(!bySender.has(email)) bySender.set(email, { name: row["Sent By"] || email, rows: [] });
+    bySender.get(email).rows.push(row);
+  });
+  const byPage = new Map(); // "university|||program" -> { name (label), rows:[] }
+  rows.forEach(row=>{
+    const uni = (row["University"]||"").toString().trim();
+    const prog = (row["Program"]||"").toString().trim();
+    if(!uni && !prog) return; // no page context to group by
+    const key = (uni+"|||"+prog).toLowerCase();
+    if(!byPage.has(key)) byPage.set(key, { name: [uni,prog].filter(Boolean).join(" — "), rows: [] });
+    byPage.get(key).rows.push(row);
+  });
+  const mapRow = row => ({
+    title: row["Subject"] || "Untitled notification",
+    sub: (row["Timestamp"]||"").toString().slice(0,10),
+  });
+  if(senderEl){
+    const entries = [...bySender.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
+    renderBreakdownBars_(senderEl, entries, "No notifications sent yet.", "Notifications", mapRow);
+  }
+  if(pageEl){
+    const entries = [...byPage.entries()].sort((a,b)=> b[1].rows.length - a[1].rows.length);
+    renderBreakdownBars_(pageEl, entries, "No page-specific notifications yet.", "Notifications", mapRow);
+    wirePageSearch_(pageEl, entries, mapRow, "notification");
+  }
+}
+// noun: singular label for the count shown per option ("request"/"notification") and the prefix
+// used on the drill-down modal's title — defaults to "request" so the original Requests-by-Page
+// caller doesn't need to change.
+function wirePageSearch_(container, entries, mapRow, noun){
   if(!entries.length) return;
+  noun = noun || "request";
+  const nounPlural = noun + (noun.endsWith("s") ? "es" : "s");
+  const nounTitle = noun.charAt(0).toUpperCase() + noun.slice(1) + "s";
   const listId = "pageSearchList_" + Math.random().toString(36).slice(2);
   const byLabel = new Map();
   const options = entries.map(([,v])=>{
-    const label = `${v.name} (${v.rows.length} request${v.rows.length!==1?"s":""})`;
+    const label = `${v.name} (${v.rows.length} ${v.rows.length!==1?nounPlural:noun})`;
     byLabel.set(label, v);
     return `<option value="${esc(label)}">`;
   }).join("");
@@ -2369,7 +2439,7 @@ function wirePageSearch_(container, entries, mapRow){
     </div>`);
   document.getElementById(`pageSearchInput_${listId}`).addEventListener("input", (e)=>{
     const found = byLabel.get(e.target.value);
-    if(found) openInsightListModal(`Requests — ${found.name}`, found.rows, mapRow);
+    if(found) openInsightListModal(`${nounTitle} — ${found.name}`, found.rows, mapRow);
   });
 }
 /* Generic click-to-drill-down popup used by the Quick Insights breakdowns (Program AND Landing
@@ -6565,6 +6635,8 @@ function applyRoleGating_(){
   if(liveInsightsGrid) liveInsightsGrid.style.display = admin ? "" : "none";
   const requestActivityWrap = document.getElementById("requestActivityWrap");
   if(requestActivityWrap) requestActivityWrap.style.display = admin ? "" : "none";
+  const notificationActivityWrap = document.getElementById("notificationActivityWrap");
+  if(notificationActivityWrap) notificationActivityWrap.style.display = admin ? "" : "none";
   const formMappingsCoveragePanel = document.getElementById("formMappingsCoveragePanel");
   if(formMappingsCoveragePanel) formMappingsCoveragePanel.style.display = admin ? "" : "none";
   const notifyBtn = document.getElementById("notifyRequestBtn");

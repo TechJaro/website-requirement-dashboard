@@ -1622,14 +1622,55 @@ of both functions to confirm no caller was missed. Not exercised against the liv
 redeploy first) — the next real request Lalit raises after redeploying should confirm both: he
 receives a copy, and the email's From name reads as his own name rather than just the dashboard's.
 
+The above batch (Loop In + the two email fixes, plus the Blogs date filter before it) was committed
+and pushed as `975359d` on 2026-09-05, after the user redeployed `Code.gs`. Confirmed live: hit the
+Vercel-deployed `index.html` directly (the new Loop In functions/icon are present) and posted a real
+`loopInRecipients` call straight to the Apps Script exec URL (got back a session error, not "Unknown
+action" — confirms the backend redeploy picked up the new dispatch case).
+
+## New feature: Notification Activity graphs on Home (2026-09-05)
+
+User noticed the Home page's "Request Activity" section (Requests by Requester / Requests by Page)
+only reflects the Requirements Log — Notify broadcasts weren't represented anywhere on Home. Added a
+parallel "Notification Activity" section directly below it (same Admin-only gating, same
+"live from the [X] Log" meta line), with its own two panels: "Notifications by Sender" and
+"Notifications by Page" — same segmented-bar-plus-legend visual, same click-a-slice-to-drill-down
+behavior, same search-any-page box, as the existing Requests panels. Deliberately a **separate**
+section rather than merging notification counts into the existing Requests bars — Notify has been
+kept a distinct, non-trackable concept from a real request everywhere else in this project (its own
+sheet, its own "Notifications Log" nav page, its own audit trail), so folding its counts into
+"Requests by Requester" would have quietly blurred that line instead of just surfacing the data that
+was missing.
+
+**Implementation**: new `renderNotificationActivity()` (Unified Dashboard.txt), a near-exact mirror
+of the existing `renderRequesterActivity()` but reading `listNotifications` instead of
+`listRequirements`, grouping by `Sent By`/`Email` and by University+Program same as before, and
+reusing the same generic `renderBreakdownBars_`/`wirePageSearch_`/`openInsightListModal` helpers
+that already power every other breakdown panel on Home — no new UI primitives needed. Wired into
+`renderHome()` alongside the existing `renderRequesterActivity()` call (Admin-only), and into
+`applyRoleGating_` so the new section hides for a Support session exactly like the Requests one does.
+
+**Bug caught and fixed before shipping**: `wirePageSearch_` (the "search any of the N pages" box
+under a "by Page" panel) hardcoded the word "request"/"requests" in both the per-option count label
+and the drill-down modal's title — harmless while it only ever served the Requests panel, but wrong
+once reused for Notifications (a searched Notifications page opened a modal titled "Requests — …").
+Fixed by adding a `noun` parameter ("request" or "notification") that both the pluralized count label
+and the modal-title prefix now derive from, with the original Requests-by-Page call site passing
+"request" explicitly so its behavior is unchanged.
+
+**Verification**: syntax-checked with `node --check`. Tested in the browser with mocked
+`listNotifications` data (3 notifications, 2 senders, 2 pages) — confirmed the bar/legend counts
+match, clicking a sender slice opens a correctly-titled drill-down modal listing that person's exact
+notifications (subject + date), and — the specific bug above — searching a page in the Notifications
+panel now opens a modal titled "Notifications — …" with a correctly-pluralized option label, while
+re-testing the original Requests-by-Page search alongside it confirmed that one still reads
+"Requests — …" exactly as before (no regression from the shared-helper change). Confirmed the new
+section's `display` toggles correctly between an Admin and a Support session via `applyRoleGating_`.
+
 ## Immediate next action
 
-Both fixes above are backend-only (`Code.gs`); the Loop In feature touched both `Code.gs` and the
-front end. Send the user the updated `Code.gs` with the standing instruction: paste into the Apps
-Script editor and redeploy (Deploy → Manage deployments → New version) before any of this batch is
-live — the Loop In button will otherwise fail with a real error until that happens. `index.html` was
-resynced from `Unified Dashboard.txt` (copied wholesale, diff confirmed identical). Nothing in this
-batch (or the Blogs date-filter feature just before it) has been committed/pushed yet — ask the user
-explicitly before running any git commands. Both the `C:\Users\user\Downloads\Website Requirement
-Dashboard` and `D:\JARO EDUCATION - LALIT\Website Requirement Dashboard` copies need this same sync
-— only the Downloads copy was edited this round.
+This Notification Activity feature is frontend-only (no `Code.gs` changes) — built and verified but
+**not yet committed or pushed**. Ask the user explicitly before running any git commands. `index.html`
+was resynced from `Unified Dashboard.txt` (copied wholesale, diff confirmed identical). Both the
+`C:\Users\user\Downloads\Website Requirement Dashboard` and `D:\JARO EDUCATION - LALIT\Website
+Requirement Dashboard` copies need this same sync — only the Downloads copy was edited this round.
