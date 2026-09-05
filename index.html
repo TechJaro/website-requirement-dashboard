@@ -388,6 +388,9 @@ input,select,textarea{font-family:inherit}
 .link-chip svg{width:11px;height:11px}
 .link-chip.disabled{color:var(--ink-35);border-color:var(--line-soft);pointer-events:none;text-decoration:line-through;opacity:.6}
 .link-chip.primary-chip{background:var(--yellow-tint);border-color:#f0d98c;color:#8a6800}
+.loop-in-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:7px;background:#fff;border:1px solid var(--line);color:var(--blue);cursor:pointer;transition:all .12s ease}
+.loop-in-btn:hover{background:var(--blue);color:#fff;border-color:var(--blue)}
+.loop-in-btn svg{width:14px;height:14px}
 .link-chip.primary-chip:hover{background:var(--yellow);color:var(--black);border-color:var(--yellow)}
 
 /* ---------- LANDING PAGES: link-set cards ---------- */
@@ -1188,6 +1191,7 @@ const ICONS = {
   image: `<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>`,
   bold: `<path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/>`,
   italic: `<path d="M19 4h-9M14 20H5M15 4 9 20"/>`,
+  userPlus: `<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>`,
 };
 function ic(name, extra=""){ return `<svg class="${extra}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]||""}</svg>`; }
 
@@ -3029,17 +3033,52 @@ async function renderBlogCards(sec){
   setLivePill(isLive);
 
   const categories = [...new Set(data.map(r=>r["Category"]).filter(Boolean))].sort();
+  // Every year actually present in the data, newest first — avoids offering a year filter option
+  // that could never match anything.
+  const years = [...new Set(data.map(r=>{
+    const ts = sheetDateSortValue_(r["Published Date"]);
+    return ts ? new Date(ts).getUTCFullYear() : null;
+  }).filter(Boolean))].sort((a,b)=>b-a);
   const filterbar = document.querySelector(".filterbar");
   const catSelect = document.createElement("select");
   catSelect.innerHTML = `<option value="">All Categories</option>` + categories.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
   filterbar.insertBefore(catSelect, document.getElementById("resultCount"));
+  // Three independent ways to narrow by publish date — any one works on its own; picking more than
+  // one just ANDs them together (harmless even when redundant, e.g. a Year that already matches
+  // the Month picked).
+  const resultCountEl = document.getElementById("resultCount");
+  const dateEl = document.createElement("input");
+  dateEl.type = "date"; dateEl.id = "blogDateFilter"; dateEl.title = "Filter by exact date";
+  const monthEl = document.createElement("input");
+  monthEl.type = "month"; monthEl.id = "blogMonthFilter"; monthEl.title = "Filter by month";
+  const yearEl = document.createElement("select");
+  yearEl.id = "blogYearFilter"; yearEl.title = "Filter by year";
+  yearEl.innerHTML = `<option value="">All Years</option>` + years.map(y=>`<option value="${y}">${y}</option>`).join("");
+  const clearDatesEl = document.createElement("button");
+  clearDatesEl.type = "button"; clearDatesEl.id = "blogDateFilterClear"; clearDatesEl.className = "btn"; clearDatesEl.textContent = "Clear Dates";
+  filterbar.insertBefore(dateEl, resultCountEl);
+  filterbar.insertBefore(monthEl, resultCountEl);
+  filterbar.insertBefore(yearEl, resultCountEl);
+  filterbar.insertBefore(clearDatesEl, resultCountEl);
 
   let page = 1;
   const pageSize = 12;
   function draw(){
     const q = (document.getElementById("sec_search").value||"").toLowerCase();
     const cat = catSelect.value;
-    let items = data.filter(r => (!cat || r["Category"]===cat) && JSON.stringify(r).toLowerCase().includes(q));
+    const dateFilter = dateEl.value, monthFilter = monthEl.value, yearFilter = yearEl.value;
+    let items = data.filter(r => {
+      if(!((!cat || r["Category"]===cat) && JSON.stringify(r).toLowerCase().includes(q))) return false;
+      if(dateFilter || monthFilter || yearFilter){
+        const ts = sheetDateSortValue_(r["Published Date"]);
+        if(!ts) return false; // no usable Published Date on this row — can't match any date filter
+        const iso = new Date(ts).toISOString();
+        if(dateFilter && iso.slice(0,10) !== dateFilter) return false;
+        if(monthFilter && iso.slice(0,7) !== monthFilter) return false;
+        if(yearFilter && iso.slice(0,4) !== yearFilter) return false;
+      }
+      return true;
+    });
     items = items.slice().sort((a,b)=> sheetDateSortValue_(b["Published Date"]) - sheetDateSortValue_(a["Published Date"]));
     const totalPages = Math.max(1, Math.ceil(items.length/pageSize));
     page = Math.min(Math.max(page,1), totalPages);
@@ -3082,6 +3121,10 @@ async function renderBlogCards(sec){
   draw();
   document.getElementById("sec_search").addEventListener("input", debounce(()=>{page=1;draw();}, 220));
   catSelect.addEventListener("change", ()=>{page=1;draw();});
+  dateEl.addEventListener("change", ()=>{page=1;draw();});
+  monthEl.addEventListener("change", ()=>{page=1;draw();});
+  yearEl.addEventListener("change", ()=>{page=1;draw();});
+  clearDatesEl.addEventListener("click", ()=>{ dateEl.value=""; monthEl.value=""; yearEl.value=""; page=1; draw(); });
 }
 
 /* ================================================================================================
@@ -5529,6 +5572,7 @@ function appliesToTagHtml_(row){
    else. Cancelling reverts the dropdown to its previous value rather than leaving it changed with
    no email sent. */
 let statusNoteToPicker, statusNoteCcPicker, statusNoteRTE;
+let loopInCcPicker, loopInRTE;
 function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, cc, target}){
   let overlay = document.getElementById("statusNoteOverlay");
   if(!overlay){
@@ -5682,6 +5726,127 @@ function openStatusNoteModal_({sel, newStatus, prevValue, sheetRow, email, to, c
   closeBtn.addEventListener("click", revert);
   confirmBtn.addEventListener("click", onConfirm);
 }
+/* ---- "Loop In" — adds a missed recipient to an ALREADY-raised request or ALREADY-sent
+   notification, from a row in the Requirements Log / Notifications Log tables specifically — not
+   from the raise-a-request form (that already has its own Cc field at submit time). Sends the
+   newly-added people an immediate email with the original context and folds them into the row's
+   stored Cc, so every future status-update email on this request naturally includes them too. ---- */
+async function loopInRecipients_({source, sheetRow, cc, noteHtml, noteText, senderName}){
+  if(!AUTH_SESSION || !AUTH_SESSION.token) throw new Error("You're not logged in — please log in again");
+  return await authApiPostCall_("loopInRecipients", {
+    token: AUTH_SESSION.token, source, sheetRow, cc: cc||[],
+    noteHtml: noteHtml||"", noteText: noteText||"", senderName: senderName||""
+  });
+}
+function openLoopInModal_({source, sheetRow, email, to, cc}){
+  let overlay = document.getElementById("loopInOverlay");
+  if(!overlay){
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal-overlay" id="loopInOverlay">
+        <div class="modal" style="max-width:480px">
+          <div class="modal-watermark"></div>
+          <div class="modal-head">
+            <div class="ic">${ic("userPlus")}</div>
+            <div>
+              <h3>Loop Someone In</h3>
+              <p id="loopInSubtitle">They'll get an email with the full context, and be added to future updates on this</p>
+            </div>
+            <button class="modal-close" id="loopInClose" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="modal-body" style="display:grid;gap:14px">
+            <div class="cell-muted" id="loopInExisting" style="font-size:12px"></div>
+            <div class="field">
+              <label>Add to CC</label>
+              <div class="chip-picker" id="loopInCc_picker">
+                <div class="chip-list" id="loopInCc_chips"></div>
+                <input type="text" id="loopInCc_input" placeholder="Type a name/email or pick below…" autocomplete="off">
+                <div class="chip-suggest" id="loopInCc_suggest"></div>
+              </div>
+            </div>
+            <div class="field">
+              <label>Note (optional)</label>
+              <div class="rte-toolbar" id="loopInToolbar">
+                <button type="button" class="rte-btn" data-cmd="bold" title="Bold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12h7a4 4 0 0 1 0 8H6z"/><path d="M6 4h6a4 4 0 0 1 0 8H6z"/></svg></button>
+                <button type="button" class="rte-btn" data-cmd="italic" title="Italic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 4h-9M14 20H5M15 4 9 20"/></svg></button>
+                <button type="button" class="rte-btn" id="loopInLinkBtn" title="Insert hyperlink"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"/></svg></button>
+                <button type="button" class="rte-btn" id="loopInImageBtn" title="Attach a file (image, PDF, etc. — up to 10MB)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></button>
+                <input type="file" id="loopInImageInput" multiple hidden>
+                <span class="rte-hint">Optional context for whoever you're looping in</span>
+              </div>
+              <div class="rte-body" id="loopInText" contenteditable="true" data-placeholder="e.g. Looping you in — can you take a look at this?" style="min-height:90px"></div>
+            </div>
+          </div>
+          <div class="modal-foot">
+            <button type="button" class="btn" id="loopInCancel">Cancel</button>
+            <button type="button" class="btn primary" id="loopInConfirm">Loop In</button>
+          </div>
+        </div>
+      </div>`);
+    overlay = document.getElementById("loopInOverlay");
+    loopInRTE = wireRichTextEditor({
+      bodyId:"loopInText", scopeEl:document.getElementById("loopInToolbar"),
+      linkBtnId:"loopInLinkBtn", imageBtnId:"loopInImageBtn", imageInputId:"loopInImageInput",
+      ccPicker: ()=>loopInCcPicker
+    });
+    loopInCcPicker = createChipPicker(
+      { chips:"loopInCc_chips", input:"loopInCc_input", suggest:"loopInCc_suggest", picker:"loopInCc_picker" }, [], false
+    );
+  }
+  document.getElementById("loopInSubtitle").textContent = source === "notification"
+    ? "They'll get an email with the full context of this notification, and be added to future notifications on it"
+    : "They'll get an email with the full context of this request, and be added to future status updates on it";
+  const alreadyOn = (to||[]).concat(cc||[]).filter((e,i,a)=>e && a.indexOf(e)===i);
+  document.getElementById("loopInExisting").textContent = alreadyOn.length
+    ? `Already on this thread: ${alreadyOn.join(", ")}`
+    : "";
+  loopInCcPicker.reset([]);
+  const textEl = document.getElementById("loopInText");
+  textEl.innerHTML = "";
+  overlay.classList.add("show");
+  setTimeout(()=>document.getElementById("loopInCc_input").focus(), 30);
+
+  const cancelBtn = document.getElementById("loopInCancel");
+  const closeBtn = document.getElementById("loopInClose");
+  const confirmBtn = document.getElementById("loopInConfirm");
+  const cleanup = ()=>{
+    overlay.removeEventListener("click", onOverlayClick);
+    cancelBtn.removeEventListener("click", close_);
+    closeBtn.removeEventListener("click", close_);
+    confirmBtn.removeEventListener("click", onConfirm);
+  };
+  const close_ = ()=>{ overlay.classList.remove("show"); cleanup(); };
+  const onOverlayClick = (e)=>{ if(e.target.id === "loopInOverlay") close_(); };
+  const onConfirm = async ()=>{
+    if(loopInRTE && loopInRTE.hasPendingUploads()){
+      confirmBtn.disabled = true; confirmBtn.textContent = "Waiting for attachment…";
+      await loopInRTE.waitForUploads();
+      confirmBtn.disabled = false; confirmBtn.textContent = "Loop In";
+    }
+    const ccEmails = loopInCcPicker.get().map(c=>c.email);
+    if(!ccEmails.length){ toast("Add at least one person to loop in", true); return; }
+    const noteHtml = textEl.innerHTML.trim();
+    const noteText = textEl.innerText.trim();
+    confirmBtn.disabled = true; confirmBtn.textContent = "Sending…";
+    try{
+      const myEmail = getCurrentUserEmail_();
+      const known = CONTACTS.find(c=>c.email.toLowerCase()===myEmail.toLowerCase());
+      const senderName = (known && known.name) || myEmail;
+      const r = await loopInRecipients_({ source, sheetRow, cc: ccEmails, noteHtml, noteText, senderName });
+      toast(r && r.debug ? `Looped in — ${r.debug}` : "Looped in");
+      close_();
+    }catch(err){
+      toast(err.message || "Couldn't loop them in", true);
+    }finally{
+      confirmBtn.disabled = false; confirmBtn.textContent = "Loop In";
+    }
+  };
+  overlay.addEventListener("click", onOverlayClick);
+  cancelBtn.addEventListener("click", close_);
+  closeBtn.addEventListener("click", close_);
+  confirmBtn.addEventListener("click", onConfirm);
+}
 /* ---- Reads the Requirements Log via the Apps Script backend (same login-session token used for
    submitting/updating requests) instead of a separate client-side Google OAuth grant. That older
    OAuth-based reader is what kept popping the "Choose an account" consent screen even after
@@ -5760,7 +5925,7 @@ async function renderRequirementsTable(sec){
       ${pagerHTML}
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Raised</th><th>University</th><th>Program</th><th>Category</th><th>Type</th><th>Priority</th><th>Requested By</th><th>Status</th></tr></thead>
+          <thead><tr><th>Raised</th><th>University</th><th>Program</th><th>Category</th><th>Type</th><th>Priority</th><th>Requested By</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             ${items.map(row=>`<tr>
               <td class="cell-muted">${esc((row["Timestamp"]||"").toString().slice(0,16))}</td>
@@ -5771,7 +5936,10 @@ async function renderRequirementsTable(sec){
               <td>${esc(row["Priority"]||"—")}</td>
               <td class="cell-muted">${esc(row["Requested By"]||row["Email"]||"—")}</td>
               <td>${isAdmin_() ? requestStatusSelectHtml_(row) : requestStatusBadgeHtml_(row)}${appliesToTagHtml_(row)}</td>
-            </tr>`).join("") || `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--ink-35)">No requests raised yet</td></tr>`}
+              <td style="text-align:center">
+                <button type="button" class="loop-in-btn" title="Loop someone in" data-row="${row._sheetRow}" data-email="${esc(row["Email"]||"")}" data-to="${esc(row["To"]||"")}" data-cc="${esc(row["Cc"]||"")}">${ic("userPlus")}</button>
+              </td>
+            </tr>`).join("") || `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--ink-35)">No requests raised yet</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -5790,6 +5958,15 @@ async function renderRequirementsTable(sec){
           to: (sel.dataset.to||"").split(",").map(s=>s.trim()).filter(Boolean),
           cc: (sel.dataset.cc||"").split(",").map(s=>s.trim()).filter(Boolean),
           target: sel.dataset.target||""
+        });
+      });
+    });
+    listWrap.querySelectorAll(".loop-in-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        openLoopInModal_({
+          source: "request", sheetRow: +btn.dataset.row, email: btn.dataset.email,
+          to: (btn.dataset.to||"").split(",").map(s=>s.trim()).filter(Boolean),
+          cc: (btn.dataset.cc||"").split(",").map(s=>s.trim()).filter(Boolean)
         });
       });
     });
@@ -5812,7 +5989,10 @@ async function fetchNotificationsLogRows_({page, pageSize, q, month, date}){
     token: AUTH_SESSION.token, page: page||1, pageSize: pageSize||20,
     q: q||"", month: month||"", date: date||""
   });
-  return { rows: r.rows || [], total: r.total || 0 };
+  return {
+    rows: (r.rows || []).map(row => Object.assign({}, row, { _sheetRow: row._row })),
+    total: r.total || 0
+  };
 }
 async function renderNotificationsLog(sec){
   const el = document.getElementById("content");
@@ -5861,7 +6041,7 @@ async function renderNotificationsLog(sec){
       ${pagerHTML}
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Sent</th><th>University</th><th>Program</th><th>Category</th><th>Type</th><th>Priority</th><th>Sent By</th><th>Subject</th></tr></thead>
+          <thead><tr><th>Sent</th><th>University</th><th>Program</th><th>Category</th><th>Type</th><th>Priority</th><th>Sent By</th><th>Subject</th><th>Actions</th></tr></thead>
           <tbody>
             ${items.map(row=>`<tr>
               <td class="cell-muted">${esc((row["Timestamp"]||"").toString().slice(0,16))}</td>
@@ -5872,7 +6052,10 @@ async function renderNotificationsLog(sec){
               <td>${esc(row["Priority"]||"—")}</td>
               <td class="cell-muted">${esc(row["Sent By"]||row["Email"]||"—")}</td>
               <td>${esc(row["Subject"]||"—")}</td>
-            </tr>`).join("") || `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--ink-35)">No notifications sent yet</td></tr>`}
+              <td style="text-align:center">
+                <button type="button" class="loop-in-btn" title="Loop someone in" data-row="${row._sheetRow}" data-email="${esc(row["Email"]||"")}" data-to="${esc(row["To"]||"")}" data-cc="${esc(row["Cc"]||"")}">${ic("userPlus")}</button>
+              </td>
+            </tr>`).join("") || `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--ink-35)">No notifications sent yet</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -5882,6 +6065,15 @@ async function renderNotificationsLog(sec){
     listWrap.querySelectorAll("#pgPrev").forEach(b=>b.addEventListener("click", ()=>{page--; draw(); scrollToTop();}));
     listWrap.querySelectorAll("#pgNext").forEach(b=>b.addEventListener("click", ()=>{page++; draw(); scrollToTop();}));
     listWrap.querySelectorAll("#pgLast").forEach(b=>b.addEventListener("click", ()=>{page=totalPages; draw(); scrollToTop();}));
+    listWrap.querySelectorAll(".loop-in-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        openLoopInModal_({
+          source: "notification", sheetRow: +btn.dataset.row, email: btn.dataset.email,
+          to: (btn.dataset.to||"").split(",").map(s=>s.trim()).filter(Boolean),
+          cc: (btn.dataset.cc||"").split(",").map(s=>s.trim()).filter(Boolean)
+        });
+      });
+    });
   }
   draw();
   searchEl.addEventListener("input", debounce(()=>{ page=1; draw(); }, 300));

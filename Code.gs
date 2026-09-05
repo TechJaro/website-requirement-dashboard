@@ -277,6 +277,7 @@ function dispatchAction_(body){
     case "updateStatus": return handleUpdateStatus_(body);
     case "quickActionInfo": return handleQuickActionInfo_(body);
     case "applyQuickAction": return handleApplyQuickAction_(body);
+    case "loopInRecipients": return handleLoopInRecipients_(body);
     case "uploadChunk": return handleUploadChunk_(body); // unused by the current front end — see the "Attachments v2" comment above assembleAttachments_
     case "checkFormUpload": return handleCheckFormUpload_(body);
     case "listRequirements": return handleListRequirements_(body);
@@ -1007,7 +1008,14 @@ function handleSubmitRequest_(body){
   // Subject headers silently drifting apart and Gmail starting a new thread instead of replying.
   const subject = payload.subject || "New Request";
   payload.subject = subject;
-  const to = (payload.to && payload.to.length) ? payload.to.join(",") : "lalit.rade@jaro.in";
+  // The requester's own address is never in payload.to by default — the dashboard's "Send To"
+  // picker deliberately excludes whoever's currently logged in from the fixed recipients it
+  // pre-fills (updateSendToForSection_), so without this the person raising a request would never
+  // get a copy of their own submission. Same "always append if missing" rule already used for the
+  // status-update email (see applyStatusUpdate_).
+  const toList = (payload.to && payload.to.length) ? payload.to.slice() : ["lalit.rade@jaro.in"];
+  if(session.Email && !toList.some(e=>e.toLowerCase()===session.Email.toLowerCase())) toList.push(session.Email);
+  const to = toList.join(",");
   const cc = (payload.cc||[]).join(",");
   // Generated upfront, independent of the row it'll end up in (that row doesn't exist yet — the
   // email has to be built and sent before appendRow runs, same as it always has). This is what a
@@ -1030,7 +1038,7 @@ function handleSubmitRequest_(body){
   html = rewireInlineImages_(html, attachments);
   let sent;
   try{
-    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments });
+    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments, fromName: payload.name, replyTo: session.Email });
   }catch(err){
     throw friendlyGmailApiError_(err);
   }
@@ -1094,7 +1102,7 @@ function handleSubmitNotification_(body){
   html = rewireInlineImages_(html, attachments);
   let sent;
   try{
-    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments });
+    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments, fromName: payload.name, replyTo: session.Email });
   }catch(err){
     throw friendlyGmailApiError_(err);
   }
@@ -1155,7 +1163,7 @@ function getOriginalThreadingHeaders_(messageId){
 // see assembleUploadedFile_, which does the base64url->standard conversion before this is called.
 // Builds a multipart/mixed message when there are any; otherwise the exact same plain text/html
 // message as before (unchanged for the common no-attachment case).
-function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, references, attachments}){
+function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, references, attachments, fromName, replyTo}){
   // Hardcoded rather than Session.getEffectiveUser().getEmail() — that call needs the
   // https://www.googleapis.com/auth/userinfo.email OAuth scope, which isn't in this project's
   // manifest, and adding it would mean yet another authorize-and-redeploy round trip for no real
@@ -1165,12 +1173,20 @@ function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, refe
   // the submitRequest fallback recipient) — those are about Lalit's own role *within* the
   // dashboard's login system, which stays unchanged; this is about which Google account the
   // script itself is authorized to run as and send mail through, which moved.
+  // The actual From: address is always tech@jaro.in — Gmail only lets a message truly originate
+  // from an address the sending account owns or has verified as a "Send As" alias, and that isn't
+  // configured for anyone raising a request here. fromName/replyTo are what make "who this is
+  // really from" visible without that Workspace-level change: the display name shows the real
+  // person (e.g. "Lalit Rade (via Jaro Dashboard)") instead of the generic dashboard name, and
+  // Reply-To routes a reply straight to them instead of the shared tech@jaro.in inbox.
   const fromEmail = "tech@jaro.in";
+  const displayName = (fromName || "Jaro Web Pages Dashboard").toString().replace(/["\r\n]/g, "");
   const baseHeaders = [
     "MIME-Version: 1.0",
-    "From: \"Jaro Web Pages Dashboard\" <" + fromEmail + ">",
+    "From: \"" + mimeEncodeHeaderValue_(displayName) + "\" <" + fromEmail + ">",
     "To: " + to,
     cc ? ("Cc: " + cc) : null,
+    replyTo ? ("Reply-To: " + replyTo) : null,
     "Subject: " + mimeEncodeHeaderValue_(subject),
     inReplyTo ? ("In-Reply-To: " + inReplyTo) : null,
     references ? ("References: " + references) : null,
@@ -1245,7 +1261,7 @@ function handleUpdateStatus_(body){
   // overlay on top of one), so body.sendEmail can be trusted directly here — unlike
   // handleApplyQuickAction_, which isn't necessarily talking to an Admin-role account.
   const sendEmail = body.sendEmail !== false;
-  const result = applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, body.to, body.cc, attachments, senderName, sendEmail);
+  const result = applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, body.to, body.cc, attachments, senderName, sendEmail, session.Email);
   uploadIds.forEach(deleteFormFile_); // only after a confirmed send, so a failed send can be retried without re-uploading
   return result;
 }
@@ -1255,7 +1271,7 @@ function handleUpdateStatus_(body){
 // note, editable To/Cc, possible attachments) and renderQuickStatusPage_ (a one-click email action
 // link — no session, no note, no attachments, To/Cc always fall back to the row's own stored
 // values) — the two differ only in where their arguments come from, not in what actually happens.
-function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, to, cc, attachments, senderName, sendEmail){
+function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, noteHtml, noteText, to, cc, attachments, senderName, sendEmail, senderEmail){
   // A request raised against the merged "Program Pages/Landing Pages" section tracks Program Page
   // and Landing Page as two independent statuses — in practice one often ships well before the
   // other, so a single shared Status shouldn't silently imply both are done. Each gets its own
@@ -1310,15 +1326,17 @@ function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, n
       debugLines.push(`inReplyTo=${th.inReplyTo || "(empty — original Message-ID header lookup failed)"}`);
       const sent = sendGmailMessage_({
         threadId: threadId, to: toStr, cc: ccStr, subject: "Re: " + (payload.subject || "Your request"),
-        htmlBody: html, inReplyTo: th.inReplyTo, references: th.references, attachments
+        htmlBody: html, inReplyTo: th.inReplyTo, references: th.references, attachments,
+        fromName: senderName, replyTo: senderEmail
       });
       debugLines.push("path=gmail-api-threaded", `sentThreadId=${(sent && sent.threadId) || "(unknown)"}`);
     } else {
       // No stored thread to reply into (an older row from before Gmail Thread ID was tracked) —
       // falls back to a fresh email; this one genuinely can't be placed in the original thread
       // since there's no thread on record for it.
-      const options = { htmlBody: html, name: "Jaro Web Pages Dashboard" };
+      const options = { htmlBody: html, name: senderName || "Jaro Web Pages Dashboard" };
       if(ccStr) options.cc = ccStr;
+      if(senderEmail) options.replyTo = senderEmail;
       if(attachments.length) options.attachments = attachments.map(a => Utilities.newBlob(Utilities.base64Decode(a.base64), a.mimeType, a.filename));
       GmailApp.sendEmail(toStr, `Re: ${payload.subject||"Your request"}`, "This email requires HTML to view.", options);
       debugLines.push("path=fresh-email-fallback (no Gmail Thread ID stored on this row)");
@@ -1329,6 +1347,133 @@ function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, n
     debugLines.push(`error=${(err && err.message) || err}`);
     const friendly = friendlyGmailApiError_(err);
     throw new Error("Status saved, but the notification email failed: " + friendly.message + " [" + debugLines.join(" | ") + "]");
+  }
+  return { ok:true, debug: debugLines.join(" | ") };
+}
+/* ---- "Loop In" — add a missed recipient to Cc on an ALREADY-raised request or ALREADY-sent
+   notification, from the Requirements Log / Notifications Log tables specifically. Deliberately
+   NOT on the raise-a-request form — that already has its own Cc field at submit time; this is for
+   "oh, I forgot to add someone" after the fact. Sends the newly-added people an immediate email
+   with the original context, threaded into the same Gmail thread when one exists, and folds them
+   into the row's stored Cc so every future status-update email on this request naturally includes
+   them too, without anyone having to remember to re-add them by hand. ---- */
+function loopInEmailHtml_(payload, senderName, noteHtml, noteText, showLink){
+  const section = payload.section || "";
+  const isCombined = section === COMBINED_SECTION_LABEL;
+  const isDefaultSection = !SECTIONS_NO_UNI_PROGRAM.includes(section) && !SECTIONS_UNI_ONLY.includes(section);
+  const showUniversity = isCombined || SECTIONS_UNI_ONLY.includes(section) || isDefaultSection;
+  const showProgram = isCombined || isDefaultSection;
+  const rows = [
+    ...(showUniversity ? [["University", payload.university]] : []),
+    ...(showProgram ? [["Program", payload.program]] : []),
+    ["Section", payload.section],
+    ["Request Type", payload.type], ["Priority", payload.priority],
+    // Notifications never had a "Related Link" field to begin with — omitted entirely for that
+    // source rather than shown empty, same convention used elsewhere for a field that's genuinely
+    // inapplicable rather than just happens to be blank on this particular row.
+    ...(showLink ? [[isCombined ? "Related Programme Page Link" : "Related Link",
+      payload.link ? `<a href="${escHtml_(payload.link)}" style="color:#0029A6">${escHtml_(payload.link)}</a>` : "—"]] : []),
+    ["Subject", payload.subject],
+  ].map(([label,val])=>`<tr>
+      <td style="padding:7px 14px;color:#5b6472;font-size:12.5px;font-weight:600;white-space:nowrap;border-bottom:1px solid #eef0f3">${escHtml_(label)}</td>
+      <td style="padding:7px 14px;font-size:13px;color:#111;border-bottom:1px solid #eef0f3">${val || "—"}</td>
+    </tr>`).join("");
+  const descriptionInner = (payload.descriptionHtml && payload.descriptionHtml.trim())
+    ? payload.descriptionHtml
+    : escHtml_(payload.description||"").replace(/\n/g,"<br>");
+  const descriptionBlock = (payload.description || payload.descriptionHtml) ? `
+    <div style="font-size:13px;color:#333;margin-top:16px">
+      <div style="font-weight:700;margin-bottom:8px">Original Message</div>
+      <div style="line-height:1.5">${descriptionInner}</div>
+    </div>` : "";
+  const noteInner = (noteHtml && noteHtml.trim()) ? noteHtml
+    : (noteText && noteText.trim()) ? escHtml_(noteText).replace(/\n/g,"<br>") : "";
+  const noteBlock = noteInner ? `
+    <div style="font-size:13px;color:#333;margin-top:16px">
+      <div style="font-weight:700;margin-bottom:8px">Message by ${escHtml_(senderName || "the sender")}</div>
+      <div style="line-height:1.5">${noteInner}</div>
+    </div>` : "";
+  return `
+<div style="font-family:Verdana,Geneva,sans-serif;max-width:600px;margin:0 auto">
+  <div style="background:#0029A6;padding:20px 26px;border-radius:12px 12px 0 0">
+    <div style="color:#FFCF24;font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase">Jaro Dashboard</div>
+    <div style="color:#fff;font-weight:700;font-size:19px;margin-top:6px">You've Been Looped In</div>
+  </div>
+  <div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:22px 26px">
+    <p style="font-size:13px;color:#333;margin:0 0 16px"><b>${escHtml_(senderName||"A teammate")}</b> looped you in on this ${escHtml_(payload.kindLabel||"request")}.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px">${rows}</table>
+    ${descriptionBlock}
+    ${noteBlock}
+  </div>
+  <p style="font-size:11px;color:#9aa1ab;margin:14px 4px 0">Sent from the Jaro Web Pages Dashboard</p>
+</div>`;
+}
+function handleLoopInRecipients_(body){
+  const session = requireSession_(body.token);
+  const source = (body.source === "notification") ? "notification" : "request";
+  const sheetRow = +body.sheetRow;
+  const newCc = (Array.isArray(body.cc) ? body.cc : []).map(s=>(s||"").toString().trim()).filter(Boolean);
+  if(!newCc.length) throw new Error("Add at least one person to loop in.");
+  const noteHtml = (body.noteHtml || "").toString();
+  const noteText = (body.noteText || "").toString();
+
+  const sheet = source === "notification" ? getOrCreateSheet_("Notifications", NOTIFICATIONS_HEADER) : getRequestsSheet_();
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0];
+  const rowData = values[sheetRow - 1];
+  if(!rowData) throw new Error("That row couldn't be found.");
+  const get = (name)=>{ const i = headers.indexOf(name); return i === -1 ? "" : rowData[i]; };
+
+  // Notifications are Admin-only end to end (the whole page, and handleListNotifications_, are
+  // already gated); a request row additionally lets a non-Admin loop someone in on their OWN
+  // request only — mirrors the exact same visibility handleListRequirements_ already enforces for
+  // reading the log, so this can't be used to reach into someone else's request by guessing a row
+  // number.
+  if(source === "notification" && session.Role !== "Admin") throw new Error("Admins only.");
+  if(source === "request" && session.Role !== "Admin" && (get("Email")||"").toString().trim().toLowerCase() !== session.Email.toLowerCase()){
+    throw new Error("You can only loop someone in on your own requests.");
+  }
+
+  const existingCc = (get("Cc")||"").toString().split(",").map(s=>s.trim()).filter(Boolean);
+  const mergedCc = existingCc.slice();
+  newCc.forEach(e=>{ if(!mergedCc.some(x=>x.toLowerCase()===e.toLowerCase())) mergedCc.push(e); });
+  const ccCol = headers.indexOf("Cc");
+  if(ccCol === -1) throw new Error("This sheet has no Cc column.");
+  sheet.getRange(sheetRow, ccCol + 1).setValue(mergedCc.join(", "));
+
+  const toList = (get("To")||"").toString().split(",").map(s=>s.trim()).filter(Boolean);
+  const existingAll = toList.concat(existingCc).filter((e,i,a)=>a.indexOf(e)===i).join(", ");
+  const subject = (get("Subject")||"").toString() || (source === "notification" ? "Program Notification" : "Your request");
+  const senderName = (body.senderName||"").toString().trim() || session.Name || session.Email;
+
+  const payload = {
+    university:get("University"), program:get("Program"), section:get("Section"), subject:subject,
+    type:get("Request Type"), priority:get("Priority"), link:get("Related Link"),
+    description: source === "notification" ? get("Message") : get("Description"),
+    descriptionHtml: source === "notification" ? "" : get("Description HTML"),
+    kindLabel: source === "notification" ? "notification" : "request"
+  };
+  const html = loopInEmailHtml_(payload, senderName, noteHtml, noteText, source !== "notification");
+  const messageId = (get("Gmail Message ID")||"").toString().trim();
+  const threadId = (get("Gmail Thread ID")||"").toString().trim();
+  const debugLines = [`row=${sheetRow}`, `threadId=${threadId||"(empty)"}`];
+  try{
+    if(threadId){
+      const th = messageId ? getOriginalThreadingHeaders_(messageId) : { inReplyTo:"", references:"" };
+      sendGmailMessage_({
+        threadId: threadId, to: newCc.join(", "), cc: existingAll, subject: "Re: " + subject,
+        htmlBody: html, inReplyTo: th.inReplyTo, references: th.references,
+        fromName: senderName, replyTo: session.Email
+      });
+      debugLines.push("path=gmail-api-threaded");
+    } else {
+      const options = { htmlBody: html, name: senderName || "Jaro Web Pages Dashboard", replyTo: session.Email };
+      if(existingAll) options.cc = existingAll;
+      GmailApp.sendEmail(newCc.join(", "), `Re: ${subject}`, "This email requires HTML to view.", options);
+      debugLines.push("path=fresh-email-fallback (no Gmail Thread ID stored on this row)");
+    }
+  }catch(err){
+    throw new Error("Added to Cc, but the notification email failed: " + friendlyGmailApiError_(err).message + " [" + debugLines.join(" | ") + "]");
   }
   return { ok:true, debug: debugLines.join(" | ") };
 }
@@ -1467,9 +1612,9 @@ function handleApplyQuickAction_(body){
     const assigneeEmail = (body.assigneeEmail||"").toString().trim();
     if(!assigneeEmail) throw new Error("Enter the email of who you're assigning this to.");
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assigneeEmail)) throw new Error("Enter a valid email address to assign this to.");
-    result = applyAssignment_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, assigneeEmail, noteHtml, noteText, attachments, senderName, Array.isArray(body.cc) ? body.cc : []);
+    result = applyAssignment_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, assigneeEmail, noteHtml, noteText, attachments, senderName, Array.isArray(body.cc) ? body.cc : [], session.Email);
   } else {
-    result = applyStatusUpdate_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, status, target, noteHtml, noteText, null, mergedCc, attachments, senderName, sendEmail);
+    result = applyStatusUpdate_(reqSheet, reqFound.headers, reqFound.row, reqFound.data, status, target, noteHtml, noteText, null, mergedCc, attachments, senderName, sendEmail, session.Email);
   }
   uploadIds.forEach(deleteFormFile_);
   return result;
@@ -1477,7 +1622,7 @@ function handleApplyQuickAction_(body){
 // Parallel to applyStatusUpdate_, but for "Assign to Someone" — writes a self-healing "Assigned To"
 // column instead of a status, and emails the assignee directly (CC'ing whoever was already on the
 // request, so the rest of the thread stays in the loop) instead of the requester-notification email.
-function applyAssignment_(sheet, headers, sheetRow, rowData, assigneeEmail, noteHtml, noteText, attachments, assignerName, extraCc){
+function applyAssignment_(sheet, headers, sheetRow, rowData, assigneeEmail, noteHtml, noteText, attachments, assignerName, extraCc, assignerEmail){
   const assignedToCol = ensureColumn_(sheet, headers, "Assigned To");
   sheet.getRange(sheetRow, assignedToCol + 1).setValue(assigneeEmail);
   const get = name => rowData[headers.indexOf(name)];
@@ -1497,12 +1642,14 @@ function applyAssignment_(sheet, headers, sheetRow, rowData, assigneeEmail, note
       const th = messageId ? getOriginalThreadingHeaders_(messageId) : { inReplyTo:"", references:"" };
       const sent = sendGmailMessage_({
         threadId: threadId, to: assigneeEmail, cc: cc, subject: "Re: " + (payload.subject || "Your request"),
-        htmlBody: html, inReplyTo: th.inReplyTo, references: th.references, attachments
+        htmlBody: html, inReplyTo: th.inReplyTo, references: th.references, attachments,
+        fromName: assignerName, replyTo: assignerEmail
       });
       debugLines.push("path=gmail-api-threaded", `sentThreadId=${(sent && sent.threadId) || "(unknown)"}`);
     } else {
-      const options = { htmlBody: html, name: "Jaro Web Pages Dashboard" };
+      const options = { htmlBody: html, name: assignerName || "Jaro Web Pages Dashboard" };
       if(cc) options.cc = cc;
+      if(assignerEmail) options.replyTo = assignerEmail;
       if(attachments.length) options.attachments = attachments.map(a => Utilities.newBlob(Utilities.base64Decode(a.base64), a.mimeType, a.filename));
       GmailApp.sendEmail(assigneeEmail, `Re: ${payload.subject||"Your request"}`, "This email requires HTML to view.", options);
       debugLines.push("path=fresh-email-fallback (no Gmail Thread ID stored on this row)");

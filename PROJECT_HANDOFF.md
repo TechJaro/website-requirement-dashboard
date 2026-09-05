@@ -1518,16 +1518,118 @@ serial-number "Published Date" values and confirmed both the displayed date *and
 turned up affected; every other `.slice(0,10)` site operates on a real JS `Date`/ISO-string value,
 not a raw sheet cell. Frontend-only, no `Code.gs` changes.
 
+## New feature: date/month/year filter for Blogs (2026-09-05)
+
+User wanted to be able to search the Blogs page by date, not just free-text/category — "I should be
+able to search via date, month and also by year. any of these filter should work." Added three
+independent filter controls to `renderBlogCards`, each optional and freely combinable (all active
+ones AND together): an exact-date `<input type="date">`, a `<input type="month">`, and a `<select>`
+populated dynamically from every year actually present in the data (so it never offers a year that
+couldn't match anything — a row with no usable "Published Date" is simply excluded from the list,
+not shown as an empty/blank option). All three reuse the same `sheetDateSortValue_` serial-detection
+helper added for the earlier raw-date-serial-number fix, so a real sheet Date cell (arriving as a
+bare integer string like `"46268"`) is converted to a real timestamp before any comparison — the
+filters work correctly against the actual sheet data shape, not just already-formatted strings.
+Added a "Clear Dates" button that resets all three fields and re-draws in one click.
+
+**Bug caught before shipping**: the "Clear Dates" button's element was created via
+`document.createElement("button")` with `type`/`className`/`textContent` set, but — unlike the
+three filter inputs, each of which got an explicit `.id` — the button itself never received one.
+The click handler was still correctly attached directly to the in-memory element reference
+(`clearDatesEl.addEventListener("click", ...)`), so a real mouse click in the actual rendered page
+would have worked regardless; but anything looking the button up by ID (`getElementById`, browser
+automation, a future test) would silently get `null` and no-op. Added `clearDatesEl.id =
+"blogDateFilterClear"` to match the pattern already used for the other three controls.
+
+**Verification**: tested end-to-end in the browser against the real live Blogs data (2,622 actual
+articles from the Google Sheets API, not mocked) via the `static-preview` launch config. Confirmed:
+Year dropdown lists real years present in the data (2026, 2025, 2024, 2023, …); selecting a Date
+narrows to the exact matching articles; selecting a Year alone narrows correctly (2,622 → 501 for
+one tested year); adding a Month on top of that Year narrows further (501 → 31), confirming the
+three filters combine with AND logic rather than overriding each other; clicking "Clear Dates" (by
+ID, post-fix) resets all three fields to empty and restores the full 2,622-article count in one
+click. Frontend-only change — no `Code.gs` involvement, so no backend redeploy needed for this
+feature specifically. `index.html` resynced from `Unified Dashboard.txt` (copied wholesale, diff
+confirmed identical) — not yet committed/pushed as of this writing, pending the user's explicit
+go-ahead per this session's standing safety rule.
+
+## New feature: "Loop In" — add a missed CC recipient after the fact (2026-09-05)
+
+User wanted a way to fix "I forgot to CC someone" *after* a request or notification was already
+sent, from the Requirements Log / Notifications Log tables specifically — explicitly **not** from
+the raise-a-request form itself (that already has its own Cc field at submit time). Added a small
+person-add icon button in a new "Actions" column on both tables. Clicking it opens a focused modal
+(chip-picker CC field + optional rich-text note, reusing the same `wireRichTextEditor`/
+`createChipPicker` machinery as the status-update modal, including @mention support) that shows who
+is already on the thread (read-only context, not editable/removable — the action only ever adds).
+
+**Backend** (`Code.gs`): new `handleLoopInRecipients_` (dispatch action `loopInRecipients`) looks up
+the row in either the Requests or Notifications sheet by `sheetRow`, merges the newly-picked emails
+into the row's stored Cc (deduped, case-insensitive), and sends those new people an immediate email
+— threaded into the existing Gmail thread when one's on record, same `sendGmailMessage_`/threading
+path every other email in this system uses — carrying the original request/notification's full
+context (new `loopInEmailHtml_`, modeled on `statusEmailHtml_`, minus a "Related Link" row for
+Notifications since that source never had that field to begin with). Access control: Notifications
+Log is Admin-only end to end already (page + `handleListNotifications_`), so looping in on a
+notification requires `session.Role === "Admin"`; a request row additionally lets a non-Admin loop
+someone in on **their own** request only, mirroring the exact same ownership check
+`handleListRequirements_` already applies when deciding what a Support session can even see — so
+this can't be used to reach into someone else's request by guessing a row number.
+
+**Verification**: syntax-checked with `node --check`; tested in the browser against mocked
+Requirements Log and Notifications Log rows (the real backend doesn't have this action yet, so a
+live call would correctly fail until redeploy) — confirmed both tables render a 9th "Actions"
+column with a working button carrying the right row/email/To/Cc data, the modal correctly shows
+"Already on this thread: …" from that row's real To+Cc, empty-CC submission is blocked client-side
+with a toast, and a real submission (CC picker + note) builds the exact expected
+`loopInRecipients` payload (`source`, numeric `sheetRow`, `cc` array, `noteHtml`/`noteText`,
+`senderName` resolved via `CONTACTS`) for both `source:"request"` and `source:"notification"`.
+
+## Real bugs fixed: requester missing from their own request email; sender identity unclear (2026-09-05)
+
+User raised a request from their own account (lalit.rade@jaro.in) and never received a copy of it,
+even though everyone else on the request got it — and separately noted the email always shows as
+being from tech@jaro.in regardless of who actually raised the request.
+
+**Requester exclusion**: `handleSubmitRequest_` built its "To" list purely from `payload.to` (the
+dashboard's fixed per-section recipients, e.g. the admin team) with no guarantee the requester's
+own address was ever in it — and the dashboard's own "Send To" picker (`updateSendToForSection_`)
+deliberately excludes whoever's currently logged in from those fixed recipients (fixed earlier this
+project so people didn't see themselves listed oddly in their own "Send To" field). Combined, that
+meant anyone who is *also* part of a section's fixed recipient team (as Lalit is) would never get a
+copy of their own submission — the exact same bug class already fixed for the status-update email
+(`applyStatusUpdate_`'s "always append the requester if missing" rule) had never been applied to
+the *original* "New Request Raised" email. Now it is — same rule, same place it was missing.
+
+**Sender identity**: every email this system sends is technically forced through tech@jaro.in — the
+account the Apps Script project is deployed to run as (a 2026-08 ownership migration) — because
+Gmail only lets a message truly originate from an address the sending account owns or has verified
+as a "Send As" alias, which isn't configured for individual staff here. That's a Workspace-level
+constraint, not something fixable in code. What *is* fixable: `sendGmailMessage_` (used by all four
+outgoing email paths — new request, notification, status update, assignment) now accepts an
+optional `fromName`/`replyTo`, so the display name shows the real person (e.g. "Lalit Rade" instead
+of the generic "Jaro Web Pages Dashboard") and a `Reply-To` header routes a reply straight to them
+instead of the shared tech@jaro.in inbox — even though the technical From: address is unchanged.
+Applied consistently to all four send sites, not just the one that was reported, since they all
+share the exact same tech@jaro.in characteristic.
+
+**Verification**: syntax-checked with `node --check`. Traced `handleSubmitRequest_`'s new "To"-list
+logic by hand against the reported scenario (Lalit raising a request against a section where he's
+also a fixed recipient) — confirms his own address is now always appended if the picker excluded
+it. Every `sendGmailMessage_`/`applyStatusUpdate_`/`applyAssignment_` call site updated to pass
+`fromName`/`replyTo` (or `senderEmail`/`assignerEmail` through to it) — grepped for all call sites
+of both functions to confirm no caller was missed. Not exercised against the live backend (needs
+redeploy first) — the next real request Lalit raises after redeploying should confirm both: he
+receives a copy, and the email's From name reads as his own name rather than just the dashboard's.
+
 ## Immediate next action
 
-Send the user the updated `Code.gs` (this batch changed `handleUpdateStatus_`,
-`handleListRequirements_`, `statusEmailHtml_`'s "Applies To" row, plus the new one-click
-quick-action-link system above) with the standing instruction:
-paste into the Apps Script editor (the tech@jaro.in-owned project, opened from **"Jaro Dashboard —
-Requirements & Insights"**) and redeploy (Deploy → Manage deployments → New version) before any of
-this batch is live. `index.html` was resynced from `Unified Dashboard.txt` (copied wholesale, diff
-confirmed identical) — commit + push still needs the user's explicit go-ahead per this session's
-own safety rules (pushing is a "shared/visible" action), not assumed from earlier pushes this
-project. Both the `C:\Users\user\Downloads\Website Requirement Dashboard` and `D:\JARO EDUCATION -
-LALIT\Website Requirement Dashboard` copies need this same sync — only the Downloads copy was
-edited this round.
+Both fixes above are backend-only (`Code.gs`); the Loop In feature touched both `Code.gs` and the
+front end. Send the user the updated `Code.gs` with the standing instruction: paste into the Apps
+Script editor and redeploy (Deploy → Manage deployments → New version) before any of this batch is
+live — the Loop In button will otherwise fail with a real error until that happens. `index.html` was
+resynced from `Unified Dashboard.txt` (copied wholesale, diff confirmed identical). Nothing in this
+batch (or the Blogs date-filter feature just before it) has been committed/pushed yet — ask the user
+explicitly before running any git commands. Both the `C:\Users\user\Downloads\Website Requirement
+Dashboard` and `D:\JARO EDUCATION - LALIT\Website Requirement Dashboard` copies need this same sync
+— only the Downloads copy was edited this round.
