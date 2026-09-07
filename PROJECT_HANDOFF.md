@@ -1718,8 +1718,49 @@ selects list all 9 each; the read-only Support badge renders "Follow Up" with th
 and a row already carrying a stored Status of "Follow Up" correctly shows it pre-selected in the
 dropdown.
 
+The "Follow Up" status option above was committed and pushed as `954bb9d` on 2026-09-07.
+
+## Emails now try sending as the real person, self-healing once a Gmail alias is verified (2026-09-07)
+
+User pushed further on the tech@jaro.in sender-identity limitation: seeing the raw "from:
+...<tech@jaro.in>" in Gmail's expanded header view (not just the display name), they wanted their
+own replies to genuinely come from their own address. They also offered to give up their dashboard
+"Super Admin" role if that's what it would take.
+
+Clarified and did **not** act on the Super Admin offer: that role only controls in-app permissions
+(resetting passwords, changing another account's Role — see `isSuperAdmin_`/`SUPER_ADMIN_EMAILS`)
+and has no connection whatsoever to which Google account the Apps Script executes as or which Gmail
+account sends mail — removing it would not have helped and would only have cost real capability for
+nothing. Flagged this misunderstanding directly rather than silently complying or silently ignoring
+the request.
+
+**What actually changed**: `sendGmailMessage_` (`Code.gs`) now takes an optional `fromEmail` and
+tries sending as that real address first; if Gmail rejects it (not yet a verified "Send As" alias on
+tech@jaro.in's account — Settings > Accounts and Import > Send mail as, one-time per person,
+verified via a confirmation link Gmail emails to that address), it catches the failure and retries
+once as tech@jaro.in — today's exact existing behavior, so this is safe to ship immediately: nothing
+changes for anyone until their alias is actually verified, and the moment it is, their replies start
+sending from their real address automatically, with no further code change or redeploy needed. Same
+idea applied to the rarer `GmailApp.sendEmail` fallback path (no Gmail Thread ID on record) via a new
+shared `sendGmailAppEmail_` helper, replacing 3 near-duplicate call sites. Wired `fromEmail` through
+all 5 send call sites using the sender who's actually taking that action: the requester on a new
+request/notification, and whoever's applying it (Admin session email) on a status update, assignment,
+or Loop In.
+
+**Verification**: syntax-checked with `node --check`. Simulated the try/fallback control flow
+standalone in Node against 5 scenarios: an unverified alias (falls back to tech@jaro.in, matching
+today's behavior exactly), a verified alias (sends as the real person, no fallback triggered), no
+`fromEmail` passed at all (goes straight to tech@jaro.in, unchanged for any caller that doesn't pass
+it), `fromEmail` happening to already equal tech@jaro.in (no pointless double-send), and both the
+primary and fallback attempt failing (the real error still propagates to the caller's existing
+error-handling rather than being silently swallowed). Not exercised against the live backend — no
+alias has been verified yet, so live behavior stays exactly as it was until that Gmail-side step
+happens.
+
 ## Immediate next action
 
-Frontend-only change — `index.html` resynced from `Unified Dashboard.txt` (copied wholesale, diff
-confirmed identical). Not yet committed/pushed — ask the user explicitly before running any git
-commands.
+Backend-only change (`Code.gs`) — send the user the updated file with the standing instruction:
+paste into the Apps Script editor and redeploy. Nothing changes for anyone yet; this only becomes
+observable once someone verifies a "Send As" alias in tech@jaro.in's Gmail settings (a Gmail-account
+action, outside what this project's code can do). Not yet committed/pushed — ask the user explicitly
+before running any git commands.

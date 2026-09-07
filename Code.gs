@@ -1054,7 +1054,7 @@ function handleSubmitRequest_(body){
   html = rewireInlineImages_(html, attachments);
   let sent;
   try{
-    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments, fromName: payload.name, replyTo: session.Email });
+    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments, fromName: payload.name, replyTo: session.Email, fromEmail: session.Email });
   }catch(err){
     throw friendlyGmailApiError_(err);
   }
@@ -1117,7 +1117,7 @@ function handleSubmitNotification_(body){
   html = rewireInlineImages_(html, attachments);
   let sent;
   try{
-    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments, fromName: payload.name, replyTo: session.Email });
+    sent = sendGmailMessage_({ to, cc, subject, htmlBody: html, attachments, fromName: payload.name, replyTo: session.Email, fromEmail: session.Email });
   }catch(err){
     throw friendlyGmailApiError_(err);
   }
@@ -1178,62 +1178,86 @@ function getOriginalThreadingHeaders_(messageId){
 // see assembleUploadedFile_, which does the base64url->standard conversion before this is called.
 // Builds a multipart/mixed message when there are any; otherwise the exact same plain text/html
 // message as before (unchanged for the common no-attachment case).
-function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, references, attachments, fromName, replyTo}){
-  // Hardcoded rather than Session.getEffectiveUser().getEmail() — that call needs the
-  // https://www.googleapis.com/auth/userinfo.email OAuth scope, which isn't in this project's
-  // manifest, and adding it would mean yet another authorize-and-redeploy round trip for no real
-  // benefit: this script only ever runs as this one account (matching the "Execute as" identity
-  // on the deployment — tech@jaro.in as of the 2026-08 ownership migration). Deliberately
-  // different from lalit.rade@jaro.in elsewhere in this file (setupAdmin(), SUPER_ADMIN_EMAILS,
-  // the submitRequest fallback recipient) — those are about Lalit's own role *within* the
-  // dashboard's login system, which stays unchanged; this is about which Google account the
-  // script itself is authorized to run as and send mail through, which moved.
-  // The actual From: address is always tech@jaro.in — Gmail only lets a message truly originate
-  // from an address the sending account owns or has verified as a "Send As" alias, and that isn't
-  // configured for anyone raising a request here. fromName/replyTo are what make "who this is
-  // really from" visible without that Workspace-level change: the display name shows the real
-  // person (e.g. "Lalit Rade (via Jaro Dashboard)") instead of the generic dashboard name, and
-  // Reply-To routes a reply straight to them instead of the shared tech@jaro.in inbox.
-  const fromEmail = "tech@jaro.in";
+function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, references, attachments, fromName, replyTo, fromEmail}){
+  // This script always runs as one fixed Google account (tech@jaro.in, as of the 2026-08
+  // ownership migration) — deliberately different from lalit.rade@jaro.in elsewhere in this file
+  // (setupAdmin(), SUPER_ADMIN_EMAILS) — those are about someone's role *within* the dashboard's
+  // own login system, unrelated to which Google account the script executes as.
+  // Gmail only ever lets a message truly originate from an address the SENDING ACCOUNT (tech@jaro.in)
+  // owns or has verified as a "Send As" alias (Gmail Settings > Accounts and Import > Send mail as)
+  // — no parameter on any Apps Script mail API (this one included) can override that; it's Gmail
+  // enforcing it on send, not a choice made here. So: try fromEmail (the real person taking this
+  // action) first; if that address isn't (yet) a verified alias, Gmail rejects the send and this
+  // catches that and retries once as tech@jaro.in — the exact same behavior this had before
+  // fromEmail existed. That fallback means shipping this is safe at any time: nothing here changes
+  // until someone actually verifies an alias, and the moment they do, sending as that person starts
+  // working with no further code change or redeploy. fromName/replyTo don't have this restriction
+  // (a display name and Reply-To aren't a real "from") — they're what carried "who this is really
+  // from" before fromEmail existed, and still apply on both the primary attempt and the fallback.
+  const defaultFromEmail = "tech@jaro.in";
   const displayName = (fromName || "Jaro Web Pages Dashboard").toString().replace(/["\r\n]/g, "");
-  const baseHeaders = [
-    "MIME-Version: 1.0",
-    "From: \"" + mimeEncodeHeaderValue_(displayName) + "\" <" + fromEmail + ">",
-    "To: " + to,
-    cc ? ("Cc: " + cc) : null,
-    replyTo ? ("Reply-To: " + replyTo) : null,
-    "Subject: " + mimeEncodeHeaderValue_(subject),
-    inReplyTo ? ("In-Reply-To: " + inReplyTo) : null,
-    references ? ("References: " + references) : null,
-  ].filter(Boolean);
-  let rawMessage;
-  if(Array.isArray(attachments) && attachments.length){
-    const boundary = "jarodash_" + Utilities.getUuid().replace(/-/g,"");
-    const bodyPart = ["--" + boundary, "Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: 8bit", "", htmlBody].join("\r\n");
-    // a.inline (set by rewireInlineImages_ below) makes an image render directly in the email body
-    // instead of only showing as a separate downloadable file — Gmail (and every client that
-    // matters here, since recipients are all Workspace/Gmail users) renders a Content-ID'd inline
-    // part referenced via cid: correctly even flattened into this multipart/mixed rather than
-    // nested under a separate multipart/related, so that extra nesting is skipped for simplicity.
-    const attachmentParts = attachments.map(a => [
-      "--" + boundary,
-      "Content-Type: " + (a.mimeType || "application/octet-stream") + "; name=\"" + a.filename + "\"",
-      a.inline ? ("Content-Disposition: inline; filename=\"" + a.filename + "\"") : ("Content-Disposition: attachment; filename=\"" + a.filename + "\""),
-      a.inline ? ("Content-ID: <" + a.contentId + ">") : null,
-      "Content-Transfer-Encoding: base64",
-      "",
-      wrapBase64Lines_(a.base64)
-    ].filter(Boolean).join("\r\n"));
-    rawMessage = baseHeaders.concat(["Content-Type: multipart/mixed; boundary=\"" + boundary + "\""]).join("\r\n")
-      + "\r\n\r\n" + bodyPart + "\r\n" + attachmentParts.join("\r\n") + "\r\n--" + boundary + "--";
-  } else {
-    rawMessage = baseHeaders.concat(["Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: 8bit"]).join("\r\n")
-      + "\r\n\r\n" + htmlBody;
+  function buildRaw_(senderEmail){
+    const baseHeaders = [
+      "MIME-Version: 1.0",
+      "From: \"" + mimeEncodeHeaderValue_(displayName) + "\" <" + senderEmail + ">",
+      "To: " + to,
+      cc ? ("Cc: " + cc) : null,
+      replyTo ? ("Reply-To: " + replyTo) : null,
+      "Subject: " + mimeEncodeHeaderValue_(subject),
+      inReplyTo ? ("In-Reply-To: " + inReplyTo) : null,
+      references ? ("References: " + references) : null,
+    ].filter(Boolean);
+    let rawMessage;
+    if(Array.isArray(attachments) && attachments.length){
+      const boundary = "jarodash_" + Utilities.getUuid().replace(/-/g,"");
+      const bodyPart = ["--" + boundary, "Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: 8bit", "", htmlBody].join("\r\n");
+      // a.inline (set by rewireInlineImages_ below) makes an image render directly in the email body
+      // instead of only showing as a separate downloadable file — Gmail (and every client that
+      // matters here, since recipients are all Workspace/Gmail users) renders a Content-ID'd inline
+      // part referenced via cid: correctly even flattened into this multipart/mixed rather than
+      // nested under a separate multipart/related, so that extra nesting is skipped for simplicity.
+      const attachmentParts = attachments.map(a => [
+        "--" + boundary,
+        "Content-Type: " + (a.mimeType || "application/octet-stream") + "; name=\"" + a.filename + "\"",
+        a.inline ? ("Content-Disposition: inline; filename=\"" + a.filename + "\"") : ("Content-Disposition: attachment; filename=\"" + a.filename + "\""),
+        a.inline ? ("Content-ID: <" + a.contentId + ">") : null,
+        "Content-Transfer-Encoding: base64",
+        "",
+        wrapBase64Lines_(a.base64)
+      ].filter(Boolean).join("\r\n"));
+      rawMessage = baseHeaders.concat(["Content-Type: multipart/mixed; boundary=\"" + boundary + "\""]).join("\r\n")
+        + "\r\n\r\n" + bodyPart + "\r\n" + attachmentParts.join("\r\n") + "\r\n--" + boundary + "--";
+    } else {
+      rawMessage = baseHeaders.concat(["Content-Type: text/html; charset=UTF-8", "Content-Transfer-Encoding: 8bit"]).join("\r\n")
+        + "\r\n\r\n" + htmlBody;
+    }
+    return Utilities.base64EncodeWebSafe(rawMessage, Utilities.Charset.UTF_8);
   }
-  const raw = Utilities.base64EncodeWebSafe(rawMessage, Utilities.Charset.UTF_8);
-  const resource = { raw: raw };
+  const primarySender = fromEmail || defaultFromEmail;
+  const resource = { raw: buildRaw_(primarySender) };
   if(threadId) resource.threadId = threadId;
-  return Gmail.Users.Messages.send(resource, "me");
+  try{
+    return Gmail.Users.Messages.send(resource, "me");
+  }catch(err){
+    if(primarySender === defaultFromEmail) throw err; // already the fallback identity — nothing left to retry
+    const fallbackResource = { raw: buildRaw_(defaultFromEmail) };
+    if(threadId) fallbackResource.threadId = threadId;
+    return Gmail.Users.Messages.send(fallbackResource, "me");
+  }
+}
+// Same self-healing "try the real sender, fall back to tech@jaro.in on any failure" idea as
+// sendGmailMessage_ above (see its comment for why this is safe to ship before any alias is
+// actually verified), for the rarer no-thread-on-record fallback path — GmailApp.sendEmail instead
+// of the raw Gmail API — used by applyStatusUpdate_/applyAssignment_/handleLoopInRecipients_.
+function sendGmailAppEmail_(recipient, subject, options){
+  if(!options.from){ GmailApp.sendEmail(recipient, subject, "This email requires HTML to view.", options); return; }
+  try{
+    GmailApp.sendEmail(recipient, subject, "This email requires HTML to view.", options);
+  }catch(err){
+    const fallbackOptions = Object.assign({}, options);
+    delete fallbackOptions.from;
+    GmailApp.sendEmail(recipient, subject, "This email requires HTML to view.", fallbackOptions);
+  }
 }
 // MIME requires base64 attachment content wrapped at a fixed line length (76 chars is the
 // standard) — most clients tolerate one giant line but this keeps it spec-correct.
@@ -1342,7 +1366,7 @@ function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, n
       const sent = sendGmailMessage_({
         threadId: threadId, to: toStr, cc: ccStr, subject: "Re: " + (payload.subject || "Your request"),
         htmlBody: html, inReplyTo: th.inReplyTo, references: th.references, attachments,
-        fromName: senderName, replyTo: senderEmail
+        fromName: senderName, replyTo: senderEmail, fromEmail: senderEmail
       });
       debugLines.push("path=gmail-api-threaded", `sentThreadId=${(sent && sent.threadId) || "(unknown)"}`);
     } else {
@@ -1352,8 +1376,9 @@ function applyStatusUpdate_(sheet, headers, sheetRow, rowData, status, target, n
       const options = { htmlBody: html, name: senderName || "Jaro Web Pages Dashboard" };
       if(ccStr) options.cc = ccStr;
       if(senderEmail) options.replyTo = senderEmail;
+      if(senderEmail) options.from = senderEmail;
       if(attachments.length) options.attachments = attachments.map(a => Utilities.newBlob(Utilities.base64Decode(a.base64), a.mimeType, a.filename));
-      GmailApp.sendEmail(toStr, `Re: ${payload.subject||"Your request"}`, "This email requires HTML to view.", options);
+      sendGmailAppEmail_(toStr, `Re: ${payload.subject||"Your request"}`, options);
       debugLines.push("path=fresh-email-fallback (no Gmail Thread ID stored on this row)");
     }
   }catch(err){
@@ -1478,13 +1503,13 @@ function handleLoopInRecipients_(body){
       sendGmailMessage_({
         threadId: threadId, to: newCc.join(", "), cc: existingAll, subject: "Re: " + subject,
         htmlBody: html, inReplyTo: th.inReplyTo, references: th.references,
-        fromName: senderName, replyTo: session.Email
+        fromName: senderName, replyTo: session.Email, fromEmail: session.Email
       });
       debugLines.push("path=gmail-api-threaded");
     } else {
-      const options = { htmlBody: html, name: senderName || "Jaro Web Pages Dashboard", replyTo: session.Email };
+      const options = { htmlBody: html, name: senderName || "Jaro Web Pages Dashboard", replyTo: session.Email, from: session.Email };
       if(existingAll) options.cc = existingAll;
-      GmailApp.sendEmail(newCc.join(", "), `Re: ${subject}`, "This email requires HTML to view.", options);
+      sendGmailAppEmail_(newCc.join(", "), `Re: ${subject}`, options);
       debugLines.push("path=fresh-email-fallback (no Gmail Thread ID stored on this row)");
     }
   }catch(err){
@@ -1658,15 +1683,16 @@ function applyAssignment_(sheet, headers, sheetRow, rowData, assigneeEmail, note
       const sent = sendGmailMessage_({
         threadId: threadId, to: assigneeEmail, cc: cc, subject: "Re: " + (payload.subject || "Your request"),
         htmlBody: html, inReplyTo: th.inReplyTo, references: th.references, attachments,
-        fromName: assignerName, replyTo: assignerEmail
+        fromName: assignerName, replyTo: assignerEmail, fromEmail: assignerEmail
       });
       debugLines.push("path=gmail-api-threaded", `sentThreadId=${(sent && sent.threadId) || "(unknown)"}`);
     } else {
       const options = { htmlBody: html, name: assignerName || "Jaro Web Pages Dashboard" };
       if(cc) options.cc = cc;
       if(assignerEmail) options.replyTo = assignerEmail;
+      if(assignerEmail) options.from = assignerEmail;
       if(attachments.length) options.attachments = attachments.map(a => Utilities.newBlob(Utilities.base64Decode(a.base64), a.mimeType, a.filename));
-      GmailApp.sendEmail(assigneeEmail, `Re: ${payload.subject||"Your request"}`, "This email requires HTML to view.", options);
+      sendGmailAppEmail_(assigneeEmail, `Re: ${payload.subject||"Your request"}`, options);
       debugLines.push("path=fresh-email-fallback (no Gmail Thread ID stored on this row)");
     }
   }catch(err){
