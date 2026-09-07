@@ -5611,16 +5611,22 @@ function perTargetStatusHtml_(row, editable){
   // silently folding back to two the moment the column gets tight.
   return `<div style="display:flex;align-items:center;gap:10px;white-space:nowrap">${parts.join("")}</div>`;
 }
+// The leading spacer below is exactly as wide as the "Program"/"Landing" label span
+// perTargetStatusHtml_ puts before ITS pills (see STATUS_LABEL_SPACER_HTML_) — without it, a
+// plain single-status row's pill starts flush against the cell edge while a combined-section row's
+// "Program" pill starts 52px+gap further right, so the whole Status column reads as two different
+// starting positions instead of one clean vertical line of pills.
+const STATUS_LABEL_SPACER_HTML_ = `<span style="width:52px;flex-shrink:0"></span>`;
 function requestStatusSelectHtml_(row){
   if((row["Section"]||"") === COMBINED_SECTION_LABEL) return perTargetStatusHtml_(row, true);
   const current = REQUEST_STATUS_OPTIONS.includes(row["Status"]) ? row["Status"] : "Not Started";
   const c = REQUEST_STATUS_COLORS[current] || REQUEST_STATUS_COLORS["Not Started"];
-  return `<select class="req-status-select" style="background:${c.bg};color:${c.fg};border:none;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer"
+  return `<div style="display:flex;align-items:center;gap:6px">${STATUS_LABEL_SPACER_HTML_}<select class="req-status-select" style="background:${c.bg};color:${c.fg};border:none;border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer"
       data-row="${row._sheetRow}" data-threadid="${esc(row["Gmail Thread ID"]||"")}" data-msgid="${esc(row["Gmail Message ID"]||"")}"
       data-email="${esc(row["Email"]||"")}" data-subject="${esc(row["Subject"]||"")}"
       data-to="${esc(row["To"]||"")}" data-cc="${esc(row["Cc"]||"")}" data-section="${esc(row["Section"]||"")}">
     ${REQUEST_STATUS_OPTIONS.map(s=>`<option value="${s}" ${s===current?"selected":""}>${s}</option>`).join("")}
-  </select>`;
+  </select></div>`;
 }
 // Read-only counterpart for Support — they can see their own requests' status, but changing it
 // (which fires a notification email + Gmail thread reply) is an Admin action. Same colors as the
@@ -5629,7 +5635,7 @@ function requestStatusBadgeHtml_(row){
   if((row["Section"]||"") === COMBINED_SECTION_LABEL) return perTargetStatusHtml_(row, false);
   const current = REQUEST_STATUS_OPTIONS.includes(row["Status"]) ? row["Status"] : "Not Started";
   const c = REQUEST_STATUS_COLORS[current] || REQUEST_STATUS_COLORS["Not Started"];
-  return `<span style="display:inline-block;background:${c.bg};color:${c.fg};border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700">${esc(current)}</span>`;
+  return `<div style="display:flex;align-items:center;gap:6px">${STATUS_LABEL_SPACER_HTML_}<span style="display:inline-block;background:${c.bg};color:${c.fg};border-radius:20px;padding:5px 10px;font-size:12px;font-weight:700">${esc(current)}</span></div>`;
 }
 // Superseded for combined-section rows by the two separate status controls above (perTargetStatusHtml_)
 // — kept only for whatever pre-existing "Status Applies To" data non-combined rows might carry.

@@ -1860,9 +1860,33 @@ University+Program (correctly not counted as a duplicate).
 
 ## Immediate next action
 
-Three things are sitting uncommitted right now — ask the user explicitly which they want pushed,
-rather than assuming all of them:
-1. This batch (`Code.gs`, backend) — needs redeploy before it's live.
-2. The Status column one-row fix (`index.html`, frontend-only) from just before this.
-3. The `PREFERRED_SEND_AS_EMAIL` universal-sender change (`Code.gs`, backend) — explicitly on hold
-   per the user ("No I'm not deploying this now"); do not assume this should ship alongside 1 or 2.
+All three items above were committed and pushed together as `336889f` on 2026-09-07, after the user
+redeployed `Code.gs` (which meant the on-hold `PREFERRED_SEND_AS_EMAIL` change shipped too — the user
+had redeployed the file containing it, taken as implicit go-ahead once explicitly flagged beforehand).
+
+## Correction: Status column alignment fix from earlier today was the wrong direction (2026-09-07)
+
+User clarified the "one row" ask from earlier today was a miscommunication on their end — what they
+actually wanted was every row's status pill(s) starting at the **same horizontal position**, so the
+whole Status column reads as one clean vertical line, not each row's pill(s) starting wherever that
+row's own content happens to put them. The earlier fix (Program/Landing side by side within one
+combined-section row) was correct and stays — the actual gap was that a plain single-status row
+(most sections) had no leading label, so its pill sat flush against the cell edge while a combined
+row's "Program" pill sat 52px+gap further right, meaning the column had two different starting
+positions depending on row type.
+
+**Fix**: `requestStatusSelectHtml_`/`requestStatusBadgeHtml_` (the single-status renderers) now
+prepend the exact same invisible 52px spacer `perTargetStatusHtml_` already puts before its
+"Program"/"Landing" text labels — new shared `STATUS_LABEL_SPACER_HTML_` constant, so both stay in
+sync if that label width ever changes. A single-status row's pill now starts at the identical x
+position as a combined row's "Program" pill.
+
+**Verification**: syntax-checked with `node --check`. Checked real pixel geometry in the browser (the
+same rigor as the earlier same-day correction, not just a screenshot) at a 1600px desktop width: a
+combined-section row's "Program" pill and a plain single-status row's pill both measured the exact
+same `left` coordinate.
+
+## Immediate next action
+
+Frontend-only — `index.html` resynced from `Unified Dashboard.txt` (copied wholesale, diff confirmed
+identical). Not yet committed/pushed — ask the user explicitly before running any git commands.
