@@ -1759,8 +1759,110 @@ happens.
 
 ## Immediate next action
 
-Backend-only change (`Code.gs`) — send the user the updated file with the standing instruction:
-paste into the Apps Script editor and redeploy. Nothing changes for anyone yet; this only becomes
-observable once someone verifies a "Send As" alias in tech@jaro.in's Gmail settings (a Gmail-account
-action, outside what this project's code can do). Not yet committed/pushed — ask the user explicitly
-before running any git commands.
+The self-healing per-actor sender fix above was committed and pushed as `f8e190f` on 2026-09-07.
+
+## lalit.rade@jaro.in as the universal preferred sender, not just per-actor (2026-09-07)
+
+User (over several turns) confirmed they wanted the automated script to *always* try sending as
+lalit.rade@jaro.in specifically — not just when Lalit himself is the one taking the action (which
+the previous fix already covered), but as the default for every email the system sends, so it reads
+as coming from him rather than the generic tech@jaro.in wherever possible. Along the way, also asked
+about two heavier alternatives — a Google Cloud service account with domain-wide delegation, and
+switching the whole deployment to "Execute as: User accessing the web app" — both of which were
+explained and explicitly **not** built: the former needs new service-account/JWT infrastructure this
+project doesn't have and still wouldn't cover the 2 external contractor addresses; the latter would
+reintroduce the Google OAuth consent-screen friction this project deliberately moved away from once
+already, and would likely break Sheet access for anyone without their own direct edit permission on
+the underlying sheets. User chose to stick with the simple verified-alias approach, scaled up.
+
+**What changed**: the two-tier "try the actor's own email, else tech@jaro.in" fallback (`f8e190f`)
+became a three-tier cascade — new `PREFERRED_SEND_AS_EMAIL` ("lalit.rade@jaro.in") constant, tried
+right after the specific actor's own address and right before the always-safe `SCRIPT_ACCOUNT_EMAIL`
+("tech@jaro.in", renamed from the old inline `"tech@jaro.in"` literal for clarity). The list is
+de-duped, so Lalit acting himself doesn't attempt his own address twice. Applied to both
+`sendGmailMessage_` (the primary Gmail API path) and the rarer `sendGmailAppEmail_` fallback (no
+Gmail Thread ID on record) identically. Net effect once lalit.rade@jaro.in is verified as a Send As
+alias: any request/reply/status-update/Loop In from someone whose own address *isn't* separately
+verified will read as coming from Lalit instead of the generic dashboard name — while someone whose
+own address *is* separately verified (say, if Jasmeet's gets added later) still sends as themselves,
+since their own address is still tried first.
+
+**Still true, unchanged**: this is still gated on the exact same one-time Gmail step described
+throughout this whole thread (verifying lalit.rade@jaro.in as a Send As alias on tech@jaro.in's
+Gmail — Settings > Accounts and Import > Send mail as) — nothing about today's change removes that
+requirement or works around it. Until that's done, every email still falls through to
+tech@jaro.in exactly as it does today; this batch only changes what happens *after* that one
+Gmail-side step, not whether it's needed.
+
+**Verification**: syntax-checked with `node --check`. Simulated the three-tier cascade standalone in
+Node against 5 scenarios: nothing verified with someone else acting (falls through all 3 tiers to
+tech@jaro.in), nothing verified with Lalit acting himself (correctly de-dupes to 2 attempts, not 3),
+only lalit.rade@jaro.in verified with someone else acting (their own attempt fails, correctly lands
+on Lalit's now-verified address — the core new behavior), both the actor's own address and Lalit's
+verified (the actor's own address still wins, confirming this is a fallback, not an override), and
+no `fromEmail` passed at all (still resolves safely, never breaks a call site that omits it).
+
+## Immediate next action
+
+The `PREFERRED_SEND_AS_EMAIL` change above is intentionally **on hold** — user said "No I'm not
+deploying this now" after seeing it, so `Code.gs` has this uncommitted change sitting locally.
+Several follow-up turns were spent giving a plain-language explanation of why tech@jaro.in sends
+every email regardless of dashboard login (the dashboard's own login and the script's Gmail-sending
+identity are two unrelated systems) — no further code changes came out of that, just clarification.
+
+## UI fix: combined-section Status column showed Program/Landing stacked instead of side by side (2026-09-07)
+
+User wanted the two status pills (Program Page / Landing Page) that a "Program Pages/Landing Pages"
+request shows in the Requirements Log to sit in one row instead of stacked on two lines.
+`perTargetStatusHtml_` (Unified Dashboard.txt) wrapped each target in its own block-level `<div>`
+with no shared parent controlling their layout, so they stacked by default. Wrapped both in one
+outer flex row instead.
+
+**Bug caught before shipping**: the first attempt added `flex-wrap:wrap` on that outer row as a
+defensive measure — but a browser-level check (not just eyeballing a screenshot) showed the two
+items were still stacking even at a full 1600px desktop width, because the outer wrap wasn't leaving
+enough room and kept folding back to two lines the moment the column got even slightly tight,
+defeating the entire point of the request. Root cause: this table already has its own horizontal-
+scroll safety net (`.table-wrap`, same as every other column with long content) — the `flex-wrap`
+was a redundant, actively counterproductive second safety net. Removed it (default `nowrap`) and
+tightened the gap slightly; the table cell now simply grows to fit both pills on one line, exactly
+like every other column already does, with `.table-wrap` handling anything that doesn't fit the
+viewport.
+
+**Verification**: syntax-checked with `node --check`. Checked actual pixel geometry in the browser
+(not just a screenshot) at both a cramped width (where the bug first showed up) and a real 1600px
+desktop width — confirmed both fixes: before the `flex-wrap` removal, "Program" and "Landing" sat at
+different `top` values (still stacked) even at 1600px; after removing it, both sit at the identical
+`top` value (genuinely one row), with the cell growing wider to fit rather than wrapping.
+
+## Immediate next action
+
+## Extended the duplicate-subject differentiation to Notification Log (2026-09-07)
+
+User asked whether the "(#2)"-style subject differentiation (built earlier for Requirements Log —
+see the 2026-09-07 entry above) also covered Notify broadcasts. It didn't — it was scoped to
+`handleSubmitRequest_` only. Extended the same rule to `handleSubmitNotification_`.
+
+**Refactor**: the duplicate-counting logic (same University+Program+Request Type+Section match
+against a sheet's existing rows) was inline in `handleSubmitRequest_`; pulled out into a shared
+`dedupedSubject_(sheet, payload, baseSubject)` used by both handlers now — same rule, same
+reasoning, just pointed at a different sheet (Requests vs. Notifications). Both handlers now fetch
+their sheet once, upfront, and reuse that same reference for both the dedup count and the later
+`appendRow` (previously `handleSubmitNotification_` fetched the Notifications sheet a second time,
+redundantly, after the email was already sent).
+
+**Verification**: syntax-checked with `node --check`. Confirmed `NOTIFICATIONS_HEADER` has the exact
+same 4 field names (`University`, `Program`, `Request Type`, `Section`) `dedupedSubject_` reads, so
+the shared function works unmodified against either sheet. Simulated against 4 scenarios mirroring
+the original Requests verification: a first-ever notification (subject unchanged), a 2nd/3rd
+notification for the same combo (correctly `(#2)`/`(#3)`), and a different Request Type on the same
+University+Program (correctly not counted as a duplicate).
+
+## Immediate next action
+
+Three things are sitting uncommitted right now — ask the user explicitly which they want pushed,
+rather than assuming all of them:
+1. This batch (`Code.gs`, backend) — needs redeploy before it's live.
+2. The Status column one-row fix (`index.html`, frontend-only) from just before this.
+3. The `PREFERRED_SEND_AS_EMAIL` universal-sender change (`Code.gs`, backend) — explicitly on hold
+   per the user ("No I'm not deploying this now"); do not assume this should ship alongside 1 or 2.

@@ -75,6 +75,19 @@ const QUICK_ACTION_ALLOWED_EMAILS = new Set([
   "ishaan.b@jaro.in",       // Ishaan
 ]);
 function isQuickActionAllowed_(email){ return QUICK_ACTION_ALLOWED_EMAILS.has((email||"").trim().toLowerCase()); }
+// The script's own native Google identity — matches the Apps Script project's "Execute as" setting
+// (Deploy > Manage deployments), so it can ALWAYS send as itself with zero Gmail verification
+// needed. Every outgoing email's sender-selection (see sendGmailMessage_/sendGmailAppEmail_) is
+// guaranteed to be able to fall back to this, however many other attempts fail — never remove it
+// as the final fallback tier, or a send can start hard-failing instead of degrading gracefully.
+const SCRIPT_ACCOUNT_EMAIL = "tech@jaro.in";
+// The address every outgoing email tries right after the specific person actually taking the
+// action (whose own address is tried first, if given) — by explicit request, so the dashboard
+// reads as coming from Lalit rather than the generic script account wherever possible. Only takes
+// effect once verified as a Send As alias on SCRIPT_ACCOUNT_EMAIL's Gmail (Settings > Accounts and
+// Import > Send mail as) — until then this is silently skipped in favor of SCRIPT_ACCOUNT_EMAIL,
+// exactly as before this constant existed.
+const PREFERRED_SEND_AS_EMAIL = "lalit.rade@jaro.in";
 function requireQuickActionAllowed_(token){
   const session = requireSession_(token);
   if(!isQuickActionAllowed_(session.Email)) throw new Error("Only specific team members can use Quick Actions.");
@@ -997,6 +1010,25 @@ function friendlyGmailError_(err){
   }
   return err;
 }
+// A second (or third...) request/notification for the exact same University+Program+Request
+// Type+Section combo would otherwise get a byte-for-byte identical email subject to the first one
+// — genuinely ambiguous to tell apart in an inbox, and risks Gmail's own conversation view visually
+// grouping two unrelated threads together. Counted against every existing row in `sheet` for this
+// combo (any Status, including a long-closed one — the ambiguity in an inbox doesn't go away just
+// because the earlier one is already done), and only appended when a duplicate actually exists, so
+// the common, non-duplicate case keeps the exact subject it always has. Shared by
+// handleSubmitRequest_ (Requests sheet) and handleSubmitNotification_ (Notifications sheet) — same
+// rule, same reasoning, different sheet.
+function dedupedSubject_(sheet, payload, baseSubject){
+  const norm = s => (s||"").toString().trim().toLowerCase();
+  const priorCount = sheetRowsAsObjects_(sheet).filter(r =>
+    norm(r["University"]) === norm(payload.university) &&
+    norm(r["Program"]) === norm(payload.program) &&
+    norm(r["Request Type"]) === norm(payload.type) &&
+    norm(r["Section"]) === norm(payload.section)
+  ).length;
+  return priorCount > 0 ? `${baseSubject} (#${priorCount + 1})` : baseSubject;
+}
 function handleSubmitRequest_(body){
   const session = requireSession_(body.token);
   const payload = body.payload || {};
@@ -1006,23 +1038,8 @@ function handleSubmitRequest_(body){
   // reply on this request — see sendGmailMessage_ below. That's what guarantees Gmail's own
   // exact-Subject-match requirement for threading is met, instead of two independently-encoded
   // Subject headers silently drifting apart and Gmail starting a new thread instead of replying.
-  let subject = payload.subject || "New Request";
   const sheet = getRequestsSheet_();
-  // A second (or third...) request for the exact same University+Program+Request Type+Section
-  // combo would otherwise get a byte-for-byte identical email subject to the first one — genuinely
-  // ambiguous to tell apart in an inbox, and risks Gmail's own conversation view visually grouping
-  // two unrelated requests together. Counted against every existing row for this combo (any
-  // Status, including a long-closed one — the ambiguity in an inbox doesn't go away just because
-  // the earlier request is already done), and only appended when a duplicate actually exists, so
-  // the common, non-duplicate case keeps the exact subject it always has.
-  const normForDup_ = s => (s||"").toString().trim().toLowerCase();
-  const priorRequestCount = sheetRowsAsObjects_(sheet).filter(r =>
-    normForDup_(r["University"]) === normForDup_(payload.university) &&
-    normForDup_(r["Program"]) === normForDup_(payload.program) &&
-    normForDup_(r["Request Type"]) === normForDup_(payload.type) &&
-    normForDup_(r["Section"]) === normForDup_(payload.section)
-  ).length;
-  if(priorRequestCount > 0) subject = `${subject} (#${priorRequestCount + 1})`;
+  const subject = dedupedSubject_(sheet, payload, payload.subject || "New Request");
   payload.subject = subject;
   // The requester's own address is never in payload.to by default — the dashboard's "Send To"
   // picker deliberately excludes whoever's currently logged in from the fixed recipients it
@@ -1095,7 +1112,8 @@ function handleSubmitNotification_(body){
   const payload = body.payload || {};
   payload.email = session.Email;
   payload.name = payload.name || session.Email;
-  const subject = payload.subject || "Program Notification";
+  const sheet = getOrCreateSheet_("Notifications", NOTIFICATIONS_HEADER);
+  const subject = dedupedSubject_(sheet, payload, payload.subject || "Program Notification");
   payload.subject = subject;
   // Resolved fresh from the Dashboard Users sheet each send, not a hardcoded list — stays correct
   // as Admins are added/removed, rather than silently going stale.
@@ -1122,7 +1140,6 @@ function handleSubmitNotification_(body){
     throw friendlyGmailApiError_(err);
   }
   uploadIds.forEach(deleteFormFile_);
-  const sheet = getOrCreateSheet_("Notifications", NOTIFICATIONS_HEADER);
   sheet.appendRow([
     new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
     payload.section||"", payload.name||"", payload.email||"", subject, payload.descriptionText||"",
@@ -1179,22 +1196,22 @@ function getOriginalThreadingHeaders_(messageId){
 // Builds a multipart/mixed message when there are any; otherwise the exact same plain text/html
 // message as before (unchanged for the common no-attachment case).
 function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, references, attachments, fromName, replyTo, fromEmail}){
-  // This script always runs as one fixed Google account (tech@jaro.in, as of the 2026-08
-  // ownership migration) — deliberately different from lalit.rade@jaro.in elsewhere in this file
-  // (setupAdmin(), SUPER_ADMIN_EMAILS) — those are about someone's role *within* the dashboard's
-  // own login system, unrelated to which Google account the script executes as.
-  // Gmail only ever lets a message truly originate from an address the SENDING ACCOUNT (tech@jaro.in)
-  // owns or has verified as a "Send As" alias (Gmail Settings > Accounts and Import > Send mail as)
-  // — no parameter on any Apps Script mail API (this one included) can override that; it's Gmail
-  // enforcing it on send, not a choice made here. So: try fromEmail (the real person taking this
-  // action) first; if that address isn't (yet) a verified alias, Gmail rejects the send and this
-  // catches that and retries once as tech@jaro.in — the exact same behavior this had before
-  // fromEmail existed. That fallback means shipping this is safe at any time: nothing here changes
-  // until someone actually verifies an alias, and the moment they do, sending as that person starts
-  // working with no further code change or redeploy. fromName/replyTo don't have this restriction
-  // (a display name and Reply-To aren't a real "from") — they're what carried "who this is really
-  // from" before fromEmail existed, and still apply on both the primary attempt and the fallback.
-  const defaultFromEmail = "tech@jaro.in";
+  // This script always runs as one fixed Google account (SCRIPT_ACCOUNT_EMAIL, tech@jaro.in as of
+  // the 2026-08 ownership migration) — deliberately different from lalit.rade@jaro.in elsewhere in
+  // this file (setupAdmin(), SUPER_ADMIN_EMAILS) — those are about someone's role *within* the
+  // dashboard's own login system, unrelated to which Google account the script executes as.
+  // Gmail only ever lets a message truly originate from an address the SENDING ACCOUNT owns or has
+  // verified as a "Send As" alias (Gmail Settings > Accounts and Import > Send mail as) — no
+  // parameter on any Apps Script mail API (this one included) can override that; it's Gmail
+  // enforcing it on send, not a choice made here. So this tries up to three senders in order: the
+  // real person taking this action (fromEmail) -> PREFERRED_SEND_AS_EMAIL, the address every send
+  // should default to once verified, by explicit request -> SCRIPT_ACCOUNT_EMAIL, which needs no
+  // verification at all (an account can always send as itself) and is therefore guaranteed to
+  // succeed, so this can never hard-fail purely because an alias isn't verified yet. That also
+  // means shipping this is safe at any time: nothing here changes until someone actually verifies
+  // an alias, and the moment they do, sending as that address starts working with no further code
+  // change or redeploy. fromName/replyTo don't have this restriction (a display name and Reply-To
+  // aren't a real "from") — they apply on every attempt, whichever one ends up succeeding.
   const displayName = (fromName || "Jaro Web Pages Dashboard").toString().replace(/["\r\n]/g, "");
   function buildRaw_(senderEmail){
     const baseHeaders = [
@@ -1233,31 +1250,41 @@ function sendGmailMessage_({threadId, to, cc, subject, htmlBody, inReplyTo, refe
     }
     return Utilities.base64EncodeWebSafe(rawMessage, Utilities.Charset.UTF_8);
   }
-  const primarySender = fromEmail || defaultFromEmail;
-  const resource = { raw: buildRaw_(primarySender) };
-  if(threadId) resource.threadId = threadId;
-  try{
-    return Gmail.Users.Messages.send(resource, "me");
-  }catch(err){
-    if(primarySender === defaultFromEmail) throw err; // already the fallback identity — nothing left to retry
-    const fallbackResource = { raw: buildRaw_(defaultFromEmail) };
-    if(threadId) fallbackResource.threadId = threadId;
-    return Gmail.Users.Messages.send(fallbackResource, "me");
+  // De-duped so e.g. Lalit performing the action himself (fromEmail already ===
+  // PREFERRED_SEND_AS_EMAIL) never attempts the exact same sender twice.
+  const attempts = [fromEmail, PREFERRED_SEND_AS_EMAIL, SCRIPT_ACCOUNT_EMAIL]
+    .filter(Boolean).filter((email, i, arr) => arr.indexOf(email) === i);
+  let lastErr;
+  for(const senderEmail of attempts){
+    const resource = { raw: buildRaw_(senderEmail) };
+    if(threadId) resource.threadId = threadId;
+    try{
+      return Gmail.Users.Messages.send(resource, "me");
+    }catch(err){ lastErr = err; }
   }
+  throw lastErr;
 }
-// Same self-healing "try the real sender, fall back to tech@jaro.in on any failure" idea as
-// sendGmailMessage_ above (see its comment for why this is safe to ship before any alias is
-// actually verified), for the rarer no-thread-on-record fallback path — GmailApp.sendEmail instead
-// of the raw Gmail API — used by applyStatusUpdate_/applyAssignment_/handleLoopInRecipients_.
+// Same self-healing three-tier sender cascade as sendGmailMessage_ above (see its comment for the
+// full reasoning), for the rarer no-thread-on-record fallback path — GmailApp.sendEmail instead of
+// the raw Gmail API — used by applyStatusUpdate_/applyAssignment_/handleLoopInRecipients_.
 function sendGmailAppEmail_(recipient, subject, options){
-  if(!options.from){ GmailApp.sendEmail(recipient, subject, "This email requires HTML to view.", options); return; }
-  try{
-    GmailApp.sendEmail(recipient, subject, "This email requires HTML to view.", options);
-  }catch(err){
-    const fallbackOptions = Object.assign({}, options);
-    delete fallbackOptions.from;
-    GmailApp.sendEmail(recipient, subject, "This email requires HTML to view.", fallbackOptions);
+  const attempts = [options.from, PREFERRED_SEND_AS_EMAIL, SCRIPT_ACCOUNT_EMAIL]
+    .filter(Boolean).filter((email, i, arr) => arr.indexOf(email) === i);
+  let lastErr;
+  for(const senderEmail of attempts){
+    const attemptOptions = Object.assign({}, options);
+    // Omitting `from` entirely (rather than setting it to SCRIPT_ACCOUNT_EMAIL explicitly) is what
+    // already worked before any of this per-sender logic existed — kept exactly that way for the
+    // guaranteed-safe final tier, rather than assuming GmailApp treats an explicit self-address the
+    // same as no override at all.
+    if(senderEmail === SCRIPT_ACCOUNT_EMAIL) delete attemptOptions.from;
+    else attemptOptions.from = senderEmail;
+    try{
+      GmailApp.sendEmail(recipient, subject, "This email requires HTML to view.", attemptOptions);
+      return;
+    }catch(err){ lastErr = err; }
   }
+  throw lastErr;
 }
 // MIME requires base64 attachment content wrapped at a fixed line length (76 chars is the
 // standard) — most clients tolerate one giant line but this keeps it spec-correct.
