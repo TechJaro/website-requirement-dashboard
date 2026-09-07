@@ -5557,11 +5557,11 @@ async function renderRequirementsGateOrTable(sec){
   input.addEventListener("keydown", e=>{ if(e.key === "Enter") submit(); });
   input.focus();
 }
-const REQUEST_STATUS_OPTIONS = ["Not Started","In Progress","At Risk","Delayed","On Hold","Completed","Terminated","Not Applicable"];
+const REQUEST_STATUS_OPTIONS = ["Not Started","In Progress","At Risk","Delayed","On Hold","Follow Up","Completed","Terminated","Not Applicable"];
 const REQUEST_STATUS_COLORS = {
   "Not Started":{bg:"var(--ink-35)",fg:"#fff"}, "In Progress":{bg:"var(--blue)",fg:"#fff"},
   "At Risk":{bg:"#8a6800",fg:"#fff"}, "Delayed":{bg:"var(--red)",fg:"#fff"},
-  "On Hold":{bg:"#6b46c1",fg:"#fff"},
+  "On Hold":{bg:"#6b46c1",fg:"#fff"}, "Follow Up":{bg:"#0aa5a0",fg:"#fff"},
   "Completed":{bg:"#1b9c58",fg:"#fff"}, "Terminated":{bg:"var(--black)",fg:"#fff"},
   "Not Applicable":{bg:"#eef0f3",fg:"var(--ink-50)"}
 };

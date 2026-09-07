@@ -1697,9 +1697,29 @@ unrelated Program (correctly not counted, subject unchanged), and a different Re
 same programme — e.g. "Content Change" vs "Brochure Change" (correctly treated as a different thing,
 not a duplicate). Not exercised against the live backend yet — needs redeploy.
 
+The subject-differentiation fix above was committed and pushed as `8d5777e` on 2026-09-07, after the
+user redeployed `Code.gs`.
+
+## New status option: "Follow Up" (2026-09-07)
+
+Added "Follow Up" to the Requirements Log status dropdown, between "On Hold" and "Completed" —
+`REQUEST_STATUS_OPTIONS`/`REQUEST_STATUS_COLORS` (Unified Dashboard.txt) are the single source of
+truth for every status control on this dashboard (the flat dropdown, the combined Program/Landing
+per-target dropdowns, the read-only Support badge, and the status-update email), so this one entry
+propagates everywhere with no other code changes — confirmed by grepping for any other hardcoded
+status list, and there is none. Gave it its own color (`#0aa5a0`, teal — already used elsewhere in
+this file's palette, not a new one-off hex) distinct from all 8 existing status colors. `Code.gs` has
+no hardcoded status whitelist (it just writes whatever string the client sends), so this needed no
+backend change or redeploy.
+
+**Verification**: syntax-checked with `node --check`. Tested in the browser: the flat status select
+lists all 9 options in the right order; both combined-section (Program Page/Landing Page) per-target
+selects list all 9 each; the read-only Support badge renders "Follow Up" with the correct teal color;
+and a row already carrying a stored Status of "Follow Up" correctly shows it pre-selected in the
+dropdown.
+
 ## Immediate next action
 
-Backend-only change (`Code.gs`) — send the user the updated file with the standing instruction:
-paste into the Apps Script editor and redeploy before the next request submission reflects this.
-No `index.html`/`Unified Dashboard.txt` changes this round. Not yet committed/pushed — ask the user
-explicitly before running any git commands.
+Frontend-only change — `index.html` resynced from `Unified Dashboard.txt` (copied wholesale, diff
+confirmed identical). Not yet committed/pushed — ask the user explicitly before running any git
+commands.
