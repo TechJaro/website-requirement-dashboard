@@ -1006,7 +1006,23 @@ function handleSubmitRequest_(body){
   // reply on this request — see sendGmailMessage_ below. That's what guarantees Gmail's own
   // exact-Subject-match requirement for threading is met, instead of two independently-encoded
   // Subject headers silently drifting apart and Gmail starting a new thread instead of replying.
-  const subject = payload.subject || "New Request";
+  let subject = payload.subject || "New Request";
+  const sheet = getRequestsSheet_();
+  // A second (or third...) request for the exact same University+Program+Request Type+Section
+  // combo would otherwise get a byte-for-byte identical email subject to the first one — genuinely
+  // ambiguous to tell apart in an inbox, and risks Gmail's own conversation view visually grouping
+  // two unrelated requests together. Counted against every existing row for this combo (any
+  // Status, including a long-closed one — the ambiguity in an inbox doesn't go away just because
+  // the earlier request is already done), and only appended when a duplicate actually exists, so
+  // the common, non-duplicate case keeps the exact subject it always has.
+  const normForDup_ = s => (s||"").toString().trim().toLowerCase();
+  const priorRequestCount = sheetRowsAsObjects_(sheet).filter(r =>
+    normForDup_(r["University"]) === normForDup_(payload.university) &&
+    normForDup_(r["Program"]) === normForDup_(payload.program) &&
+    normForDup_(r["Request Type"]) === normForDup_(payload.type) &&
+    normForDup_(r["Section"]) === normForDup_(payload.section)
+  ).length;
+  if(priorRequestCount > 0) subject = `${subject} (#${priorRequestCount + 1})`;
   payload.subject = subject;
   // The requester's own address is never in payload.to by default — the dashboard's "Send To"
   // picker deliberately excludes whoever's currently logged in from the fixed recipients it
@@ -1043,7 +1059,6 @@ function handleSubmitRequest_(body){
     throw friendlyGmailApiError_(err);
   }
   uploadIds.forEach(deleteFormFile_); // only after a confirmed send, so a failed send can be retried without re-uploading
-  const sheet = getRequestsSheet_();
   sheet.appendRow([
     new Date().toISOString(), payload.university||"", payload.program||"", payload.type||"", payload.priority||"",
     payload.name||"", payload.email||"", payload.team||"", payload.section||"", payload.link||"", subject,

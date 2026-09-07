@@ -1667,10 +1667,39 @@ re-testing the original Requests-by-Page search alongside it confirmed that one 
 "Requests — …" exactly as before (no regression from the shared-helper change). Confirmed the new
 section's `display` toggles correctly between an Admin and a Support session via `applyRoleGating_`.
 
+The Notification Activity feature above was committed and pushed as `1f9f3df` on 2026-09-05.
+
+## Real bug fixed: duplicate requests produced byte-identical email subjects (2026-09-07)
+
+User raised the concern: two separate requests for the exact same University+Program+Request Type
+(e.g. two "Brochure Change" requests for "IIT Delhi — Executive Programme in Brand Management")
+produced two emails with the *exact same subject line* — hard to tell apart in an inbox, and a risk
+that Gmail's own conversation view could visually group two genuinely unrelated requests together.
+Explicit constraint from the user: don't change the subject's existing format/pattern (it's "going
+perfect") — just make duplicates distinguishable. Asked which differentiator to use (a sequential
+number, a date stamp, or a short reference code); user chose the sequential number.
+
+**Fix** (`Code.gs`, `handleSubmitRequest_`): before building the email, counts existing rows in the
+Requests sheet matching the same University+Program+Request Type+Section (case/whitespace-insensitive
+— any Status, including long-closed ones, since the inbox ambiguity doesn't go away just because the
+earlier request is already done). Only when a prior match actually exists does it append `` (#N)``
+to the subject — the *first* time a given combo is requested, the subject is completely untouched,
+matching the user's "don't change what's working" constraint exactly. The (possibly-suffixed)
+subject is computed once and stored in the row's "Subject" column as always, so every later reply on
+that thread (status update, assignment, Loop In) naturally reuses the same disambiguated subject —
+no changes needed anywhere else, since those all already read the stored Subject rather than
+recomputing it.
+
+**Verification**: syntax-checked with `node --check`. Simulated the counting logic standalone in
+Node against 6 scenarios: no prior rows (subject unchanged), one prior match (→ "(#2)"), two prior
+matches (→ "(#3)"), a messy-case/whitespace variant of the same combo (still correctly matched), an
+unrelated Program (correctly not counted, subject unchanged), and a different Request Type for the
+same programme — e.g. "Content Change" vs "Brochure Change" (correctly treated as a different thing,
+not a duplicate). Not exercised against the live backend yet — needs redeploy.
+
 ## Immediate next action
 
-This Notification Activity feature is frontend-only (no `Code.gs` changes) — built and verified but
-**not yet committed or pushed**. Ask the user explicitly before running any git commands. `index.html`
-was resynced from `Unified Dashboard.txt` (copied wholesale, diff confirmed identical). Both the
-`C:\Users\user\Downloads\Website Requirement Dashboard` and `D:\JARO EDUCATION - LALIT\Website
-Requirement Dashboard` copies need this same sync — only the Downloads copy was edited this round.
+Backend-only change (`Code.gs`) — send the user the updated file with the standing instruction:
+paste into the Apps Script editor and redeploy before the next request submission reflects this.
+No `index.html`/`Unified Dashboard.txt` changes this round. Not yet committed/pushed — ask the user
+explicitly before running any git commands.
