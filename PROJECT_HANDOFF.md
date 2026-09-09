@@ -1912,9 +1912,45 @@ entries and does have the new Runtime Team entry; `QUICK_ACTION_ALLOWED_EMAILS` 
 exactly `[jasmeet.kaur@jaro.in, lalit.rade@jaro.in, runtime@jaro.in, ishaan.b@jaro.in]`, matching
 Code.gs's copy.
 
+The contact-cleanup batch above was committed and pushed as `6c1a968` on 2026-09-09, after the user
+redeployed `Code.gs`.
+
+## New feature: Remove User, needed to finish the contact cleanup above (2026-09-09)
+
+User caught that the contact cleanup didn't actually cover everything "everywhere" meant: Chirag and
+Sudesh still had real Dashboard Users accounts (one Active with a real last-login, per the user's own
+screenshot of the Users page) — a completely different, separate list from Contacts/Quick Actions
+(live rows in the "Dashboard Users" sheet, not a hardcoded array in either source file). There was no
+existing way to remove an account at all — the Users page only ever had Regenerate Password and
+Make Admin/Support, never a way to revoke someone's access entirely.
+
+**Backend** (`Code.gs`): new `handleRemoveUser_` (dispatch action `removeUser`), `requireSuperAdmin_`-
+gated like the other two account-management actions. Deletes the row from Dashboard Users outright
+(not just a status flip, unlike Regenerate Password) and invalidates any of that person's existing
+sessions, so a removed account can't keep using an already-issued token. Two guards beyond ownership:
+can't remove your own account (prevents an accidental self-lockout), and can't remove the Super
+Admin's own account this way (mirrors the existing guard on `handleSetUserRole_`). Doesn't touch
+anything that person already did — past requests/notifications stay under their name/email; only
+their ability to log in is removed.
+
+**Frontend** (`Unified Dashboard.txt`): new "Remove" button in `loadUsersTable_`, same
+Super-Admin-only/never-on-your-own-row gating as the other two buttons, with a confirm() dialog
+spelling out that it's permanent before anything happens (same pattern as Regenerate Password/Make
+Admin, but worded more explicitly given this one can't be undone from the UI).
+
+**Verification**: syntax-checked both files with `node --check`. Tested in the browser with mocked
+`listUsers`/`removeUser` responses: the Remove button appears for other accounts and is correctly
+hidden on the viewer's own row; clicking it shows the exact confirmation text, and confirming sends
+`{token, email}` to `removeUser` and shows the success toast. Simulated the backend guard logic
+standalone in Node against 4 cases: removing a normal account (succeeds), removing your own account
+(blocked), removing the other Super Admin's account (blocked), removing a nonexistent account
+(blocked with a clear error) — all correct.
+
 ## Immediate next action
 
-Both files changed. `Code.gs` needs the standard paste-into-Apps-Script-editor-and-redeploy before
-the Quick Actions allowlist change is live; `index.html` was resynced from `Unified Dashboard.txt`
-(copied wholesale, diff confirmed identical) and needs no redeploy. Not yet committed/pushed — ask
-the user explicitly before running any git commands.
+Backend + frontend both changed. `Code.gs` needs the standard paste-into-Apps-Script-editor-and-
+redeploy before Remove User works at all; `index.html` was resynced from `Unified Dashboard.txt`
+(copied wholesale, diff confirmed identical). Not yet committed/pushed. Once redeployed, the user
+still needs to actually click Remove on Chirag's and Sudesh's rows themselves (Super-Admin-gated
+in-app action — not something committing/pushing code can do on their behalf) to finish removing
+those two accounts specifically.

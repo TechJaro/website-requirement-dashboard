@@ -283,6 +283,7 @@ function dispatchAction_(body){
     case "addUser": return handleAddUser_(body);
     case "resetUserPassword": return handleResetUserPassword_(body);
     case "setUserRole": return handleSetUserRole_(body);
+    case "removeUser": return handleRemoveUser_(body);
     case "submitRequest": return handleSubmitRequest_(body);
     case "submitNotification": return handleSubmitNotification_(body);
     case "updateStatus": return handleUpdateStatus_(body);
@@ -873,6 +874,31 @@ function handleSetUserRole_(body){
   if(!user) throw new Error("That account doesn't exist.");
   const sheet = getOrCreateSheet_("Dashboard Users", USERS_HEADER);
   sheet.getRange(user._row, USERS_HEADER.indexOf("Role") + 1).setValue(role);
+  return { ok:true };
+}
+/* Super-Admin-only: permanently removes someone's dashboard account — deletes their row from
+   Dashboard Users entirely (not just a status flip, unlike Regenerate Password) and invalidates
+   any of their existing sessions, so a removed person can neither log back in nor keep using an
+   already-issued session token. Doesn't touch anything they've already done — past requests,
+   notifications, etc. stay exactly as they are under their name/email; only their access to the
+   dashboard itself is removed. */
+function handleRemoveUser_(body){
+  const session = requireSuperAdmin_(body.token);
+  const email = (body.email||"").trim().toLowerCase();
+  if(!email) throw new Error("Missing email.");
+  if(session.Email.toLowerCase() === email) throw new Error("You can't remove your own account.");
+  if(isSuperAdmin_(email)) throw new Error("The Super Admin's own account can't be removed here.");
+  const user = getUser_(email);
+  if(!user) throw new Error("That account doesn't exist.");
+  const sheet = getOrCreateSheet_("Dashboard Users", USERS_HEADER);
+  sheet.deleteRow(user._row);
+  const sessSheet = getOrCreateSheet_("Sessions", SESSIONS_HEADER);
+  const values = sessSheet.getDataRange().getValues();
+  const headers = values[0];
+  const emailCol = headers.indexOf("Email");
+  for(let i = values.length - 1; i >= 1; i--){
+    if((values[i][emailCol]||"").toString().toLowerCase() === email) sessSheet.deleteRow(i + 1);
+  }
   return { ok:true };
 }
 

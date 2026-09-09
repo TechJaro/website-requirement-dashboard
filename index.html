@@ -6692,10 +6692,12 @@ async function loadUsersTable_(){
     const r = await authApiCall_("listUsers", { token: AUTH_SESSION.token });
     const users = r.users || [];
     if(countEl) countEl.textContent = users.length ? `${users.length} ${users.length === 1 ? "person" : "people"} with access` : "No records";
-    // Regenerate Password and the role toggle are Super Admin only, for anyone else's account —
-    // never shown at all for a regular Admin's view, and never shown on the Super Admin's own row.
+    // Regenerate Password, the role toggle, and Remove are all Super Admin only, for anyone else's
+    // account — never shown at all for a regular Admin's view, and never shown on the Super
+    // Admin's own row (also enforced server-side in handleRemoveUser_/handleSetUserRole_, so this
+    // is belt-and-braces, not the only guard).
     wrap.innerHTML = `<div class="table-wrap"><table>
-      <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th></th><th></th></tr></thead>
+      <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Last Login</th><th></th><th></th><th></th></tr></thead>
       <tbody>${users.map(u=>{
         const isSelf = u.email.toLowerCase() === getCurrentUserEmail_().toLowerCase();
         const canManage = superAdmin && !isSelf;
@@ -6704,8 +6706,9 @@ async function loadUsersTable_(){
         <td>${esc(u.status)}</td><td class="cell-muted">${esc(u.lastLogin||"Never")}</td>
         <td>${canManage ? `<button class="btn reset-pw-btn" data-email="${esc(u.email)}" style="font-size:11.5px;padding:5px 10px">Regenerate Password</button>` : ""}</td>
         <td>${canManage ? `<button class="btn set-role-btn" data-email="${esc(u.email)}" data-role="${u.role === "Admin" ? "Support" : "Admin"}" style="font-size:11.5px;padding:5px 10px">Make ${u.role === "Admin" ? "Support" : "Admin"}</button>` : ""}</td>
+        <td>${canManage ? `<button class="btn remove-user-btn" data-email="${esc(u.email)}" style="font-size:11.5px;padding:5px 10px;color:var(--red);border-color:rgba(246,61,68,.35)">Remove</button>` : ""}</td>
       </tr>`;
-      }).join("") || `<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--ink-35)">No records for other members</td></tr>`}</tbody>
+      }).join("") || `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--ink-35)">No records for other members</td></tr>`}</tbody>
     </table></div>`;
     wrap.querySelectorAll(".reset-pw-btn").forEach(btn=>{
       btn.addEventListener("click", async ()=>{
@@ -6729,6 +6732,18 @@ async function loadUsersTable_(){
           toast(`${email} is now ${role === "Admin" ? "an Admin" : "a Support user"}`);
           loadUsersTable_();
         }catch(e){ toast(e.message, true); btn.disabled = false; btn.textContent = `Make ${role}`; }
+      });
+    });
+    wrap.querySelectorAll(".remove-user-btn").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const email = btn.dataset.email;
+        if(!confirm(`Permanently remove ${email}'s access to this dashboard? They won't be able to log in again — this can't be undone from here (they'd need to be re-added). Their past requests/notifications aren't affected.`)) return;
+        btn.disabled = true; btn.textContent = "Removing…";
+        try{
+          await authApiCall_("removeUser", { token: AUTH_SESSION.token, email });
+          toast(`${email} removed`);
+          loadUsersTable_();
+        }catch(e){ toast(e.message, true); btn.disabled = false; btn.textContent = "Remove"; }
       });
     });
   }catch(e){
