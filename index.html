@@ -3376,22 +3376,19 @@ const CONTACTS = [
   { name:"Nidhi Parikh", email:"nidhi.p@jaro.in" },
   { name:"Pankaj", email:"pankaj.g@jaro.in" },
   { name:"Jasmeet Kaur", email:"jasmeet.kaur@jaro.in" },
-  { name:"Omkar Sharma", email:"omkar17.runtime@gmail.com" },
   { name:"Pooja Yadav", email:"Pooja.yadav@jaro.in" },
-  { name:"Chirag Prajapati", email:"chirag@runtime-solutions.com" },
   { name:"Ishaan", email:"ishaan.b@jaro.in" },
   { name:"Tanmay Jain", email:"tanmay.j@jaro.in" },
   { name:"Aditya K", email:"aditya@runtime-solutions.com" },
   { name:"Anirban Chatterjee", email:"anirban@runtime-solutions.com" },
+  { name:"Runtime Team", email:"runtime@jaro.in" },
   { name:"Supriya Gade", email:"supriya.g@jaro.in" },
   { name:"Puja Mahimkar", email:"puja.m@jaro.in" },
   { name:"Rohan Kadam", email:"rohan.kadam@jaro.in" },
   { name:"Abhijeet Dinda", email:"abhijit.runtime@gmail.com" },
-  { name:"Sudesh Jadhav", email:"sudesh@runtime-solutions.com" },
   { name:"Durgesh Kekare", email:"durgesh.kekare@jaro.in" },
   { name:"Omkar Indapure", email:"omkar.i@jaro.in" },
   { name:"Adarsh Rai", email:"Adarsh.rai@jaro.in" },
-  { name:"Omkar Sharma", email:"runtimeomkar@gmail.com" },
   { name:"Rakesh Parab", email:"rakesh.p@jaro.in" },
   { name:"Jeel Shah", email:"jeel.s@jaro.in" },
   { name:"Tushar", email:"seo@jaro.in" }
@@ -4086,7 +4083,7 @@ function wireRichTextEditor(ids){
   }
   // ---- @mention autocomplete ----
   // Typing "@" at the start of a word — not preceded by a letter/digit, so typing an email address
-  // inline (e.g. "chirag@runtime-solutions.com") doesn't trigger this — opens a dropdown of
+  // inline (e.g. "runtime@jaro.in") doesn't trigger this — opens a dropdown of
   // matching Contacts. Picking one inserts a styled, non-editable mention chip in the text. Since a
   // mention in the body text alone wouldn't actually notify anyone, it also adds that person to
   // this editor's CC list, if one was wired in via cfg.ccPicker.
@@ -4541,8 +4538,7 @@ async function updateRequestStatus_({sheetRow, status, noteHtml, noteText, to, c
    note + attachment machinery as the status modal (openStatusNoteModal_), since the ask was for the
    same note/attach capability here too. Must match Code.gs's QUICK_ACTION_ALLOWED_EMAILS. */
 const QUICK_ACTION_ALLOWED_EMAILS = new Set([
-  "jasmeet.kaur@jaro.in", "lalit.rade@jaro.in", "sudesh@runtime-solutions.com",
-  "chirag@runtime-solutions.com", "runtimeomkar@gmail.com", "ishaan.b@jaro.in"
+  "jasmeet.kaur@jaro.in", "lalit.rade@jaro.in", "runtime@jaro.in", "ishaan.b@jaro.in"
 ]);
 let quickActionRTE = null;
 async function openQuickActionModal_(quickToken){

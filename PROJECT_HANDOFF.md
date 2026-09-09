@@ -1886,7 +1886,35 @@ same rigor as the earlier same-day correction, not just a screenshot) at a 1600p
 combined-section row's "Program" pill and a plain single-status row's pill both measured the exact
 same `left` coordinate.
 
+The Status column spacer-alignment fix above was committed and pushed as `5e6a57c` on 2026-09-07.
+
+## Contact cleanup: removed 3 external contractor addresses, added runtime@jaro.in (2026-09-09)
+
+User asked to remove Sudesh Jadhav, Chirag Prajapati, and Omkar Sharma's individual addresses
+(`sudesh@runtime-solutions.com`, `chirag@runtime-solutions.com`, `runtimeomkar@gmail.com`) from
+everywhere they could be picked or granted access — suggestions and Quick Actions alike — and
+replace them with one shared `runtime@jaro.in` address. Omkar had two separate Contacts entries
+under different emails (`runtimeomkar@gmail.com` and an older `omkar17.runtime@gmail.com`); removed
+both, since the intent was clearly the person, not just the one address named.
+
+**Four locations updated, all of them**: `CONTACTS` (Unified Dashboard.txt — the To/Cc chip-picker
+and @mention suggestions) had all 4 entries removed and one new `{name:"Runtime Team",
+email:"runtime@jaro.in"}` added; `QUICK_ACTION_ALLOWED_EMAILS` in **both** Code.gs and Unified
+Dashboard.txt (these two copies must always match — see the comment on each) dropped the 3 removed
+people and added `runtime@jaro.in`, leaving Jasmeet, Lalit, Ishaan, and now Runtime Team as the
+allowlist. Also swapped a stale illustrative email in an unrelated code comment (about @mention
+trigger behavior) that happened to use Chirag's address as its example.
+
+**Verification**: syntax-checked both files with `node --check`. Grepped both files fresh for all 3
+removed emails, the old Omkar duplicate, and each person's name — zero remaining matches anywhere.
+Loaded the dashboard in the browser and confirmed live: `CONTACTS` has no trace of the 4 removed
+entries and does have the new Runtime Team entry; `QUICK_ACTION_ALLOWED_EMAILS` (client-side) reads
+exactly `[jasmeet.kaur@jaro.in, lalit.rade@jaro.in, runtime@jaro.in, ishaan.b@jaro.in]`, matching
+Code.gs's copy.
+
 ## Immediate next action
 
-Frontend-only — `index.html` resynced from `Unified Dashboard.txt` (copied wholesale, diff confirmed
-identical). Not yet committed/pushed — ask the user explicitly before running any git commands.
+Both files changed. `Code.gs` needs the standard paste-into-Apps-Script-editor-and-redeploy before
+the Quick Actions allowlist change is live; `index.html` was resynced from `Unified Dashboard.txt`
+(copied wholesale, diff confirmed identical) and needs no redeploy. Not yet committed/pushed — ask
+the user explicitly before running any git commands.

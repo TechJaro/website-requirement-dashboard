@@ -69,9 +69,7 @@ const QUICK_ACTION_STATUSES = ["Completed"];
 const QUICK_ACTION_ALLOWED_EMAILS = new Set([
   "jasmeet.kaur@jaro.in",   // Jasmeet Kaur
   "lalit.rade@jaro.in",     // Lalit Sanjiv Rade
-  "sudesh@runtime-solutions.com", // Sudesh Jadhav
-  "chirag@runtime-solutions.com", // Chirag Prajapati
-  "runtimeomkar@gmail.com", // Omkar Sharma
+  "runtime@jaro.in",        // Runtime Team
   "ishaan.b@jaro.in",       // Ishaan
 ]);
 function isQuickActionAllowed_(email){ return QUICK_ACTION_ALLOWED_EMAILS.has((email||"").trim().toLowerCase()); }
