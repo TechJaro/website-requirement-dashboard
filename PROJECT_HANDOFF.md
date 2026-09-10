@@ -1948,9 +1948,64 @@ standalone in Node against 4 cases: removing a normal account (succeeds), removi
 
 ## Immediate next action
 
-Backend + frontend both changed. `Code.gs` needs the standard paste-into-Apps-Script-editor-and-
-redeploy before Remove User works at all; `index.html` was resynced from `Unified Dashboard.txt`
-(copied wholesale, diff confirmed identical). Not yet committed/pushed. Once redeployed, the user
-still needs to actually click Remove on Chirag's and Sudesh's rows themselves (Super-Admin-gated
-in-app action — not something committing/pushing code can do on their behalf) to finish removing
-those two accounts specifically.
+The Remove User feature above was committed and pushed as `5b810f6` on 2026-09-09, after the user
+redeployed `Code.gs`.
+
+## Added CHRIST (Deemed to be University) logo; fixed @mention for anyone not already a saved Contact (2026-09-10)
+
+Two unrelated things in one request. Frontend-only — no `Code.gs` changes.
+
+**New university logo**: user attached CHRIST's official "Online" lockup (saved locally at
+`ONLINE_LOGO.png` and siblings in Downloads, ~Sep 10 12:16-12:18). That file is a wide horizontal
+lockup (crest + wordmark + "Online" tag, 6000x3375) — way too wide to read once scaled into the
+small square `.ic-badge` (22x22, `object-fit:contain`) this dashboard uses for university icons
+elsewhere (e.g. the "What's Trending" strip). Used Python/Pillow to programmatically find the exact
+bounding box of the circular crest on the left (avoiding a hand-eyeballed crop), cropped it out with
+a small padding margin, and resized to 80x80 to match the existing entries' scale (checked one
+existing entry's PNG header to confirm). Added as a new `"christ"` key in `UNIVERSITY_LOGO_DATA`
+(Unified Dashboard.txt) plus a matching entry in `UNIVERSITY_LOGO_ALIASES` (`["christ", "christ
+university", "christ deemed to be university"]`) — `normUniName`/`containsPhrase` strip punctuation
+and match whole word-sequences, so this correctly matches the sheet's actual stored value "CHRIST
+(Deemed to be University)".
+
+Both this insertion and the earlier huge existing `UNIVERSITY_LOGO_DATA`/`_ALIASES` blocks are too
+large to safely hand-edit through string-match-based tooling — a raw non-breaking-space character
+buried in the pre-existing `@mention` regex (see below) silently broke several edit attempts before
+being caught. Used direct Python line-index-based insertion instead (reads the file, inserts new
+lines at a known index, writes back) for both this and the @mention fix, specifically to avoid that
+whole class of invisible-character mismatch.
+
+**Real bug fixed: @mention only worked for people already in Contacts**: typing `@` followed by an
+existing contact's name (e.g. "@Meghna") worked fine, but typing `@` followed by a full email address
+for someone NOT already saved (e.g. "@pooja.shetty@jaro.in") just sat there as plain unstyled text
+forever - never became a real mention, and the person was never added to CC. Root cause, in
+`wireRichTextEditor`'s mention-detection handler: it found the mention's starting "@" via
+`text.lastIndexOf("@")` - which breaks the instant the typed query itself contains another "@" (any
+email address does), since `lastIndexOf` then jumps to that SECOND "@" and a separate check
+correctly-but-unhelpfully treats that as "mid-word, not a mention" and closes the dropdown for good.
+Separately, even if the boundary parsing were fixed, there was no fallback for a query that matches
+nobody in Contacts - it just hid the dropdown with nothing to click, unlike the To/Cc chip-picker
+field, which already offers to add a typed-but-unlisted email directly.
+
+Fixed both: the boundary now finds the whole word currently being typed (`text.match(/\S*$/)[0]`),
+so an email's internal "@" no longer truncates the query. And when nothing in Contacts matches but
+the typed text is already a complete, validly-shaped email, the dropdown now offers "Add
+"<address>"" - clicking it inserts a real mention chip using that typed address, same as picking a
+saved contact. That validity check (`isValidEmailStr_`) was factored out of the chip-picker (which
+already had its own private copy of the exact same regex) into one shared top-level function, so
+both places agree on what counts as "a real enough email address."
+
+**Verification**: syntax-checked with `node --check`. Cropped-logo quality checked visually
+(rendered the intermediate crop before embedding it) and confirmed `findUniversityLogo("CHRIST
+(Deemed to be University)")` returns the right data URI in the browser. For the mention fix, tested
+end-to-end in the browser by literally reproducing the user's reported scenario: typing
+"@pooja.shetty@jaro.in" (not a saved contact) now shows the free-text "Add" option and inserts a
+correctly-styled mention chip on selection; typing "@Meghna" (an existing contact) still resolves
+exactly as before (no regression); and typing both mentions in sequence in one message - the user's
+exact screenshot scenario - produced two correctly-styled chips, `@pooja.shetty@jaro.in` and
+`@Meghna`, matching what the "working" half of their screenshot already showed for Meghna.
+
+## Immediate next action
+
+Frontend-only. `index.html` resynced from `Unified Dashboard.txt` (copied wholesale, diff confirmed
+identical). Not yet committed/pushed - ask the user explicitly before running any git commands.
